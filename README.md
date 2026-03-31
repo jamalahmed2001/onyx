@@ -8,7 +8,7 @@ Local agent orchestration engine that executes AI-driven development phases in y
 
 1. **Clone and install**
    ```bash
-   git clone https://github.com/openclaw/groundzeroOS-starter
+   git clone https://github.com/jamalahmed2001/groundzeroOS-starter
    cd groundzeroOS-starter
    npm install
    # builds automatically via postinstall
@@ -191,10 +191,26 @@ Every agent task receives the Repo Context as the first item in its system promp
 |---|---|
 | `gzos doctor` | Pre-flight checks: vault path, API keys, agent driver, Linear config. Prints exact fix commands for anything missing. |
 | `gzos init "Name"` | Interactive project init. Prompts for repo path, auto-scans stack, creates full vault bundle. |
+| `gzos plan "<project>"` | Generate phases from an Overview note + atomise tasks. All-in-one: backlog → tasks → phase-ready. |
+| `gzos plan "<project>" <n>` | Atomise a single phase by number only. |
+| `gzos plan "<project>" --extend` | Add new phases to an in-progress project from an updated Overview. |
 | `gzos run` | Main loop. Picks next phase-ready phase, locks it, spawns agent, runs to completion, uplinks. |
-| `gzos heal` | Vault maintenance: healer + graph maintainer + consolidator. Safe to run at any time. |
+| `gzos run --project <name>` | Run only phases for a specific project. |
+| `gzos run --phase <n>` | Execute a specific phase number only (auto-implies --once). |
+| `gzos run --dry-run` | Preview what would run without executing anything. |
+| `gzos run --once` | Single iteration then exit. |
 | `gzos status` | Shows all projects, their current phase, and phase status (active / ready / blocked / completed). |
+| `gzos heal` | Vault maintenance: healer + graph maintainer + consolidator. Safe to run at any time. |
+| `gzos reset "<project>"` | Reset a blocked or stuck phase back to phase-ready. |
 | `gzos import <id>` | Imports a project from a Linear project ID. Creates full vault bundle from Linear epics and issues. |
+| `gzos logs [project]` | Show execution log for a project or phase. |
+| `gzos research <topic>` | Run a research step and write findings to the vault. |
+| `gzos consolidate` | Manually trigger vault consolidation (archive completed phases, merge docs). |
+| `gzos refresh-context "<project>"` | Re-scan the repo and update the Repo Context note. |
+| `gzos linear-uplink "<project>"` | Sync vault phases to Linear issues. |
+| `gzos daily-plan [date]` | Write a time-blocked daily plan to the vault (uses LLM). |
+| `gzos capture "<text>"` | Quick-capture a note to the vault Inbox. |
+| `gzos dashboard [port]` | Launch the web dashboard (default port 7070). |
 
 ---
 
@@ -228,13 +244,20 @@ AGENT_DRIVER=claude-code
   "llm": {
     "model": "anthropic/claude-sonnet-4-6"
   },
-  "projects_glob": "01 - Projects/**",
+  "projects_glob": "{01 - Projects/**,02 - Areas/**}",
+  "notify": {
+    "stdout": true
+  }
+}
+```
+
+To enable Linear:
+```json
+{
   "linear": {
     "enabled": true,
-    "teamId": "your-team-id"
-  },
-  "notify": {
-    "whatsapp": true
+    "api_key": "lin_api_...",
+    "team_id": "your-team-id"
   }
 }
 ```
@@ -247,23 +270,31 @@ Any [OpenRouter](https://openrouter.ai/models) model works. Change it in config 
 
 GroundZeroOS supports two agent drivers:
 
-**Claude Code** (default)
+**Claude Code** (default, recommended)
 ```env
 AGENT_DRIVER=claude-code
 ```
 Requires the `claude` CLI. Install:
 ```bash
 npm install -g @anthropic-ai/claude-code
+claude login   # authenticate once
 ```
-Claude Code runs non-interactively with `--print` mode. Full file system access within the repo path.
+Runs non-interactively via `--print` mode. Full file system access scoped to the repo path. Works headlessly — no desktop app required.
 
 **Cursor**
 ```env
 AGENT_DRIVER=cursor
 ```
-Opens a Cursor session with the task context pre-loaded. Better for tasks that benefit from interactive review before committing.
+Requires the **Cursor desktop app** and its shell command to be installed:
+1. Download and install [Cursor](https://cursor.sh)
+2. Open Cursor → **Cursor menu → Install Shell Command**
+3. Verify: `cursor --version`
 
-To switch drivers: update `.env` or `groundzero.config.json`. You can override per-project in the project's config block.
+Cursor runs headlessly via `cursor agent --print --yolo`. It uses your existing Cursor account and model settings — no extra API key needed.
+
+> **Note:** The Cursor CLI (`cursor` in your PATH) is what GroundZeroOS calls — not the desktop app directly. Step 2 above is required, not optional.
+
+To switch drivers: update `agent_driver` in `groundzero.config.json`. You can run `gzos doctor` to confirm the selected driver is available.
 
 ---
 

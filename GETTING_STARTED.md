@@ -16,21 +16,52 @@ The vault is the source of truth. Every project, every phase, every task, every 
 
 | Requirement | Why |
 |---|---|
-| [Obsidian](https://obsidian.md) | Where your projects live |
+| [Obsidian](https://obsidian.md) | Where your projects live — the vault is the source of truth |
 | [Node.js 18+](https://nodejs.org) | Runs gzos |
-| [Claude Code CLI](https://claude.ai/code) | Default agent driver |
-| [OpenRouter API key](https://openrouter.ai) | LLM calls for atomising and planning |
+| [OpenRouter API key](https://openrouter.ai) | LLM calls for planning and atomising phases |
+| **One of the agent drivers below** | Executes tasks in your repo |
+
+### Agent driver — pick one
+
+**Claude Code** (recommended)
+
+```bash
+npm install -g @anthropic-ai/claude-code
+claude login
+```
+
+Runs headlessly. No desktop app needed. Uses your `claude login` session — no extra API key required.
+
+**Cursor** (alternative)
+
+1. Download and install [Cursor](https://cursor.sh)
+2. Open Cursor → **Cursor menu → Install Shell Command**
+3. Confirm: `cursor --version`
+
+The **shell command** (step 2) is mandatory — GroundZeroOS calls `cursor` in your terminal PATH. Installing the desktop app alone is not enough.
+
+Set your chosen driver in `groundzero.config.json`:
+```json
+{ "agent_driver": "claude-code" }
+```
+or
+```json
+{ "agent_driver": "cursor" }
+```
+
+Run `gzos doctor` at any point to confirm the selected driver is found.
+
+---
 
 Optional:
-- **Cursor** — alternative agent driver (more interactive)
-- **Linear API key** — if you want to import projects from Linear
+- **Linear API key** — to import projects from Linear (`gzos import <id>`)
 
 ---
 
 ## 2. Installation
 
 ```bash
-git clone https://github.com/openclaw/groundzeroOS-starter
+git clone https://github.com/jamalahmed2001/groundzeroOS-starter
 cd groundzeroOS-starter
 npm install
 ```
@@ -248,27 +279,52 @@ Maintenance
 
 ## 9. Commands
 
+**Planning**
+
 | Command | What it does |
 |---|---|
-| `gzos doctor` | Pre-flight checks. Run this first. |
-| `gzos init "Name"` | Create a new project bundle interactively. |
-| `gzos run` | Main loop — heal, discover, execute, log. |
-| `gzos run --project <name>` | Run only phases for a specific project. |
-| `gzos run --dry-run` | Preview what would run without executing. |
-| `gzos run --once` | Single iteration then exit (use with cron). |
-| `gzos status` | All projects and phase states (with task progress). |
-| `gzos heal` | Fix stale locks, broken links, graph drift. |
-| `gzos plan` | Generate a time-blocked daily plan from your vault context. |
-| `gzos import <id>` | Import a Linear project as a vault bundle. |
-| `gzos reset [phase]` | Reset a blocked phase to phase-ready. |
-| `gzos atomise <project>` | Generate phases from an Overview note. |
-| `gzos logs [phase]` | Show execution log for a phase by name or number. |
-| `gzos logs --recent` | Show the most recently modified log. |
-| `gzos refresh-context <proj>` | Re-scan repo and update Repo Context note. |
-| `gzos linear-uplink <proj>` | Sync vault phases to Linear issues. |
-| `vault-viewer.html` | Open in Chrome/Edge to browse vault in browser. |
+| `gzos plan "<project>"` | Scan Overview → generate phases → atomise tasks → set phase-ready. All in one. |
+| `gzos plan "<project>" <n>` | Atomise a single phase number only. |
+| `gzos plan "<project>" --extend` | Add new phases to an in-progress project from an updated Overview. |
+| `gzos daily-plan [date]` | Write a time-blocked daily plan to the vault (LLM-assisted). |
 
-**Cross-project knowledge** is stored at `08 - System/Cross-Project Knowledge.md` in your vault. After each phase completes, the consolidator automatically extracts broadly-applicable learnings (patterns, pitfalls, architectural decisions) and appends them here. Future phases across all projects can benefit from them.
+**Execution**
+
+| Command | What it does |
+|---|---|
+| `gzos run` | Main loop — heal, discover, execute, log. |
+| `gzos run --project <name>` | Scope execution to one project. |
+| `gzos run --phase <n>` | Execute a specific phase number (auto-implies --once). |
+| `gzos run --dry-run` | Preview what would run without executing. |
+| `gzos run --once` | Single iteration then exit (good for cron). |
+
+**Monitoring**
+
+| Command | What it does |
+|---|---|
+| `gzos status` | All projects and phase states with task progress. |
+| `gzos logs [project]` | Show execution log for a project or phase. |
+
+**Maintenance**
+
+| Command | What it does |
+|---|---|
+| `gzos doctor` | Pre-flight checks. Run this first, and whenever something feels wrong. |
+| `gzos heal` | Fix stale locks, broken links, graph drift. Safe to run any time. |
+| `gzos reset "<project>"` | Reset a blocked or stuck phase back to phase-ready. |
+| `gzos refresh-context "<proj>"` | Re-scan the repo and update the Repo Context note. |
+| `gzos consolidate` | Manually trigger vault consolidation. |
+
+**Other**
+
+| Command | What it does |
+|---|---|
+| `gzos init "Name"` | Create a new project bundle interactively. |
+| `gzos import <id>` | Import a Linear project as a vault bundle. |
+| `gzos linear-uplink "<proj>"` | Sync vault phases to Linear issues. |
+| `gzos research <topic>` | Run a research step and write findings to vault. |
+| `gzos capture "<text>"` | Quick-capture a note to the vault Inbox. |
+| `gzos dashboard [port]` | Launch the web dashboard (default: port 7070). |
 
 ---
 
