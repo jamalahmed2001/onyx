@@ -1,0 +1,221 @@
+// gzos doctor — pre-flight checks
+// Validates everything needed before first run.
+// No config required to run — that's the point.
+
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+import { readRawFile } from '../vault/reader.js';
+import { loadConfig } from '../config/load.js';
+
+interface Check {
+  label: string;
+  pass: boolean;
+  warn?: boolean; // non-blocking issue
+  fix?: string;
+}
+
+function which(binary: string): boolean {
+  try {
+    execSync(`which ${binary}`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function runDoctor(): Promise<void> {
+  const checks: Check[] = [];
+  const cwd = process.cwd();
+  const configPath = path.join(cwd, 'groundzero.config.json');
+
+  // Load .env + config early so env vars are populated for the checks below
+  try { loadConfig(); } catch { /* ignore — we'll surface missing fields as failed checks */ }
+
+  // 1. Config file
+  const configExists = fs.existsSync(configPath);
+  checks.push({
+    label: 'groundzero.config.json found',
+    pass: configExists,
+    fix: 'Copy the template: cp groundzero.config.json.example groundzero.config.json',
+  });
+
+  let vaultRoot: string | undefined;
+  let agentDriver = 'claude-code';
+
+  if (configExists) {
+    try {
+      const raw = JSON.parse(readRawFile(configPath) ?? '{}') as Record<string, unknown>;
+      vaultRoot = (raw['vault_root'] ?? raw['vaultRoot']) as string | undefined;
+      agentDriver = String(raw['agent_driver'] ?? raw['agentDriver'] ?? 'claude-code');
+    } catch {
+      checks.push({ label: 'groundzero.config.json is valid JSON', pass: false, fix: 'Check for syntax errors in groundzero.config.json' });
+    }
+  }
+
+  // 2. .env file (optional but helpful)
+  const envExists = fs.existsSync(path.join(cwd, '.env'));
+  checks.push({
+    label: '.env file found',
+    pass: envExists,
+    fix: 'cp .env.example .env  then fill in your keys',
+  });
+
+  // 3. vault_root set
+  const envVaultRoot = process.env['GROUNDZERO_VAULT_ROOT'];
+  const resolvedVaultRoot = envVaultRoot ?? vaultRoot;
+  checks.push({
+    label: 'vault_root is configured',
+    pass: Boolean(resolvedVaultRoot),
+    fix: 'Set vault_root in groundzero.config.json, or GROUNDZERO_VAULT_ROOT in .env',
+  });
+
+  // 4. vault_root exists on disk
+  if (resolvedVaultRoot) {
+    const vaultExists = fs.existsSync(resolvedVaultRoot);
+    checks.push({
+      label: `Vault directory exists (${resolvedVaultRoot})`,
+      pass: vaultExists,
+      fix: `Create the directory or update vault_root: mkdir -p "${resolvedVaultRoot}"`,
+    });
+
+    // 4b. vault write access
+    if (vaultExists) {
+      let writeOk = false;
+      try {
+        const testPath = path.join(resolvedVaultRoot, '.gzos-write-test');
+        fs.writeFileSync(testPath, 'ok');
+        fs.unlinkSync(testPath);
+        writeOk = true;
+      } catch {
+        writeOk = false;
+      }
+      checks.push({
+        label: 'Vault write access',
+        pass: writeOk,
+        fix: `Cannot write to vault root. Check permissions: ls -la "${resolvedVaultRoot}"`,
+      });
+    }
+  }
+
+  // 5. OPENROUTER_API_KEY set
+  const apiKey = process.env['OPENROUTER_API_KEY'] ?? process.env['ANTHROPIC_API_KEY'];
+  checks.push({
+    label: 'OPENROUTER_API_KEY set',
+    pass: Boolean(apiKey),
+    fix: 'Add OPENROUTER_API_KEY=sk-or-... to your .env file',
+  });
+
+  // 5b. Test OpenRouter API key validity
+  if (apiKey) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: { 'Authorization': `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) {
+        checks.push({ label: 'OpenRouter API key is valid', pass: true });
+      } else {
+        checks.push({
+          label: `OpenRouter API key rejected (${res.status})`,
+          pass: false,
+          fix: 'Check your OPENROUTER_API_KEY at https://openrouter.ai/keys',
+        });
+      }
+    } catch {
+      checks.push({
+        label: 'OpenRouter API reachability check timed out',
+        pass: true,
+        warn: true,
+        fix: 'Key may still be valid — check network connectivity',
+      });
+    }
+  }
+
+  // 6. Agent binary + auth
+  if (agentDriver === 'cursor') {
+    const cursorFound = which('cursor');
+    checks.push({
+      label: 'cursor binary found in PATH',
+      pass: cursorFound,
+      fix: 'Install Cursor from https://cursor.sh and ensure CLI is in PATH',
+    });
+    if (cursorFound) {
+      checks.push({
+        label: 'Cursor auth (session login used automatically)',
+        pass: true,
+        warn: true,
+        fix: 'If agent calls fail, open Cursor and sign in to your account first',
+      });
+    }
+  } else {
+    const claudeFound = which('claude');
+    checks.push({
+      label: 'claude binary found in PATH',
+      pass: claudeFound,
+      fix: 'Install Claude Code: npm install -g @anthropic-ai/claude-code',
+    });
+    if (claudeFound) {
+      // Session auth: ~/.claude/ credentials OR ANTHROPIC_API_KEY
+      const hasApiKey = Boolean(process.env['ANTHROPIC_API_KEY']);
+      const sessionDir = path.join(process.env['HOME'] ?? '~', '.claude');
+      const hasSession = fs.existsSync(sessionDir) &&
+        fs.readdirSync(sessionDir).some(f => f.includes('credentials') || f.includes('auth') || f.endsWith('.json'));
+      const authed = hasApiKey || hasSession;
+      checks.push({
+        label: 'Claude Code authenticated (session or API key)',
+        pass: authed,
+        warn: !authed,
+        fix: 'Run: claude login  — or set ANTHROPIC_API_KEY in .env',
+      });
+    }
+  }
+
+  // 7. Node version >= 18 (for native fetch)
+  const nodeVer = process.versions.node.split('.').map(Number);
+  const nodeFine = (nodeVer[0] ?? 0) >= 18;
+  checks.push({
+    label: `Node.js >= 18 (found ${process.versions.node})`,
+    pass: nodeFine,
+    fix: 'Upgrade Node.js: https://nodejs.org',
+  });
+
+  // 8. Dependencies installed
+  const nodeModulesExists = fs.existsSync(path.join(cwd, 'node_modules', 'fast-glob'));
+  checks.push({
+    label: 'Dependencies installed (node_modules)',
+    pass: nodeModulesExists,
+    fix: 'Run: npm install',
+  });
+
+  // 9. Built (dist exists)
+  const distExists = fs.existsSync(path.join(cwd, 'dist', 'cli', 'gzos.js'));
+  checks.push({
+    label: 'Built (dist/cli/gzos.js exists)',
+    pass: distExists,
+    fix: 'Run: npm run build',
+  });
+
+  // Print results
+  console.log('\ngzos doctor\n');
+  let allPass = true;
+  for (const check of checks) {
+    const icon = check.pass ? (check.warn ? '⚠' : '✓') : '✗';
+    console.log(`  ${icon}  ${check.label}`);
+    if (!check.pass && !check.warn) {
+      allPass = false;
+      if (check.fix) console.log(`       Fix: ${check.fix}`);
+    } else if (check.warn && check.fix) {
+      console.log(`       Note: ${check.fix}`);
+    }
+  }
+
+  if (allPass) {
+    console.log('\n  All checks passed. Ready to run:\n');
+    console.log('    gzos init "My Project"');
+    console.log('    gzos run\n');
+  } else {
+    console.log('\n  Fix the issues above, then run: gzos doctor\n');
+    process.exit(1);
+  }
+}

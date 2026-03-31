@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.env
+*.DS_Store
+._*
+.groundzero-locks/
+.groundzero-checkpoints/
+.groundzero-cursor-sessions/
+.gzos-backups/
+*.jsonl
+
+# Dashboard build artifacts
+dashboard/.next/
+dashboard/node_modules/
+dashboard/tsconfig.tsbuildinfo
+
+# Vault viewer cache / generated
+vault-viewer.html
+
+# Skills node_modules
+skills/**/node_modules/

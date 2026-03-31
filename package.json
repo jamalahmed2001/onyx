@@ -1,0 +1,38 @@
+{
+  "name": "groundzero-os",
+  "version": "0.1.0",
+  "description": "GroundZeroOS — vault-native agent orchestration. Start a vault, run agents, maintain everything.",
+  "type": "module",
+  "bin": {
+    "gzos": "./dist/cli/gzos.js"
+  },
+  "files": [
+    "dist/",
+    "vault/",
+    "skills/",
+    "config/",
+    "src/",
+    "groundzero.config.json",
+    ".env.example",
+    "CLAUDE.md",
+    "README.md",
+    "GETTING_STARTED.md",
+    "tsconfig.json",
+    "vault-viewer.html"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "postbuild": "node -e \"const fs=require('fs');const f='dist/cli/gzos.js';if(fs.existsSync(f)){const c=fs.readFileSync(f,'utf8');if(!c.startsWith('#!/'))fs.writeFileSync(f,'#!/usr/bin/env node\\n'+c);}\"",
+    "dev": "tsc --watch",
+    "postinstall": "npm run build",
+    "gzos": "node dist/cli/gzos.js"
+  },
+  "dependencies": {
+    "fast-glob": "^3.3.2",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

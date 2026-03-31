@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+:root {
+  /* ── Base ───────────────────────────────────────────────────────────── */
+  --bg:   #07090f;
+  --bg-1: #0b0f1a;
+  --bg-2: #111827;
+  --bg-3: #1a2236;
+
+  /* ── Glass ──────────────────────────────────────────────────────────── */
+  --glass:      rgba(255,255,255,0.028);
+  --glass-hi:   rgba(255,255,255,0.055);
+  --glass-b:    rgba(255,255,255,0.07);
+  --glass-b-hi: rgba(255,255,255,0.14);
+
+  /* ── Legacy border aliases ──────────────────────────────────────────── */
+  --border:    rgba(255,255,255,0.07);
+  --border-hi: rgba(255,255,255,0.14);
+
+  /* ── Text ───────────────────────────────────────────────────────────── */
+  --text:       #bbc8d8;
+  --text-str:   #e8f0f9;
+  --text-dim:   #6e8099;
+  --text-faint: #364457;
+
+  /* ── Accent ─────────────────────────────────────────────────────────── */
+  --accent:    #4d9cf8;
+  --accent-hi: #79b8ff;
+
+  /* ── Status ─────────────────────────────────────────────────────────── */
+  --active:   #4d9cf8;
+  --ready:    #2ec866;
+  --blocked:  #f5524a;
+  --done:     #3de072;
+  --planning: #9898a8;
+  --backlog:  #2d3d52;
+
+  /* ── Radius ─────────────────────────────────────────────────────────── */
+  --r:    10px;
+  --r-sm: 6px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse 70% 55% at 15% 0%,  rgba(77,156,248,0.055) 0%, transparent 65%),
+    radial-gradient(ellipse 45% 40% at 85% 100%, rgba(46,200,102,0.032) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 35% at 50% 50%,  rgba(77,156,248,0.012) 0%, transparent 70%);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbars ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.09); border-radius: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Keyframes ───────────────────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  50%       { opacity: 1;    transform: scale(1.25); }
+}
+@keyframes slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes slide-up {
+  from { transform: translateY(10px) scale(0.985); opacity: 0; }
+  to   { transform: translateY(0)    scale(1);     opacity: 1; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.spin  { animation: spin 1s linear infinite; }
+.pulse { animation: pulse-dot 2.4s ease-in-out infinite; }
+
+/* ── Diff lines ──────────────────────────────────────────────────────────── */
+.diff-add  { color: #3de072; background: rgba(61,224,114,0.06); }
+.diff-del  { color: #f5524a; background: rgba(245,82,74,0.07); }
+.diff-hunk { color: #6e8099; background: rgba(77,156,248,0.06); }
+.diff-ctx  { color: #4a5c70; }
