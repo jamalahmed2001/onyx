@@ -3,14 +3,36 @@ import { chatCompletion } from './client.js';
 import { spawnClaudeCode } from '../agents/claudeCodeSpawn.js';
 
 /**
+ * Planning always gets the heavy model tier.
+ *
+ * Decomposing a codebase into phases and atomising tasks into concrete steps
+ * is the hardest cognitive work in the pipeline — it requires understanding
+ * architecture, existing patterns, and making sound decomposition decisions.
+ * This is worth the best model available.
+ *
+ * Execution uses tier-based routing (light/standard/heavy per task complexity)
+ * because each task has a detailed spec to follow and a cheaper model suffices.
+ */
+function planningModel(config: ControllerConfig): string {
+  // Explicit planning_model in config wins
+  if (config.modelTiers?.['planning' as keyof typeof config.modelTiers]) {
+    return config.modelTiers['planning' as keyof typeof config.modelTiers] as string;
+  }
+  // Otherwise use heavy tier — planning is always a high-complexity call
+  return config.modelTiers?.heavy ?? 'anthropic/claude-opus-4-6';
+}
+
+/**
  * Route a planning LLM call to the best available model:
  *
  *   claude-code + valid repoPath → spawnClaudeCode with --add-dir
  *     The agent has live filesystem access and can read, grep, and explore
  *     the repo before writing the plan. Far better than a static file tree.
+ *     Uses the heavy model tier (Opus by default).
  *
  *   otherwise → chatCompletion (OpenRouter)
  *     Falls back to direct API call with the file tree embedded in the prompt.
+ *     Also uses the heavy model tier.
  */
 export async function planningCall(opts: {
   config: ControllerConfig;
@@ -20,14 +42,16 @@ export async function planningCall(opts: {
   maxTokens?: number;
 }): Promise<string> {
   const { config, repoPath, systemPrompt, userPrompt, maxTokens } = opts;
+  const model = planningModel(config);
 
   if (config.agentDriver === 'claude-code' && repoPath) {
+    // Strip vendor prefix for the Claude CLI (expects bare model IDs)
     const result = await spawnClaudeCode({
       prompt: userPrompt,
       repoPath,
       systemPrompt,
-      timeoutMs: 120_000, // planning is fast — 2 min ceiling
-      model: config.llm.model,
+      timeoutMs: 180_000, // planning reads files + reasons — 3 min ceiling
+      model,
     });
     if (!result.success) {
       throw new Error(`Planning agent failed: ${result.error ?? result.output.slice(0, 300)}`);
@@ -35,15 +59,15 @@ export async function planningCall(opts: {
     return result.output;
   }
 
-  // Fallback: direct OpenRouter call
+  // Fallback: direct OpenRouter call with the heavy model
   const apiKey = config.llm.apiKey ?? process.env['OPENROUTER_API_KEY'];
   if (!apiKey) throw new Error('planningCall: no API key — set OPENROUTER_API_KEY');
 
   return chatCompletion({
-    model: config.llm.model,
+    model,
     apiKey,
     baseUrl: config.llm.baseUrl,
-    maxTokens: maxTokens ?? 3000,
+    maxTokens: maxTokens ?? 4000, // heavier model, more budget for richer plans
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },

@@ -8,7 +8,8 @@
     "model": "anthropic/claude-sonnet-4-6"
   },
   "model_tiers": {
-    "_comment": "Tasks are auto-classified light/standard/heavy based on risk + complexity. Maps to model below.",
+    "_comment": "planning = phase decomposition + task atomisation (always uses the best model). light/standard/heavy = execution tiers, auto-classified per task.",
+    "planning": "anthropic/claude-opus-4-6",
     "light": "anthropic/claude-haiku-4-5-20251001",
     "standard": "anthropic/claude-sonnet-4-6",
     "heavy": "anthropic/claude-opus-4-6"
