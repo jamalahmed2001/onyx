@@ -4,6 +4,7 @@ import { readBundle } from '../vault/reader.js';
 import { getProject, getProjectIssues, type LinearIssue } from './client.js';
 import { notify } from '../notify/notify.js';
 import { writeFile } from '../vault/writer.js';
+import { findExistingPhaseByLinearId, mergeLinearIntoPhase } from './merge.js';
 import matter from 'gray-matter';
 import path from 'path';
 import fs from 'fs';
@@ -25,9 +26,11 @@ function phaseNoteContent(
 ): string {
   const logName = `L${phaseNumber} - P${phaseNumber} - ${phaseName}`;
   return `---
+project_id: "${projectName}"
 project: "${projectName}"
 phase_number: ${phaseNumber}
 phase_name: "${phaseName}"
+linear_issue_id: "${linearId}"
 linear_identifier: "${linearId}"
 status: backlog
 locked_by: ""
@@ -100,6 +103,7 @@ export async function importLinearProject(
 
   // Overview
   writeFile(path.join(bundleDir, `${project.name} - Overview.md`), `---
+project_id: "${project.name}"
 project: "${project.name}"
 linear_project_id: "${linearProjectId}"
 type: overview
@@ -194,21 +198,11 @@ _(empty)_
   for (const issue of issues) {
     const phaseName = issue.title;
 
-    // Deduplication: skip if a phase with this linear_identifier already exists
-    const existingPhases = fs.existsSync(phasesDir)
-      ? fs.readdirSync(phasesDir).map(f => path.join(phasesDir, f))
-      : [];
-
-    const duplicate = existingPhases.find(f => {
-      try {
-        const raw = fs.readFileSync(f, 'utf-8');
-        const fm = matter(raw).data as Record<string, unknown>;
-        return fm['linear_identifier'] === issue.identifier;
-      } catch { return false; }
-    });
-
-    if (duplicate) {
-      console.log(`  [skip] Already imported: ${issue.title}`);
+    // Idempotent: if a phase with this linear_issue_id/linear_identifier already exists, merge and continue
+    const existingPath = findExistingPhaseByLinearId(phasesDir, issue.identifier);
+    if (existingPath) {
+      mergeLinearIntoPhase(existingPath, issue.title, issue.description ?? '', issue.identifier);
+      console.log(`  [updated] ${issue.title}`);
       phaseNumber++;
       continue;
     }

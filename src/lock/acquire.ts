@@ -1,44 +1,69 @@
+import os from 'os';
 import { readPhaseNode } from '../vault/reader.js';
-import { setLockFields, setPhaseTag } from '../vault/writer.js';
+import { setLockFields, setPhaseTag, writeFrontmatter } from '../vault/writer.js';
+import { appendAuditEvent } from '../audit/trail.js';
+import type { PhaseTag } from '../fsm/states.js';
 
 export type LockResult =
   | { ok: true; runId: string }
   | { ok: false; reason: 'already_locked'; lockedBy: string; lockedAt: string }
   | { ok: false; reason: 'not_ready'; currentTag: string };
 
+const DEFAULT_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
 // Attempt to acquire vault-native lock on a phase note.
 // 1. Read frontmatter
-// 2. If locked_by is set and !== runId → return already_locked
+// 2. If locked_by is set and !== runId → check TTL expiry; if expired, clear and re-acquire
 // 3. If locked_by === runId → return ok (re-entrant)
-// 4. If phase-ready → write phase-active + locked_by + locked_at
+// 4. If phase-ready → write phase-active + locked_by + locked_at + lock_pid + lock_hostname + lock_ttl_ms
 // 5. Read back to verify (race condition check)
-export function acquireLock(phaseNotePath: string, runId: string): LockResult {
+export function acquireLock(
+  phaseNotePath: string,
+  runId: string,
+  vaultRoot?: string,
+  ttlMs: number = DEFAULT_TTL_MS,
+): LockResult {
   const node = readPhaseNode(phaseNotePath);
-
-  if (!node.exists) {
-    return { ok: false, reason: 'not_ready', currentTag: 'missing' };
-  }
+  if (!node.exists) return { ok: false, reason: 'not_ready', currentTag: 'missing' };
 
   const existingLockedBy = node.frontmatter['locked_by'];
   if (typeof existingLockedBy === 'string' && existingLockedBy !== '') {
-    if (existingLockedBy === runId) {
-      // Re-entrant: we already hold the lock
-      return { ok: true, runId };
+    if (existingLockedBy === runId) return { ok: true, runId };
+
+    // Check TTL
+    const lockedAt  = node.frontmatter['locked_at'];
+    const lockTtl   = Number(node.frontmatter['lock_ttl_ms'] ?? DEFAULT_TTL_MS);
+    const elapsed   = lockedAt ? Date.now() - new Date(String(lockedAt)).getTime() : 0;
+
+    if (elapsed > lockTtl) {
+      // TTL expired — auto-clear
+      setPhaseTag(phaseNotePath, 'phase-ready');
+      setLockFields(phaseNotePath, '', '');
+      if (vaultRoot) {
+        appendAuditEvent(vaultRoot, {
+          ts: new Date().toISOString(),
+          event: 'lock_expired',
+          phaseNotePath,
+          projectId: String(node.frontmatter['project_id'] ?? node.frontmatter['project'] ?? ''),
+          detail: `Lock held by ${existingLockedBy} expired after ${Math.round(elapsed / 60000)}min`,
+        });
+      }
+      // fall through to acquire below
+    } else {
+      return {
+        ok: false,
+        reason: 'already_locked',
+        lockedBy: existingLockedBy,
+        lockedAt: String(lockedAt ?? ''),
+      };
     }
-    // Someone else holds it
-    return {
-      ok: false,
-      reason: 'already_locked',
-      lockedBy: existingLockedBy,
-      lockedAt: String(node.frontmatter['locked_at'] ?? ''),
-    };
   }
 
   // Check the phase is in a lockable state (ready or active with no lock)
-  const tags = node.frontmatter['tags'];
-  const status = node.frontmatter['status'];
+  const tags    = node.frontmatter['tags'];
+  const status  = node.frontmatter['status'];
   const tagList: string[] = Array.isArray(tags) ? (tags as string[]) : typeof tags === 'string' ? [tags] : [];
-  const hasReadyTag = tagList.includes('phase-ready') || status === 'ready';
+  const hasReadyTag  = tagList.includes('phase-ready')  || status === 'ready';
   const hasActiveTag = tagList.includes('phase-active') || status === 'active';
 
   if (!hasReadyTag && !hasActiveTag) {
@@ -51,18 +76,40 @@ export function acquireLock(phaseNotePath: string, runId: string): LockResult {
   setPhaseTag(phaseNotePath, 'phase-active');
   setLockFields(phaseNotePath, runId, lockedAt);
 
+  // Write extended lock metadata (pid, hostname, ttl)
+  const fresh = readPhaseNode(phaseNotePath);
+  writeFrontmatter(phaseNotePath, {
+    ...fresh.frontmatter,
+    lock_pid:      process.pid,
+    lock_hostname: os.hostname(),
+    lock_ttl_ms:   ttlMs,
+  });
+
   // Read back to verify we won the race
   const verified = readPhaseNode(phaseNotePath);
-  const verifiedLockedBy = verified.frontmatter['locked_by'];
-
-  if (verifiedLockedBy !== runId) {
+  if (verified.frontmatter['locked_by'] !== runId) {
     return {
       ok: false,
       reason: 'already_locked',
-      lockedBy: String(verifiedLockedBy ?? ''),
+      lockedBy: String(verified.frontmatter['locked_by'] ?? ''),
       lockedAt: String(verified.frontmatter['locked_at'] ?? ''),
     };
   }
 
+  if (vaultRoot) {
+    appendAuditEvent(vaultRoot, {
+      ts:            new Date().toISOString(),
+      event:         'lock_acquired',
+      phaseNotePath,
+      projectId:     String(fresh.frontmatter['project_id'] ?? fresh.frontmatter['project'] ?? ''),
+      runId,
+      pid:           process.pid,
+      hostname:      os.hostname(),
+    });
+  }
+
   return { ok: true, runId };
 }
+
+// Re-export PhaseTag to satisfy any consumers that imported it from here
+export type { PhaseTag };

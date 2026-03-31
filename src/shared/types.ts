@@ -2,6 +2,17 @@
 // Both CLI and dashboard import from here — this is the single source of truth.
 
 // ---------------------------------------------------------------------------
+// Schema validation
+// ---------------------------------------------------------------------------
+
+export interface SchemaViolation {
+  path:     string;
+  noteType: 'phase' | 'overview' | 'hub' | 'kanban' | 'log';
+  errors:   string[];
+  warnings: string[];
+}
+
+// ---------------------------------------------------------------------------
 // FSM
 // ---------------------------------------------------------------------------
 
@@ -88,13 +99,25 @@ export type LogEventType =
   | 'atomise_started' | 'atomise_done'
   | 'replan_started' | 'replan_done' | 'replan_failed'
   | 'linear_import_done' | 'linear_uplink_done'
-  | 'consolidate_done';
+  | 'consolidate_done'
+  | 'schema_violation' | 'lock_expired' | 'lock_force_cleared' | 'phase_started';
 
 export interface LogEntry {
   runId: string;
   event: LogEventType;
   detail?: string;
   filesChanged?: string[];
+}
+
+export interface AuditEvent {
+  ts:             string;
+  event:          LogEventType;
+  phaseNotePath?: string;
+  projectId?:     string;
+  runId?:         string;
+  pid?:           number;
+  hostname?:      string;
+  detail?:        string;
 }
 
 // ---------------------------------------------------------------------------
@@ -178,9 +201,20 @@ export interface ControllerConfig {
   };
   notify: {
     stdout: boolean;
+
+    // Legacy/simple WhatsApp channel (CallMeBot).
     whatsapp?: {
       apiUrl: string;
       recipient: string;
+    };
+
+    // OpenClaw Gateway channel.
+    // Uses the local `openclaw` CLI (no SDK dependency) to send a message.
+    openclaw?: {
+      target: string;          // E.164, e.g. "+4477..."
+      channel?: string;        // optional override, usually omit
+      profile?: string;        // optional, maps to `openclaw --profile <name>`
+      accountId?: string;      // optional, maps to `--account <id>` if supported by CLI
     };
   };
 }

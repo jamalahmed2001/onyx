@@ -34,16 +34,23 @@ export async function uplinkPhasesToLinear(
 
     const phaseName = String(phase.frontmatter['phase_name'] ?? 'Unnamed Phase');
     const phaseContent = phase.content;
-    const existingIdentifier = phase.frontmatter['linear_identifier'];
+    const linearIssueId = String(
+      phase.frontmatter['linear_issue_id'] ??
+      phase.frontmatter['linear_identifier'] ??
+      ''
+    );
 
     try {
-      if (typeof existingIdentifier === 'string' && existingIdentifier !== '') {
+      if (linearIssueId !== '') {
         // Update existing issue
-        await updateIssue(apiKey, existingIdentifier, {
+        await updateIssue(apiKey, linearIssueId, {
           title: phaseName,
           description: phaseContent,
           teamId,
         });
+        // Write back canonical field
+        const updatedFm = { ...phase.frontmatter, linear_issue_id: linearIssueId };
+        writeFrontmatter(phase.path, updatedFm);
         updated++;
       } else {
         // Create new issue
@@ -54,8 +61,8 @@ export async function uplinkPhasesToLinear(
           projectId: bundle.projectId,
         });
 
-        // Write linear_identifier back to frontmatter
-        const updatedFm = { ...phase.frontmatter, linear_identifier: issueId };
+        // Write linear_issue_id and linear_identifier back to frontmatter
+        const updatedFm = { ...phase.frontmatter, linear_issue_id: issueId, linear_identifier: issueId };
         writeFrontmatter(phase.path, updatedFm);
         created++;
       }
@@ -63,7 +70,7 @@ export async function uplinkPhasesToLinear(
       appendToLog(phase.path, {
         runId: 'uplink',
         event: 'linear_uplink_done',
-        detail: `${existingIdentifier ? 'Updated' : 'Created'} Linear issue`,
+        detail: `${linearIssueId ? 'Updated' : 'Created'} Linear issue`,
       });
     } catch (err) {
       // Log but don't throw — partial uplink is acceptable

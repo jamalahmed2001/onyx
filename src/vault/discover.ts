@@ -1,8 +1,13 @@
 import glob from 'fast-glob';
 import path from 'path';
 import type { PhaseNode } from '../shared/types.js';
+import type { SchemaViolation } from '../shared/types.js';
 import { readPhaseNode } from './reader.js';
 import { stateFromFrontmatter } from '../shared/vault-parse.js';
+import { validatePhaseFrontmatter } from '../shared/schemas.js';
+
+const _lastViolations: SchemaViolation[] = [];
+export function getLastDiscoveryViolations(): SchemaViolation[] { return [..._lastViolations]; }
 
 // Parse a dependency token to a phase number.
 // Handles numeric 1, string "1", and "P1"/"P2" shorthand.
@@ -68,13 +73,28 @@ function isPhaseNote(node: PhaseNode): boolean {
 }
 
 function discoverPhaseNodes(vaultRoot: string, projectsGlob: string): PhaseNode[] {
+  _lastViolations.length = 0;
   const pattern = `${projectsGlob}/Phases/*.md`;
   const files = glob.sync(pattern, {
     cwd: vaultRoot,
     absolute: false,
     followSymbolicLinks: false,
   });
-  return files.map(f => readPhaseNode(path.join(vaultRoot, f)));
+
+  // validate each node — skip hard-invalid notes
+  const nodes: PhaseNode[] = [];
+  for (const f of files) {
+    const node = readPhaseNode(path.join(vaultRoot, f));
+    if (!node.exists) continue;
+    const vr = validatePhaseFrontmatter(node.frontmatter);
+    if (!vr.valid) {
+      _lastViolations.push({ path: node.path, noteType: 'phase', errors: vr.errors, warnings: vr.warnings });
+      console.warn(`[gzos] schema warning — skipping ${path.basename(node.path)}: ${vr.errors.join(', ')}`);
+      continue;
+    }
+    nodes.push(node);
+  }
+  return nodes;
 }
 
 // Scan vault for phase notes tagged phase-ready.
@@ -86,13 +106,11 @@ export function discoverReadyPhases(vaultRoot: string, projectsGlob: string): Ph
   return readyPhases
     .filter(phase => {
       // Collect all phases for the same project for dependency resolution
-      const projectId = String(phase.frontmatter['project'] ?? '');
+      const projectId = String(phase.frontmatter['project_id'] ?? phase.frontmatter['project'] ?? '');
       const bundleDir = path.dirname(path.dirname(phase.path));
-      const projectPhases = allPhases.filter(p => {
-        const pProj = String(p.frontmatter['project'] ?? '');
-        const pBundle = path.dirname(path.dirname(p.path));
-        return pProj === projectId || pBundle === bundleDir;
-      });
+      const projectPhases = projectId
+        ? allPhases.filter(p => String(p.frontmatter['project_id'] ?? p.frontmatter['project'] ?? '') === projectId)
+        : allPhases.filter(p => path.dirname(path.dirname(p.path)) === bundleDir);
       return dependenciesMet(phase, projectPhases);
     })
     .sort((a, b) => {

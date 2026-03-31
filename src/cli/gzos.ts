@@ -1,20 +1,8 @@
 #!/usr/bin/env node
-// gzos — GroundZeroOS CLI
+// gzos — GroundZeroOS CLI (commander-based)
 //
 // Consistent arg pattern: gzos <verb> [project] [--flags]
 // Global flags: --json (machine-readable output), --verbose/-v
-//
-// ── CORE ─────────────────────────────────────────────────────────────────────
-//   gzos plan <project> [n] [--extend]   Plan phases / atomise tasks
-//   gzos run  [project] [--phase n]      Execute (auto-implies --once with --phase)
-//   gzos status [project] [--json]       Show state
-//
-// ── MAINTENANCE ──────────────────────────────────────────────────────────────
-//   gzos heal [--json]                   Fix vault drift, stale locks
-//   gzos doctor [--json]                 Pre-flight checks
-//   gzos reset <project> [--phase n]     Unstick a phase → ready
-//   gzos set-state <path> <state>        Programmatic state change
-//   gzos logs [project]                  Show execution log
 
 import { runInit } from './init.js';
 import { runDoctor } from './doctor.js';
@@ -45,6 +33,7 @@ import { stateFromFrontmatter } from '../shared/vault-parse.js';
 import { setPhaseTag } from '../vault/writer.js';
 import { readPhaseNode } from '../vault/reader.js';
 import { normalizeTag, toTag } from '../fsm/states.js';
+import { Command } from 'commander';
 import path from 'path';
 
 // Format task progress from shared countTasks
@@ -87,86 +76,91 @@ function renderPhaseLine(phase: ReturnType<typeof discoverAllPhases>[number], in
   }
 }
 
-// Filter out global flags before dispatching
-const rawArgs = process.argv.slice(2);
-const globalFlags = new Set(['--verbose', '-v', '--json']);
-const filteredArgs = rawArgs.filter(a => !globalFlags.has(a));
-if (rawArgs.includes('--verbose') || rawArgs.includes('-v')) setVerbose(true);
-const jsonMode = rawArgs.includes('--json');
+const program = new Command();
+program
+  .name('gzos')
+  .description('GroundZeroOS — vault-native AI agent orchestration')
+  .version('0.1.0')
+  .option('-v, --verbose', 'debug logging')
+  .option('--json', 'machine-readable output');
 
-const [command = '', ...args] = filteredArgs;
+program.hook('preAction', () => {
+  const opts = program.opts<{ verbose?: boolean; json?: boolean }>();
+  if (opts.verbose) setVerbose(true);
+});
 
-switch (command) {
-  // ── init ──────────────────────────────────────────────────────────────────
-  case 'init': {
-    await runInit(args[0]);
-    break;
-  }
+// Helper to get global json flag inside actions
+function isJson(): boolean {
+  return !!program.opts<{ json?: boolean }>().json;
+}
 
-  // ── dashboard ─────────────────────────────────────────────────────────────
-  case 'dashboard': {
+// ── init ──────────────────────────────────────────────────────────────────
+program
+  .command('init [name]')
+  .description('Create a new project bundle')
+  .action(async (name) => { await runInit(name); });
+
+// ── dashboard ─────────────────────────────────────────────────────────────
+program
+  .command('dashboard [port]')
+  .description('Launch web dashboard (default port 7070)')
+  .action(async (port) => {
     const { execSync: execDash } = await import('child_process');
     const dashDir = new URL('../../dashboard', import.meta.url).pathname;
-    const port = args[0] ?? '7070';
-    console.log(`[gzos] Dashboard → http://localhost:${port}`);
-    try { execDash(`npm run dev -- --port ${port}`, { cwd: dashDir, stdio: 'inherit' }); } catch { /* killed */ }
-    break;
-  }
+    const dashPort = port ?? '7070';
+    console.log(`[gzos] Dashboard → http://localhost:${dashPort}`);
+    try { execDash(`npm run dev -- --port ${dashPort}`, { cwd: dashDir, stdio: 'inherit' }); } catch { /* killed */ }
+  });
 
-  // ── doctor ────────────────────────────────────────────────────────────────
-  case 'doctor': {
-    await runDoctor();
-    break;
-  }
+// ── doctor ────────────────────────────────────────────────────────────────
+program
+  .command('doctor')
+  .description('Pre-flight checks')
+  .action(async () => { await runDoctor(); });
 
-  // ── run ───────────────────────────────────────────────────────────────────
-  case 'run': {
+// ── run ───────────────────────────────────────────────────────────────────
+program
+  .command('run [project]')
+  .description('Execute ready phases')
+  .option('--project <name>', 'filter by project')
+  .option('--phase <n>', 'execute a specific phase number', (v) => parseInt(v, 10))
+  .option('--dry-run', 'preview without running agents')
+  .option('--once', 'single iteration then exit')
+  .action(async (positionalProject, opts) => {
     const config = loadConfig();
-    const dryRun = args.includes('--dry-run');
-    let once = args.includes('--once');
-
-    // Project filter: --project <name> or first positional arg (if not a flag)
-    const projectIdx = args.indexOf('--project');
-    const positionalProject = args[0] && !args[0].startsWith('--') ? args[0] : undefined;
-    const projectFilter = (projectIdx !== -1 ? args[projectIdx + 1] : positionalProject) ?? undefined;
-
-    // Phase filter: --phase <n>
-    const phaseIdx = args.indexOf('--phase');
-    const phaseFilterRaw = phaseIdx !== -1 ? args[phaseIdx + 1] : undefined;
-    const phaseFilter = phaseFilterRaw !== undefined ? parseInt(phaseFilterRaw, 10) : undefined;
-
-    // Auto-imply --once when targeting a specific phase
+    const dryRun = !!opts.dryRun;
+    let once = !!opts.once;
+    const projectFilter = opts.project ?? positionalProject ?? undefined;
+    const phaseFilter: number | undefined = opts.phase;
     if (phaseFilter !== undefined) once = true;
-
-    if (!jsonMode) {
+    if (!isJson()) {
       if (dryRun) console.log('[gzos] Dry run — showing what would execute without running agents');
       if (once) console.log('[gzos] --once mode: will stop after first actionable phase');
       console.log('[gzos] Starting controller loop...');
     }
     const results = await runLoop(config, { projectFilter, phaseFilter, dryRun, once });
     const acted = results.reduce((n, r) => n + r.phasesActedOn.length, 0);
-    if (jsonMode) {
+    if (isJson()) {
       console.log(JSON.stringify(results, null, 2));
     } else {
       console.log(`[gzos] Done. ${results.length} iteration(s), ${acted} phases acted on.`);
     }
-    break;
-  }
+  });
 
-  // ── heal ──────────────────────────────────────────────────────────────────
-  case 'heal': {
+// ── heal ──────────────────────────────────────────────────────────────────
+program
+  .command('heal')
+  .description('Fix stale locks, vault drift, graph links')
+  .action(async () => {
     const config = loadConfig();
-    if (!jsonMode) console.log('[gzos] Running healer...');
-
+    if (!isJson()) console.log('[gzos] Running healer...');
     const healResult = runAllHeals(config);
     const graphResult = await maintainVaultGraph(config);
     const consolidateResult = await consolidateVaultNodes(config);
-
-    if (jsonMode) {
+    if (isJson()) {
       console.log(JSON.stringify({
         locksCleared: healResult.actions.filter(a => a.type === 'stale_lock_cleared' && a.applied).length,
-        driftFixed: healResult.applied,
-        driftDetected: healResult.detected,
+        driftFixed: healResult.applied, driftDetected: healResult.detected,
         graphRepairs: graphResult.repairs.length,
         wrongLinksRemoved: graphResult.wrongLinksRemoved,
         hubsSplit: graphResult.hubsSplit,
@@ -175,28 +169,28 @@ switch (command) {
       }, null, 2));
     } else {
       console.log(`  Healer: ${healResult.applied} applied, ${healResult.detected} detected`);
-      for (const a of healResult.actions) {
-        console.log(`    [${a.applied ? '✓' : '!'}] ${a.type}: ${a.description}`);
-      }
+      for (const a of healResult.actions) console.log(`    [${a.applied ? '✓' : '!'}] ${a.type}: ${a.description}`);
       console.log(`  Graph: ${graphResult.repairs.length} link repairs, ${graphResult.wrongLinksRemoved} wrong links removed, ${graphResult.hubsSplit} hubs split`);
       if (consolidateResult.actions.length > 0) {
         console.log(`  Consolidate: ${consolidateResult.phasesArchived} phases archived, ${consolidateResult.docsMerged} docs merged`);
       }
       console.log('[gzos] Vault is healthy.');
     }
-    break;
-  }
+  });
 
-  // ── status ────────────────────────────────────────────────────────────────
-  case 'status': {
+// ── status ────────────────────────────────────────────────────────────────
+program
+  .command('status [project]')
+  .description('Show all projects and their phase states')
+  .action(async (_project) => {
     const config = loadConfig();
     const phases = discoverAllPhases(config.vaultRoot, config.projectsGlob);
 
-    if (jsonMode) {
+    if (isJson()) {
       // Machine-readable snapshot
       const byProject = new Map<string, typeof phases>();
       for (const phase of phases) {
-        const proj = String(phase.frontmatter['project'] ?? path.basename(path.dirname(path.dirname(phase.path))));
+        const proj = String(phase.frontmatter['project_id'] ?? phase.frontmatter['project'] ?? path.basename(path.dirname(path.dirname(phase.path))));
         if (!byProject.has(proj)) byProject.set(proj, []);
         byProject.get(proj)!.push(phase);
       }
@@ -242,7 +236,7 @@ switch (command) {
       // Human-readable output with milestone grouping
       const byProject = new Map<string, typeof phases>();
       for (const phase of phases) {
-        const proj = String(phase.frontmatter['project'] ?? path.basename(path.dirname(path.dirname(phase.path))));
+        const proj = String(phase.frontmatter['project_id'] ?? phase.frontmatter['project'] ?? path.basename(path.dirname(path.dirname(phase.path))));
         if (!byProject.has(proj)) byProject.set(proj, []);
         byProject.get(proj)!.push(phase);
       }
@@ -281,206 +275,153 @@ switch (command) {
       }
       console.log('');
     }
-    break;
-  }
+  });
 
-  // ── daily-plan ────────────────────────────────────────────────────────────
-  // gzos daily-plan [YYYY-MM-DD]        — daily time-blocked plan (writes to 04 - Planning)
-  case 'daily-plan': {
+// ── daily-plan ────────────────────────────────────────────────────────────
+program
+  .command('daily-plan [date]')
+  .description('Write a time-blocked daily plan')
+  .action(async (date) => {
     const config = loadConfig();
-    await runPlan(config, args[0]);
-    break;
-  }
+    await runPlan(config, date);
+  });
 
-  // ── plan ──────────────────────────────────────────────────────────────────
-  // gzos plan <project> [n] [--extend]  — state-aware project planning
-  case 'plan': {
-    if (!args[0] || args[0].startsWith('--')) {
-      console.error('Usage: gzos plan "<project>" [phaseNumber] [--extend]');
-      console.error('Tip: for daily planning use: gzos daily-plan');
-      process.exit(1);
-    }
-    const extend = args.includes('--extend');
-    const phaseArg = args.slice(1).find(a => !a.startsWith('--') && /^\d+$/.test(a));
-    await runPlanProject(args[0], phaseArg, { extend });
-    break;
-  }
+// ── plan ──────────────────────────────────────────────────────────────────
+program
+  .command('plan <project> [n]')
+  .description('Plan phases and atomise tasks (all-in-one)')
+  .option('--extend', 'add new phases from updated Overview')
+  .action(async (project, n, opts) => {
+    const extend = !!opts.extend;
+    await runPlanProject(project, n, { extend });
+  });
 
-  // ── capture ───────────────────────────────────────────────────────────────
-  case 'capture': {
-    await runCapture(args.join(' '));
-    break;
-  }
+// ── capture ───────────────────────────────────────────────────────────────
+program
+  .command('capture [text...]')
+  .description('Quick capture to Obsidian Inbox')
+  .action(async (textParts) => { await runCapture(textParts.join(' ')); });
 
-  // ── research ──────────────────────────────────────────────────────────────
-  case 'research': {
-    await runResearch(args[0]);
-    break;
-  }
+// ── research ──────────────────────────────────────────────────────────────
+program
+  .command('research <topic>')
+  .description('Run research step and write to vault')
+  .action(async (topic) => { await runResearch(topic); });
 
-  // ── consolidate ────────────────────────────────────────────────────────────
-  case 'consolidate': {
-    await runConsolidate(args);
-    break;
-  }
+// ── consolidate ────────────────────────────────────────────────────────────
+program
+  .command('consolidate [args...]')
+  .description('Manually trigger vault consolidation')
+  .action(async (args) => { await runConsolidate(args ?? []); });
 
-  // ── import ────────────────────────────────────────────────────────────────
-  case 'import': {
-    const linearId = args[0];
-    if (!linearId) {
-      console.error('Usage: gzos import <linearProjectId>');
-      process.exit(1);
-    }
+// ── import ────────────────────────────────────────────────────────────────
+program
+  .command('import <linearProjectId>')
+  .description('Import a Linear project as a vault bundle')
+  .action(async (linearId) => {
     const config = loadConfig();
     if (!config.linear) {
-      console.error('Linear not configured. Add "linear": { "api_key": "...", "team_id": "..." } to groundzero.config.json');
+      console.error('Linear not configured. Add linear config to groundzero.config.json');
       process.exit(1);
     }
     console.log(`[gzos] Importing Linear project ${linearId}...`);
     const bundle = await importLinearProject(linearId, config);
     console.log(`[gzos] Imported "${bundle.projectId}"`);
     console.log(`  ${bundle.phases.length} phases created in: ${bundle.bundleDir}`);
-    console.log(`  Next: gzos run`);
-    break;
-  }
+  });
 
-  // ── reset ─────────────────────────────────────────────────────────────────
-  case 'reset': {
-    await runReset(args[0]);
-    break;
-  }
+// ── reset ─────────────────────────────────────────────────────────────────
+program
+  .command('reset [project]')
+  .description('Reset a blocked phase to phase-ready')
+  .action(async (project) => { await runReset(project); });
 
-  // ── set-state ─────────────────────────────────────────────────────────────
-  // Programmatic state change (used by dashboard, scripts, orchestrators)
-  // gzos set-state <path> <state> [--json]
-  case 'set-state': {
-    const phasePath = args[0];
-    const newState = args[1];
-    if (!phasePath || !newState) {
-      console.error('Usage: gzos set-state <phasePath> <state>');
-      console.error('States: backlog, planning, ready, active, blocked, completed');
-      process.exit(1);
-    }
+// ── set-state ─────────────────────────────────────────────────────────────
+program
+  .command('set-state <phasePath> <state>')
+  .description('Programmatic state change (for scripts/dashboard)')
+  .action(async (phasePath, newState) => {
     const normalized = normalizeTag(newState);
     const node = readPhaseNode(phasePath);
     if (!node.exists) {
       const msg = `Phase note not found: ${phasePath}`;
-      if (jsonMode) console.log(JSON.stringify({ error: msg }));
+      if (isJson()) console.log(JSON.stringify({ error: msg }));
       else console.error(`[gzos] ${msg}`);
       process.exit(1);
     }
     const previous = stateFromFrontmatter(node.frontmatter);
     setPhaseTag(phasePath, toTag(normalized));
-    if (jsonMode) {
-      console.log(JSON.stringify({ path: phasePath, previous, new: normalized }));
-    } else {
-      console.log(`[gzos] ${phasePath}: ${previous} → ${normalized}`);
+    if (isJson()) console.log(JSON.stringify({ path: phasePath, previous, new: normalized }));
+    else console.log(`[gzos] ${phasePath}: ${previous} → ${normalized}`);
+  });
+
+// ── logs ──────────────────────────────────────────────────────────────────
+program
+  .command('logs [project]')
+  .description('Show execution log')
+  .option('--recent', 'show most recently modified log')
+  .option('--audit [project]', 'show audit trail')
+  .action(async (project, opts) => {
+    if (opts.audit !== undefined) {
+      const { readAuditEvents } = await import('../audit/trail.js');
+      const config = loadConfig();
+      const projectFilter = typeof opts.audit === 'string' ? opts.audit : project;
+      const events = readAuditEvents(config.vaultRoot, projectFilter || undefined);
+      const recent = events.slice(-100);
+      for (const e of recent) {
+        console.log(`[${e.ts}] ${e.event}${e.projectId ? ` (${e.projectId})` : ''}${e.detail ? ` — ${e.detail}` : ''}`);
+      }
+      return;
     }
-    break;
-  }
+    await runLogs(project);
+  });
 
-  // ── deprecated aliases — kept for backward compat ────────────────────────
-  case 'atomise':
-  case 'atomize': {
-    console.warn('[gzos] Deprecated: use "gzos plan <project>" instead');
-    await runAtomiseProject(args[0]);
-    break;
-  }
-  case 'plan-phase': {
-    console.warn('[gzos] Deprecated: use "gzos plan <project> --phase <n>" instead');
-    await runPlanPhase(args[0], args[1]);
-    break;
-  }
-  case 'plan-project': {
-    console.warn('[gzos] Deprecated: use "gzos plan <project>" instead');
-    await runPlanProject(args[0]);
-    break;
-  }
-  case 'execute': {
-    console.warn('[gzos] Deprecated: use "gzos run <project> --phase <n> --once" instead');
-    await runExecute(args[0], args[1]);
-    break;
-  }
+// ── refresh-context ───────────────────────────────────────────────────────
+program
+  .command('refresh-context [project]')
+  .description('Re-scan repo and update Repo Context note')
+  .action(async (project) => { await runRefreshContext(project); });
 
-  // ── logs ──────────────────────────────────────────────────────────────────
-  case 'logs': {
-    await runLogs(args[0]);
-    break;
-  }
+// ── linear-uplink ─────────────────────────────────────────────────────────
+program
+  .command('linear-uplink [project]')
+  .description('Sync vault phases to Linear issues')
+  .action(async (project) => { await runLinearUplink(project); });
 
-  // ── refresh-context ───────────────────────────────────────────────────────
-  case 'refresh-context': {
-    await runRefreshContext(args[0]);
-    break;
-  }
+// ── deprecated aliases — hidden but functional ────────────────────────────
+program
+  .command('atomise [project]')
+  .description('Deprecated: use "gzos plan <project>"')
+  .hook('preAction', () => { console.warn('[gzos] Deprecated: use "gzos plan <project>"'); })
+  .action(async (p) => { await runAtomiseProject(p); })
+  .helpOption(false);
 
-  // ── linear-uplink ─────────────────────────────────────────────────────────
-  case 'linear-uplink': {
-    await runLinearUplink(args[0]);
-    break;
-  }
+program
+  .command('atomize [project]')
+  .description('Deprecated: use "gzos plan <project>"')
+  .hook('preAction', () => { console.warn('[gzos] Deprecated: use "gzos plan <project>"'); })
+  .action(async (p) => { await runAtomiseProject(p); })
+  .helpOption(false);
 
-  // ── help / unknown ────────────────────────────────────────────────────────
-  default: {
-    const known = [
-      'init', 'run', 'heal', 'status', 'doctor', 'plan', 'capture', 'research',
-      'consolidate', 'import', 'reset', 'atomise', 'atomize', 'plan-phase',
-      'plan-project', 'execute', 'logs', 'refresh-context', 'linear-uplink',
-      'daily-plan', 'dashboard', 'set-state',
-    ];
-    if (command && !known.includes(command)) {
-      console.error(`Unknown command: ${command}`);
-    }
-    console.log(`
-gzos — GroundZeroOS
+program
+  .command('plan-phase [project] [n]')
+  .description('Deprecated: use "gzos plan <project> <n>"')
+  .hook('preAction', () => { console.warn('[gzos] Deprecated: use "gzos plan <project> <n>"'); })
+  .action(async (p, n) => { await runPlanPhase(p, n); })
+  .helpOption(false);
 
-Usage: gzos <command> [project] [options]
+program
+  .command('plan-project [project]')
+  .description('Deprecated: use "gzos plan <project>"')
+  .hook('preAction', () => { console.warn('[gzos] Deprecated: use "gzos plan <project>"'); })
+  .action(async (p) => { await runPlanProject(p); })
+  .helpOption(false);
 
-Global flags: --json (machine-readable output)  --verbose/-v (debug logging)
+program
+  .command('execute [project] [phase]')
+  .description('Deprecated: use "gzos run <project> --phase <n>"')
+  .hook('preAction', () => { console.warn('[gzos] Deprecated: use "gzos run <project> --phase <n>"'); })
+  .action(async (p, ph) => { await runExecute(p, ph); })
+  .helpOption(false);
 
-── Planning ─────────────────────────────────────────────────────────────────────
-
-  plan <project>              Create phases + atomise tasks (all-in-one)
-  plan <project> <n>          Atomise a single backlog phase only
-  plan <project> --extend     Add new phases from updated Overview
-
-── Execution ────────────────────────────────────────────────────────────────────
-
-  run [project]               Full loop: plan backlog → execute ready → consolidate done
-  run <project> --phase <n>   Execute a specific phase (auto-implies --once)
-  run --dry-run               Preview what would run (no changes)
-  run --once                  Single iteration, then exit
-
-── Monitoring ───────────────────────────────────────────────────────────────────
-
-  status [project]            Show all projects and phase states
-  logs [project]              Show execution log for a phase
-
-── Maintenance ──────────────────────────────────────────────────────────────────
-
-  init <name>                 Create a new project bundle
-  heal                        Fix stale locks, nav links, graph drift
-  doctor                      Pre-flight checks
-  reset <project> [--phase n] Reset a blocked/active phase → ready
-  set-state <path> <state>    Programmatic state change (for scripts/dashboard)
-
-── Other ────────────────────────────────────────────────────────────────────────
-
-  daily-plan [date]           Write a time-blocked daily plan
-  capture <text>              Quick capture to Obsidian Inbox
-  import <id>                 Import a Linear project
-  dashboard [port]            Launch web dashboard (default: 7070)
-
-── Examples ─────────────────────────────────────────────────────────────────────
-
-  gzos init "My App"                    # create project bundle
-  gzos plan "My App"                    # scan repo → phases → tasks → ready
-  gzos run "My App"                     # execute ready phases
-  gzos run "My App" --phase 3           # execute P3 only
-  gzos run                              # full loop, all projects
-  gzos status --json                    # machine-readable snapshot
-  gzos heal --json                      # fix vault, return counts
-`);
-    process.exit(command && !known.includes(command) ? 1 : 0);
-  }
-}
+await program.parseAsync(process.argv);
