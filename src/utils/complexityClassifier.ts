@@ -38,21 +38,10 @@ export function classifyComplexity(
   return 'standard';
 }
 
-// Map tier to model override.
-// Config tiers take priority; falls back to sensible defaults.
+// Map complexity tier to model. Config tiers are always set (defaults in config/load.ts).
 export function modelForTier(
   tier: ComplexityTier,
-  baseModel: string,
-  configTiers?: { light?: string; standard?: string; heavy?: string },
+  configTiers: { light: string; standard: string; heavy: string },
 ): string {
-  const defaults: Record<ComplexityTier, string> = {
-    light:    'anthropic/claude-haiku-4-5-20251001',
-    standard: 'anthropic/claude-sonnet-4-6',
-    heavy:    'anthropic/claude-opus-4-6',
-  };
-  // User config overrides win
-  if (configTiers?.[tier]) return configTiers[tier]!;
-  // If base model already contains 'haiku' and tier is light, keep it
-  if (baseModel.includes('haiku') && tier === 'light') return baseModel;
-  return defaults[tier];
+  return configTiers[tier];
 }

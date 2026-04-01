@@ -18,7 +18,7 @@ export const PHASE_TRANSITIONS: Record<PhaseState, PhaseState[]> = {
 };
 
 export function canTransition(from: PhaseState, to: PhaseState): boolean {
-  const allowed = PHASE_TRANSITIONS[from];
+  const allowed = PHASE_TRANSITIONS[from] ?? [];
   return allowed.includes(to);
 }
 

@@ -124,12 +124,15 @@ export default function GitDiffPanel({ projectId }: Props) {
     if (!commitMsg.trim() || !result) return;
     setCommitting(true);
     try {
-      await fetch(`/api/gz/projects/${encodeURIComponent(projectId)}/git/commit`, {
+      const res = await fetch(`/api/gz/projects/${encodeURIComponent(projectId)}/git/commit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: commitMsg.trim() }),
       });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error ?? 'Commit failed'); return; }
       setCommitted(true);
+    } catch {
+      alert('Commit failed — network error');
     } finally {
       setCommitting(false);
     }

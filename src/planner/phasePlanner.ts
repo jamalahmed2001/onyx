@@ -133,7 +133,7 @@ interface PhaseSpec {
 // Resolve the repo path from bundle overview frontmatter
 function resolveRepoPath(bundle: VaultBundle, config: ControllerConfig): string {
   if (bundle.overview.exists) {
-    const explicit = String((bundle.overview as unknown as Record<string, unknown>)['repo_path'] ?? '').trim();
+    const explicit = String(bundle.overview.frontmatter['repo_path'] ?? '').trim();
     if (explicit && fs.existsSync(explicit)) return explicit;
   }
   // Parse frontmatter manually from raw overview

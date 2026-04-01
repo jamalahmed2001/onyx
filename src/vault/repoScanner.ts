@@ -53,7 +53,7 @@ export function scanRepoFiles(repoPath: string): string {
 
     // Show source files with sensible limits per depth
     const fileLimit = depth <= 2 ? 15 : 25;
-    const showFiles = files.filter(f => SOURCE_EXTENSIONS.test(f.name)).slice(0, fileLimit);
+    const showFiles = files.filter(f => SOURCE_EXTENSIONS.test(f.name) && !(depth === 1 && rootConfigsShown.has(f.name))).slice(0, fileLimit);
 
     for (const d of showDirs) {
       lines.push(`${prefix}${d.name}/`);
@@ -71,12 +71,14 @@ export function scanRepoFiles(repoPath: string): string {
     }
   }
 
-  // Always show key config files at root
+  // Always show key config files at root (before walk, so they appear first)
+  const rootConfigsShown = new Set<string>();
   try {
     const rootEntries = fs.readdirSync(repoPath, { withFileTypes: true });
     for (const e of rootEntries) {
       if (e.isFile() && ROOT_CONFIG_FILES.has(e.name)) {
         lines.push(e.name);
+        rootConfigsShown.add(e.name);
       }
     }
   } catch { /* skip */ }
@@ -104,8 +106,9 @@ export function validatePlanFilePaths(planBlock: string, repoPath: string): stri
     const paths = fileList.match(/`([^`]+)`/g)?.map(p => p.replace(/`/g, '').trim()) ?? [];
 
     for (const filePath of paths) {
-      // Skip paths explicitly marked as new
-      if (/\(new\s*(file)?\)/i.test(fileList)) continue;
+      // Skip paths explicitly marked as new — check for (new file) immediately after this specific path's backtick
+      const escapedPath = filePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (new RegExp(`\`${escapedPath}\`\\s*\\(new`, 'i').test(fileList)) continue;
       // Skip glob patterns
       if (filePath.includes('*')) continue;
       // Check existence

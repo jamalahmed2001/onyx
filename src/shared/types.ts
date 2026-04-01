@@ -91,7 +91,7 @@ export interface StatusSnapshot {
 
 export type LogEventType =
   | 'lock_acquired' | 'lock_released'
-  | 'task_started' | 'task_done' | 'task_blocked'
+  | 'task_started' | 'task_done' | 'task_blocked' | 'task_failed'
   | 'state_transition'
   | 'stale_lock_cleared'
   | 'phase_completed' | 'phase_blocked'
@@ -190,10 +190,10 @@ export interface ControllerConfig {
     apiKey?: string;
     baseUrl?: string;
   };
-  modelTiers?: {
-    light?: string;
-    standard?: string;
-    heavy?: string;
+  modelTiers: {
+    light: string;
+    standard: string;
+    heavy: string;
   };
   linear?: {
     apiKey: string;
@@ -205,7 +205,10 @@ export interface ControllerConfig {
     // OpenClaw Gateway — `openclaw message send --target <E.164> --message <text>`
     // Requires openclaw CLI installed + logged in. Or set OPENCLAW_NOTIFY_TARGET env var.
     openclaw?: {
-      target: string;   // E.164 phone number, e.g. "+4477..."
+      target: string;      // E.164 phone number, e.g. "+4477..."
+      channel?: string;
+      profile?: string;
+      accountId?: string;
     };
 
     // Legacy: CallMeBot WhatsApp (kept for backward compat, not recommended)

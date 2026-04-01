@@ -93,7 +93,16 @@ export function loadConfig(configPath?: string): ControllerConfig {
   let raw: RawConfig = {};
   const content = readRawFile(resolvedPath);
   if (content !== null) {
-    raw = JSON.parse(content) as RawConfig;
+    try {
+      raw = JSON.parse(content) as RawConfig;
+    } catch (err) {
+      throw new Error(
+        `\n[gzos] groundzero.config.json is not valid JSON.\n\n` +
+        `  File: ${resolvedPath}\n` +
+        `  Error: ${err instanceof Error ? err.message : String(err)}\n\n` +
+        `  Fix: check for trailing commas, unquoted keys, or missing brackets.\n`
+      );
+    }
   }
 
   const vaultRoot =
@@ -109,6 +118,14 @@ export function loadConfig(configPath?: string): ControllerConfig {
       '  Option B: Set GROUNDZERO_VAULT_ROOT in your .env file\n' +
       '    GROUNDZERO_VAULT_ROOT=/path/to/your/obsidian/vault\n\n' +
       '  Run: gzos doctor  — to check all configuration\n'
+    );
+  }
+
+  if (!fs.existsSync(vaultRoot)) {
+    throw new Error(
+      `\n[gzos] vault_root does not exist on disk: ${vaultRoot}\n\n` +
+      `  Create the directory or correct the path in groundzero.config.json\n` +
+      `  Run: gzos doctor  — to check all configuration\n`
     );
   }
 
@@ -128,8 +145,10 @@ export function loadConfig(configPath?: string): ControllerConfig {
 
   let whatsapp: ControllerConfig['notify']['whatsapp'];
   if (raw.notify?.whatsapp) {
+    const configApiUrl = raw.notify.whatsapp.api_url ?? raw.notify.whatsapp.apiUrl;
     whatsapp = {
-      apiUrl: raw.notify.whatsapp.api_url ?? raw.notify.whatsapp.apiUrl ?? '',
+      apiUrl: configApiUrl
+        ?? (envWhatsappApiKey ? `https://api.callmebot.com/whatsapp.php?apikey=${envWhatsappApiKey}` : ''),
       recipient: envWhatsappRecipient ?? raw.notify.whatsapp.recipient ?? '',
     };
   } else if (envWhatsappRecipient && envWhatsappApiKey) {
@@ -139,7 +158,12 @@ export function loadConfig(configPath?: string): ControllerConfig {
     };
   }
 
-  const modelTiers = raw.model_tiers ?? raw.modelTiers;
+  const rawTiers = raw.model_tiers ?? raw.modelTiers;
+  const modelTiers = {
+    light:    rawTiers?.light    ?? 'anthropic/claude-haiku-4-5-20251001',
+    standard: rawTiers?.standard ?? 'anthropic/claude-sonnet-4-6',
+    heavy:    rawTiers?.heavy    ?? 'anthropic/claude-opus-4-6',
+  };
   const reposRoot = raw.repos_root ?? raw.reposRoot;
 
   // OpenClaw: merge env vars into config

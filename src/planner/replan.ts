@@ -1,11 +1,13 @@
 // replan.ts — When a phase blocks, read the log and rewrite the task list.
 //
 // Flow:
-//   1. Read log note — extract what was attempted and what failed
+//   1. Read log note (uses same path as writer.ts — must stay in sync)
 //   2. Read phase note — tasks, acceptance criteria, blockers section
 //   3. Call LLM: "phase failed, here's the evidence, propose a new task list"
 //   4. Parse new tasks from LLM output
-//   5. Rewrite ## Tasks section in phase note
+//   5. Inject tasks into AGENT_WRITABLE block (or ## Tasks if no block exists)
+//      ↳ Critical: selectNextTask checks AGENT_WRITABLE first, so tasks written
+//        only to ## Tasks are silently ignored when a managed block is present.
 //   6. Clear ## Blockers section
 //   7. Increment replan_count in frontmatter (max 2 replans per phase)
 //   8. Set phase tag back to phase-ready
@@ -15,7 +17,7 @@ import path from 'path';
 import fs from 'fs';
 import matter from 'gray-matter';
 import { readPhaseNode } from '../vault/reader.js';
-import { writeFile, setPhaseTag, appendToLog, resetAcceptanceCriteria } from '../vault/writer.js';
+import { writeFile, setPhaseTag, appendToLog, resetAcceptanceCriteria, deriveLogNotePath } from '../vault/writer.js';
 import { chatCompletion } from '../llm/client.js';
 import { notify } from '../notify/notify.js';
 import type { PhaseNode } from '../vault/reader.js';
@@ -36,26 +38,41 @@ Rules:
 
 export type ReplanResult = 'replanned' | 'max_reached' | 'no_api_key' | 'parse_error';
 
-function deriveLogNotePath(phaseNotePath: string, frontmatter: Record<string, unknown>): string {
-  const bundleDir = path.dirname(path.dirname(phaseNotePath));
-  const logsDir   = path.join(bundleDir, 'Logs');
-  const phaseNumber = frontmatter['phase_number'] ?? 0;
-  const baseName    = path.basename(phaseNotePath);
-  return path.join(logsDir, `L${phaseNumber} - ${baseName}`);
-}
+// Inject replanned tasks into the phase note.
+//
+// Priority: write into the AGENT_WRITABLE block if it exists — this is where
+// selectNextTask looks first, so tasks written only to ## Tasks are silently
+// ignored when a managed block is present.
+//
+// If no managed block exists, fall back to rewriting ## Tasks.
+function injectReplanTasks(raw: string, newTasks: string[]): string {
+  const PLAN_START = '<!-- AGENT_WRITABLE_START:phase-plan -->';
+  const PLAN_END   = '<!-- AGENT_WRITABLE_END:phase-plan -->';
+  const taskBlock  = newTasks.map(t => `- [ ] ${t.replace(/^-\s*\[\s*[x ]?\s*\]\s*/, '')}`).join('\n');
 
-function rewriteTasksSection(raw: string, newTasks: string[]): string {
-  const taskBlock = newTasks.map(t => `- [ ] ${t.replace(/^-\s*\[\s*[x ]?\s*\]\s*/, '')}`).join('\n');
+  const startIdx = raw.indexOf(PLAN_START);
+  const endIdx   = raw.indexOf(PLAN_END);
 
-  // Replace ## Tasks section content
-  if (/## Tasks/.test(raw)) {
-    return raw.replace(
-      /(## Tasks\n)([\s\S]*?)(\n## |\n---|\s*$)/,
-      (_match, heading, _old, suffix) => `${heading}\n${taskBlock}\n${suffix}`
+  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+    // Replace the managed block's content with the replanned task list.
+    // The markers themselves are preserved so the block stays valid.
+    return (
+      raw.slice(0, startIdx + PLAN_START.length) +
+      '\n\n## Replanned Tasks\n\n' +
+      taskBlock +
+      '\n\n' +
+      raw.slice(endIdx)
     );
   }
 
-  // No Tasks section — append before Acceptance Criteria or at end
+  // No managed block — rewrite (or create) ## Tasks section
+  if (/## Tasks/.test(raw)) {
+    return raw.replace(
+      /(## Tasks\n)([\s\S]*?)(\n## |\n---|$)/,
+      (_match, heading, _old, suffix) => `${heading}\n${taskBlock}\n${suffix}`,
+    );
+  }
+
   const insertBefore = raw.indexOf('\n## Acceptance Criteria');
   if (insertBefore !== -1) {
     return raw.slice(0, insertBefore) + `\n## Tasks\n\n${taskBlock}` + raw.slice(insertBefore);
@@ -66,7 +83,7 @@ function rewriteTasksSection(raw: string, newTasks: string[]): string {
 
 function clearBlockersSection(raw: string): string {
   return raw.replace(
-    /(## Blockers\n)([\s\S]*?)(\n## |\n---|\s*$)/,
+    /(## Blockers\n)([\s\S]*?)(\n## |\n---|$)/,
     (_match, heading, _old, suffix) => `${heading}\n(none)\n${suffix}`
   );
 }
@@ -180,7 +197,7 @@ Rewrite the task list so a fresh agent attempt can succeed. Output ONLY checkbox
   parsed.data['status']       = 'ready';
 
   let newContent = matter.stringify(parsed.content, parsed.data as Record<string, unknown>);
-  newContent = rewriteTasksSection(newContent, newTasks);
+  newContent = injectReplanTasks(newContent, newTasks);
   newContent = clearBlockersSection(newContent);
 
   writeFile(phaseNode.path, newContent);

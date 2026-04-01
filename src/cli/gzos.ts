@@ -7,15 +7,11 @@
 import { runInit } from './init.js';
 import { runDoctor } from './doctor.js';
 import { runPlan } from './plan.js';
-
-import { runPlanPhase } from './plan-phase.js';
-import { runExecute } from './execute.js';
 import { runCapture } from './capture.js';
 import { runResearch } from './research.js';
 import { runConsolidate } from './consolidate.js';
 import { runReset } from './reset.js';
-import { runAtomiseProject } from './atomise-project.js';
-import { runPlanProject } from './plan-project.js';
+import { runDecompose, runAtomiseCommand, runPlanProject } from './plan-project.js';
 import { runLogs } from './logs.js';
 import { runRefreshContext } from './refresh-context.js';
 import { runLinearUplink } from './linear-uplink.js';
@@ -25,11 +21,9 @@ import { runAllHeals } from '../healer/index.js';
 import { maintainVaultGraph } from '../vault/graphMaintainer.js';
 import { consolidateVaultNodes } from '../vault/nodeConsolidator.js';
 import { discoverAllPhases } from '../vault/discover.js';
-import { stateFromNode } from '../fsm/nodeAdapter.js';
 import { importLinearProject } from '../linear/import.js';
 import { setVerbose } from '../utils/log.js';
-import { countTasks } from '../shared/vault-parse.js';
-import { stateFromFrontmatter } from '../shared/vault-parse.js';
+import { countTasks, stateFromFrontmatter } from '../shared/vault-parse.js';
 import { setPhaseTag } from '../vault/writer.js';
 import { readPhaseNode } from '../vault/reader.js';
 import { normalizeTag, toTag } from '../fsm/states.js';
@@ -62,7 +56,7 @@ function extractBlockedReason(content: string): string {
 
 // Render a single phase line for human-readable status output.
 function renderPhaseLine(phase: ReturnType<typeof discoverAllPhases>[number], indent: string): void {
-  const state = stateFromNode(phase);
+  const state = stateFromFrontmatter(phase.frontmatter);
   const name = String(phase.frontmatter['phase_name'] ?? path.basename(phase.path, '.md'));
   const num = phase.frontmatter['phase_number'] ? `P${phase.frontmatter['phase_number']} — ` : '';
   const lock = phase.frontmatter['locked_by'] ? ` [locked: ${phase.frontmatter['locked_by']}]` : '';
@@ -182,9 +176,15 @@ program
 program
   .command('status [project]')
   .description('Show all projects and their phase states')
-  .action(async (_project) => {
+  .action(async (projectFilter) => {
     const config = loadConfig();
-    const phases = discoverAllPhases(config.vaultRoot, config.projectsGlob);
+    const allPhases = discoverAllPhases(config.vaultRoot, config.projectsGlob);
+    const phases = projectFilter
+      ? allPhases.filter(p => {
+          const proj = String(p.frontmatter['project_id'] ?? p.frontmatter['project'] ?? '');
+          return proj.toLowerCase().includes(projectFilter.toLowerCase());
+        })
+      : allPhases;
 
     if (isJson()) {
       // Machine-readable snapshot
@@ -198,7 +198,7 @@ program
       const snapshot = {
         timestamp: new Date().toISOString(),
         projects: Array.from(byProject.entries()).map(([projectId, projectPhases]) => {
-          const completedCount = projectPhases.filter(p => stateFromNode(p) === 'completed').length;
+          const completedCount = projectPhases.filter(p => stateFromFrontmatter(p.frontmatter) === 'completed').length;
           const bundleDir = projectPhases[0] ? path.dirname(path.dirname(projectPhases[0].path)) : '';
           return {
             projectId,
@@ -242,7 +242,7 @@ program
       }
       for (const [project, projectPhases] of byProject) {
         const totalPhases = projectPhases.length;
-        const completedPhases = projectPhases.filter(p => stateFromNode(p) === 'completed').length;
+        const completedPhases = projectPhases.filter(p => stateFromFrontmatter(p.frontmatter) === 'completed').length;
         console.log(`\n${project}`);
 
         // Separate phases with and without milestones
@@ -286,14 +286,30 @@ program
     await runPlan(config, date);
   });
 
-// ── plan ──────────────────────────────────────────────────────────────────
+// ── decompose ────────────────────────────────────────────────────────────
+program
+  .command('decompose <project>')
+  .description('Overview → phase stubs (backlog)')
+  .option('--extend', 'add new phases from updated Overview')
+  .action(async (project, opts) => {
+    await runDecompose(project, { extend: !!opts.extend });
+  });
+
+// ── atomise ──────────────────────────────────────────────────────────────
+program
+  .command('atomise <project> [n]')
+  .description('Backlog phases → concrete tasks → ready')
+  .action(async (project, n) => {
+    await runAtomiseCommand(project, n);
+  });
+
+// ── plan (convenience: decompose + atomise) ──────────────────────────────
 program
   .command('plan <project> [n]')
-  .description('Plan phases and atomise tasks (all-in-one)')
+  .description('Shortcut: decompose then atomise (both steps)')
   .option('--extend', 'add new phases from updated Overview')
   .action(async (project, n, opts) => {
-    const extend = !!opts.extend;
-    await runPlanProject(project, n, { extend });
+    await runPlanProject(project, n, { extend: !!opts.extend });
   });
 
 // ── capture ───────────────────────────────────────────────────────────────
@@ -388,40 +404,8 @@ program
   .description('Sync vault phases to Linear issues')
   .action(async (project) => { await runLinearUplink(project); });
 
-// ── deprecated aliases — hidden but functional ────────────────────────────
-program
-  .command('atomise [project]')
-  .description('Deprecated: use "gzos plan <project>"')
-  .hook('preAction', () => { console.warn('[gzos] Deprecated: use "gzos plan <project>"'); })
-  .action(async (p) => { await runAtomiseProject(p); })
-  .helpOption(false);
-
-program
-  .command('atomize [project]')
-  .description('Deprecated: use "gzos plan <project>"')
-  .hook('preAction', () => { console.warn('[gzos] Deprecated: use "gzos plan <project>"'); })
-  .action(async (p) => { await runAtomiseProject(p); })
-  .helpOption(false);
-
-program
-  .command('plan-phase [project] [n]')
-  .description('Deprecated: use "gzos plan <project> <n>"')
-  .hook('preAction', () => { console.warn('[gzos] Deprecated: use "gzos plan <project> <n>"'); })
-  .action(async (p, n) => { await runPlanPhase(p, n); })
-  .helpOption(false);
-
-program
-  .command('plan-project [project]')
-  .description('Deprecated: use "gzos plan <project>"')
-  .hook('preAction', () => { console.warn('[gzos] Deprecated: use "gzos plan <project>"'); })
-  .action(async (p) => { await runPlanProject(p); })
-  .helpOption(false);
-
-program
-  .command('execute [project] [phase]')
-  .description('Deprecated: use "gzos run <project> --phase <n>"')
-  .hook('preAction', () => { console.warn('[gzos] Deprecated: use "gzos run <project> --phase <n>"'); })
-  .action(async (p, ph) => { await runExecute(p, ph); })
-  .helpOption(false);
+// ── aliases ───────────────────────────────────────────────────────────────
+program.command('atomize <project> [n]').description('Alias: US spelling of atomise')
+  .action(async (p, n) => { await runAtomiseCommand(p, n); }).helpOption(false);
 
 await program.parseAsync(process.argv);

@@ -19,11 +19,15 @@ export async function runReset(phaseArg?: string): Promise<void> {
 
   const phases = discoverAllPhases(config.vaultRoot, config.projectsGlob);
 
+  const RESETTABLE_TAGS = new Set(['phase-blocked', 'phase-active']);
   const candidates = phaseArg
     ? phases.filter(p => {
         const name = String(p.frontmatter['phase_name'] ?? '');
         const num = String(p.frontmatter['phase_number'] ?? '');
-        return name.toLowerCase().includes(phaseArg.toLowerCase()) || num === phaseArg;
+        const tags = Array.isArray(p.frontmatter['tags']) ? p.frontmatter['tags'] as string[] : [];
+        const matchesFilter = name.toLowerCase().includes(phaseArg.toLowerCase()) || num === phaseArg;
+        const isResettable = tags.some(t => RESETTABLE_TAGS.has(t));
+        return matchesFilter && isResettable;
       })
     : phases.filter(p => {
         const tags = Array.isArray(p.frontmatter['tags']) ? p.frontmatter['tags'] as string[] : [];

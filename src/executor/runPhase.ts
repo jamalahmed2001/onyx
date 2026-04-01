@@ -4,13 +4,11 @@ import type { ControllerConfig } from '../config/load.js';
 import { acquireLock } from '../lock/acquire.js';
 import { releaseLock } from '../lock/release.js';
 import { selectNextTask, acceptanceMet } from './selectTask.js';
-import { tickTask, appendToLog, tickAcceptanceCriteria, backupPhaseFiles, writeHumanRequirement, writeCheckpoint, readCheckpoint, clearCheckpoint } from '../vault/writer.js';
+import { tickTask, appendToLog, tickAcceptanceCriteria, backupPhaseFiles, writeHumanRequirement, writeCheckpoint, readCheckpoint, clearCheckpoint, deriveLogNotePath } from '../vault/writer.js';
 import { runAgent } from '../agents/types.js';
 import { notify } from '../notify/notify.js';
-// knowledgeIndex removed — agent reads Knowledge.md directly via file paths
 import { isShutdownRequested } from '../controller/loop.js';
 import { classifyComplexity, modelForTier } from '../utils/complexityClassifier.js';
-import { appendPhaseKnowledge } from '../planner/knowledgeWriter.js';
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
@@ -21,25 +19,6 @@ export interface PhaseRunResult {
   blockers: string[];
   logNotePath: string;
   repoPath: string;
-}
-
-function safeFileSegment(s: string): string {
-  return String(s)
-    .trim()
-    .replace(/[\\/:*?"<>|]/g, '-')
-    .replace(/\s+/g, ' ')
-    .slice(0, 140);
-}
-
-function deriveLogNotePath(phaseNotePath: string, frontmatter: Record<string, unknown>): string {
-  const phasesDir = path.dirname(phaseNotePath);
-  const bundleDir = path.dirname(phasesDir);
-  const logsDir   = path.join(bundleDir, 'Logs');
-  const phaseNumber = frontmatter['phase_number'] ?? 0;
-  const phaseName = String(frontmatter['phase_name'] ?? '');
-  const nameSeg = safeFileSegment(phaseName);
-  const file = nameSeg ? `L${phaseNumber} - ${nameSeg}.md` : `L${phaseNumber}.md`;
-  return path.join(logsDir, file);
 }
 
 // Resolved context paths — agent reads these files directly via --add-dir
@@ -257,7 +236,8 @@ export async function runPhase(
     console.log(`[gzos] Resuming from checkpoint for P${phaseNum} — ${phaseLabel}`);
   }
 
-  // 3. Task loop
+  // 3. Task loop — wrapped in try/finally to guarantee lock release on unexpected errors
+  try {
   while (true) {
     // Check for graceful shutdown between tasks
     if (isShutdownRequested()) {
@@ -307,20 +287,24 @@ export async function runPhase(
     const shellResult = tryRunShellTask(nextTask, ctx.repoPath);
     if (shellResult) {
       if (shellResult.ok) {
-        tickTask(phaseNode.path, nextTask);
+        if (!tickTask(phaseNode.path, nextTask)) {
+          console.warn('[gzos] Shell task succeeded but checkbox not found — skipping');
+        }
         tasksCompleted++;
         consecutiveFailures = 0;
         completedTasksList.push(nextTask.replace(/^\s*-\s*\[[ x]\]\s*/i, '').trim());
         appendToLog(phaseNode.path, { runId, event: 'task_done', detail: `${nextTask}\n\n[command output]\n${shellResult.output}`.trim() });
         await notify({ event: 'task_done', projectId, phaseLabel, detail: nextTask.slice(0, 80), runId }, config);
         if (config.maxIterations && tasksCompleted >= 200) {
-          // sanity guard
+          appendToLog(phaseNode.path, { runId, event: 'task_blocked', detail: `Sanity guard: ${tasksCompleted} tasks completed, halting phase loop` });
+          break;
         }
         // Continue to next task
         continue;
       }
 
-      // Shell task failed — treat as blocker (no agent needed)
+      // Shell commands are deterministic — retrying without code changes produces the
+      // same result. Block immediately so replan can restructure the task.
       appendToLog(phaseNode.path, { runId, event: 'task_blocked', detail: `${nextTask}\n\n[command output]\n${shellResult.output}`.trim() });
       releaseLock(phaseNode.path, runId, 'phase-blocked');
       await notify({ event: 'phase_blocked', projectId, phaseLabel, detail: `Shell task failed: ${nextTask.slice(0, 60)}`, runId }, config);
@@ -329,7 +313,7 @@ export async function runPhase(
 
     // Classify task complexity and route to appropriate model/timeout
     const tier = classifyComplexity(nextTask, phaseNode.frontmatter);
-    const effectiveModel = modelForTier(tier, config.llm?.model ?? 'anthropic/claude-sonnet-4-6', config.modelTiers);
+    const effectiveModel = modelForTier(tier, config.modelTiers);
     const timeoutMs = tier === 'heavy' ? 900_000 : tier === 'light' ? 300_000 : 600_000;
     if (effectiveModel !== config.llm?.model) {
       console.log(`[gzos:complexity] P${phaseNum} task classified as "${tier}" → ${effectiveModel}`);
@@ -355,36 +339,70 @@ export async function runPhase(
       model: effectiveModel,
     });
 
-    if (!agentResult.success) {
-      consecutiveFailures++;
-      taskAttemptNumber++;
-      const errorDetail = agentResult.error ?? 'Agent returned failure';
-      lastFailureContext = errorDetail;
+    // ── Agent result handling ─────────────────────────────────────────────────
+    //
+    // Three outcomes, in priority order:
+    //   1. Hard failure (non-zero exit / timeout)     → retry, then block after 3×
+    //   2. Agent self-reported BLOCKED: <reason>      → retry, then block after 3×
+    //   3. Clean success                              → tick the task, continue
+    //
+    // Retry is structural: we do NOT tick the task on failure, so the next loop
+    // iteration calls selectNextTask() and gets the same task back. The failure
+    // context is threaded into the next attempt's prompt so the agent can adapt.
 
-      // Stuck detection: 3 consecutive failures on same task
+    // Detect a self-reported blocker (agent exits 0 but prints BLOCKED: <reason>)
+    const selfReportedBlocker = agentResult.success
+      ? (agentResult.output.match(/^BLOCKED:\s*(.+)$/m)?.[1] ?? null)
+      : null;
+
+    if (!agentResult.success || selfReportedBlocker) {
+      consecutiveFailures++;
+      const errorDetail = selfReportedBlocker ?? agentResult.error ?? 'Agent returned failure';
+      lastFailureContext = errorDetail;
+      blockers.push(errorDetail);
+
+      appendToLog(phaseNode.path, {
+        runId,
+        event: 'task_failed',
+        detail: `Attempt ${taskAttemptNumber}/${3}: ${errorDetail.slice(0, 300)}`,
+      });
+      await notify({ event: 'task_blocked', projectId, phaseLabel, detail: errorDetail.slice(0, 80), runId }, config);
+
       if (consecutiveFailures >= 3) {
-        const detail = `Agent stuck on same task after 3 attempts: ${nextTask.slice(0, 80)}`;
+        // Agent is genuinely stuck — write a human requirement and surface the phase
+        const detail = `Agent stuck after ${consecutiveFailures} attempts on: ${nextTask.slice(0, 80)}`;
         appendToLog(phaseNode.path, { runId, event: 'phase_blocked', detail });
-        writeHumanRequirement(phaseNode.path, `Agent stuck after 3 attempts on:\n${nextTask}\n\nLast error: ${errorDetail}`);
+        writeHumanRequirement(
+          phaseNode.path,
+          `Agent stuck after ${consecutiveFailures} attempts on:\n${nextTask}\n\nLast error:\n${errorDetail}`,
+        );
         releaseLock(phaseNode.path, runId, 'phase-blocked');
         await notify({ event: 'phase_blocked', projectId, phaseLabel, detail, runId }, config);
-        return { status: 'blocked', tasksCompleted, blockers: [detail], logNotePath, repoPath: ctx.repoPath };
+        return { status: 'blocked', tasksCompleted, blockers, logNotePath, repoPath: ctx.repoPath };
       }
 
-      blockers.push(errorDetail);
-      appendToLog(phaseNode.path, { runId, event: 'task_blocked', detail: `${nextTask}\nError: ${errorDetail}` });
-      await notify({ event: 'task_blocked', projectId, phaseLabel, detail: errorDetail.slice(0, 80), runId }, config);
-      releaseLock(phaseNode.path, runId, 'phase-blocked');
-      await notify({ event: 'phase_blocked', projectId, phaseLabel, runId }, config);
-      return { status: 'blocked', tasksCompleted, blockers, logNotePath, repoPath: ctx.repoPath };
+      // Not yet stuck — task stays unchecked; loop retries it next iteration
+      taskAttemptNumber++;
+      continue;
     }
 
-    // Success — reset failure tracking
+    // ── Task succeeded ────────────────────────────────────────────────────────
     consecutiveFailures = 0;
-    lastFailureContext = undefined;
-    taskAttemptNumber = 1;
+    lastFailureContext  = undefined;
+    taskAttemptNumber  = 1;
 
-    tickTask(phaseNode.path, nextTask);
+    const ticked = tickTask(phaseNode.path, nextTask);
+    if (!ticked) {
+      // Task checkbox couldn't be found in the file (format mismatch or external edit).
+      // Without ticking, selectNextTask would return the same task → infinite loop.
+      // Treat as a blocking failure so the operator can inspect.
+      const detail = 'Agent succeeded but task checkbox could not be ticked — possible format mismatch';
+      console.warn(`[gzos] ${detail}`);
+      appendToLog(phaseNode.path, { runId, event: 'task_blocked', detail });
+      writeHumanRequirement(phaseNode.path, `${detail}\n\nTask: ${nextTask}`);
+      releaseLock(phaseNode.path, runId, 'phase-blocked');
+      return { status: 'blocked', tasksCompleted, blockers: [detail], logNotePath, repoPath: ctx.repoPath };
+    }
     tasksCompleted++;
     completedTasksList.push(nextTask.replace(/^\s*-\s*\[\s*[x ]?\s*\]\s*/, '').trim());
     appendToLog(phaseNode.path, { runId, event: 'task_done', detail: nextTask, filesChanged: agentResult.filesChanged });
@@ -417,17 +435,8 @@ export async function runPhase(
       // Non-fatal — repo may not be a git repo, or tag already exists
     }
 
-    // Append a learning to Knowledge.md (best-effort, Haiku model)
-    await appendPhaseKnowledge({
-      projectId,
-      phaseNum,
-      phaseLabel,
-      phaseNotePath: phaseNode.path,
-      logNotePath,
-      bundleDir,
-      config,
-    }).catch(() => {/* never block on this */});
-
+    // Knowledge extraction happens in the controller loop via consolidatePhase,
+    // which runs immediately after this function returns 'completed'.
     await notify({ event: 'phase_completed', projectId, phaseLabel, detail: `${tasksCompleted} tasks done`, runId }, config);
     return { status: 'completed', tasksCompleted, blockers, logNotePath, repoPath: ctx.repoPath };
   }
@@ -436,6 +445,14 @@ export async function runPhase(
   releaseLock(phaseNode.path, runId, 'phase-blocked');
   await notify({ event: 'phase_blocked', projectId, phaseLabel, detail: 'Acceptance criteria not met', runId }, config);
   return { status: 'blocked', tasksCompleted, blockers: [...blockers, 'Acceptance criteria not met'], logNotePath, repoPath: ctx.repoPath };
+
+  } catch (err) {
+    // Guarantee lock release on any unexpected error in the task loop
+    console.error('[gzos] Unexpected error in task loop — releasing lock:', (err as Error).message);
+    appendToLog(phaseNode.path, { runId, event: 'task_failed', detail: `Unexpected error: ${(err as Error).message}` });
+    releaseLock(phaseNode.path, runId, 'phase-blocked');
+    return { status: 'error', tasksCompleted, blockers: [(err as Error).message], logNotePath, repoPath: ctx.repoPath };
+  }
 }
 
 // Produce a clean single-line commit message summary from a task (may be multi-line)

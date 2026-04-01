@@ -252,9 +252,9 @@ export async function runDoctor(): Promise<void> {
   for (const check of checks) {
     const icon = check.pass ? (check.warn ? '⚠' : '✓') : '✗';
     console.log(`  ${icon}  ${check.label}`);
-    if (!check.pass && !check.warn) {
-      allPass = false;
-      if (check.fix) console.log(`       Fix: ${check.fix}`);
+    if (!check.pass) {
+      if (!check.warn) allPass = false;
+      if (check.fix) console.log(`       ${check.warn ? 'Note' : 'Fix'}: ${check.fix}`);
     } else if (check.warn && check.fix) {
       console.log(`       Note: ${check.fix}`);
     }

@@ -489,7 +489,7 @@ function VaultGraph({ onOpenFile }: { onOpenFile: (p: string) => void }) {
 
   // ── Mouse wheel zoom ──────────────────────────────────────────────────────
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
+  const handleWheel = useCallback((e: React.WheelEvent | WheelEvent) => {
     e.preventDefault();
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -598,6 +598,11 @@ function VaultGraph({ onOpenFile }: { onOpenFile: (p: string) => void }) {
   }, [onOpenFile]);
 
   const handleLeave = useCallback(() => {
+    // Unpin any dragged node before clearing the drag ref
+    if (dragRef.current?.node) {
+      dragRef.current.node.fx = undefined;
+      dragRef.current.node.fy = undefined;
+    }
     panRef.current = { active: false, sx: 0, sy: 0, stx: 0, sty: 0 };
     dragRef.current = null;
     hovRef.current = null;
@@ -626,6 +631,15 @@ function VaultGraph({ onOpenFile }: { onOpenFile: (p: string) => void }) {
     xfTargetRef.current = { x: w / 2 - cx * k, y: h / 2 - cy * k, k };
     dirtyRef.current = true;
   }, []);
+
+  // Register wheel handler as non-passive so preventDefault() works
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const handler = (e: WheelEvent) => { handleWheel(e); };
+    canvas.addEventListener('wheel', handler, { passive: false });
+    return () => canvas.removeEventListener('wheel', handler);
+  }, [handleWheel]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', background: '#0d1117', display: 'flex', flexDirection: 'column' }}>
@@ -688,7 +702,7 @@ function VaultGraph({ onOpenFile }: { onOpenFile: (p: string) => void }) {
 
       <div ref={wrapRef} style={{ flex: 1, position: 'relative' }}>
         <canvas ref={canvasRef} style={{ display: 'block', cursor: 'grab', position: 'absolute', inset: 0 }}
-          onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
+          onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp} onMouseLeave={handleLeave} onClick={handleClick}
         />
       </div>

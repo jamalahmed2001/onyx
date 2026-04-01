@@ -31,8 +31,9 @@ export async function GET() {
   try {
     const projectFields = `id name description state updatedAt teams { nodes { key name } }`;
 
-    const query = teamId
-      ? `{ team(id: "${teamId}") { projects(first: 100, orderBy: updatedAt) { nodes { ${projectFields} } } } }`
+    const safeTeamId = teamId.replace(/["\\]/g, '');
+    const query = safeTeamId
+      ? `{ team(id: "${safeTeamId}") { projects(first: 100, orderBy: updatedAt) { nodes { ${projectFields} } } } }`
       : `{ projects(first: 100, orderBy: updatedAt) { nodes { ${projectFields} } } }`;
 
     const json = await gql(apiKey, query);

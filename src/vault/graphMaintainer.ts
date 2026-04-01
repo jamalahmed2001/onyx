@@ -108,7 +108,7 @@ function rewriteNavSection(raw: string, links: NavLink[]): string {
 function countWrongLinks(raw: string, canonical: NavLink[]): number {
   // Count ALL wikilinks across all nav sections that aren't in the canonical set
   const allNavLinks: string[] = [];
-  for (const navMatch of raw.matchAll(/## 🔗 Navigation[\s\S]*?(?=\n##|\n#[^#]|\s*$)/gm)) {
+  for (const navMatch of raw.matchAll(/## 🔗 Navigation[\s\S]*?(?=\n##|\n# (?!#)|$)/g)) {
     allNavLinks.push(...[...navMatch[0].matchAll(/\[\[([^\]|]+)/g)].map(m => m[1] ?? ''));
   }
   const allowed = new Set(canonical.map(l => l.target));
@@ -383,14 +383,14 @@ async function splitDocsHub(
     const apiKey = config.llm.apiKey ?? process.env['OPENROUTER_API_KEY'];
     if (!apiKey) {
       // No LLM available — number the groups sequentially
+      groups = new Map();
       const chunkSize = DOCS_SPLIT_THRESHOLD;
       for (let i = 0; i < docPaths.length; i += chunkSize) {
         const chunk = docPaths.slice(i, i + chunkSize);
         const groupNum = Math.floor(i / chunkSize) + 1;
-        groups = groups! ?? new Map();
         groups.set(`Group ${groupNum}`, chunk);
       }
-      groups = groups! ?? new Map([['General', docPaths]]);
+      if (groups.size === 0) groups = new Map([['General', docPaths]]);
     } else {
       const prompt = `Given these document titles from a project named "${projectName}", group them into 2-4 logical categories.
 Titles: ${docTitles.join(', ')}
@@ -625,8 +625,10 @@ created: ${today}
         : parseInt(path.basename(phasePath).match(/\d+/)?.[0] ?? '1', 10);
       const phaseName = String(phaseNode.frontmatter['phase_name'] ?? path.basename(phasePath, '.md'));
 
-      const parentTarget = `${projectName} - Kanban`;
-      const parentDisplay = 'Kanban';
+      // Link to Phase Group if groups exist, otherwise Kanban
+      const groupPath = usePhaseGroups ? phaseGroupMap.get(phaseGroupNum(phaseNum)) : undefined;
+      const parentTarget = groupPath ? path.basename(groupPath, '.md') : `${projectName} - Kanban`;
+      const parentDisplay = groupPath ? path.basename(groupPath, '.md') : 'Kanban';
 
       const logBase = `L${phaseNum} - ${phaseName}.md`;
       const logPath = path.join(bundleDir, 'Logs', logBase);

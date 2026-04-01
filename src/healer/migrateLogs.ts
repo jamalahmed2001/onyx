@@ -1,27 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import { discoverAllPhases } from '../vault/discover.js';
+import { safeFileSegment } from '../vault/writer.js';
 import type { HealAction } from './index.js';
 
-// Hard migration (Option A):
+// Hard migration:
 // Canonical logs are now: Logs/L{n} - <Phase Name>.md
-//
-// Migration does:
-// - Ensure canonical log exists (prefer renaming whichever legacy file exists)
-// - Update phase note + Agent Log Hub links to point at the canonical filename
-// - Move any other old-format logs into Logs/_Archive/legacy-logs/ (or duplicates/)
-//
-// Safety rules:
-// - Only rename when target doesn't already exist.
-// - If both exist, leave legacy file in place and emit a detected (not applied) action.
-
-function safeFileSegment(s: string): string {
-  return String(s)
-    .trim()
-    .replace(/[\\/:*?"<>|]/g, '-')
-    .replace(/\s+/g, ' ')
-    .slice(0, 140);
-}
+// Safety: only rename when target doesn't already exist.
 
 function canonicalLogFilename(n: number, phaseName: string): string {
   const seg = safeFileSegment(phaseName);

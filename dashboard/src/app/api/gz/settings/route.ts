@@ -45,8 +45,8 @@ export async function PUT(req: NextRequest) {
     if (body.agentDriver) cfg.agent_driver = body.agentDriver;
     if (body.llmModel || body.openrouterApiKey !== undefined) {
       cfg.llm = { ...(cfg.llm ?? {}) };
-      if (body.llmModel)         cfg.llm.model   = body.llmModel;
-      if (body.openrouterApiKey) cfg.llm.api_key = body.openrouterApiKey;
+      if (body.llmModel !== undefined)         cfg.llm.model   = body.llmModel;
+      if (body.openrouterApiKey !== undefined) cfg.llm.api_key = body.openrouterApiKey;
     }
 
     if (body.lat !== undefined || body.lng !== undefined) {

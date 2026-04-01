@@ -137,3 +137,54 @@ export function discoverAllPhases(vaultRoot: string, projectsGlob: string): Phas
     .filter(n => n.exists)
     .sort((a, b) => phaseNumber(a) - phaseNumber(b));
 }
+
+// Detect dependency cycles within a set of phases (e.g. P1 → P2 → P1).
+// A cycle produces a permanent deadlock: neither phase will ever execute because
+// each waits for the other. Returns one entry per cycle found, with the phase
+// numbers involved.  Call this at controller startup and warn loudly if non-empty.
+export function detectDependencyCycles(
+  phases: PhaseNode[],
+): Array<{ cycle: number[] }> {
+  const byNum = new Map<number, PhaseNode>();
+  for (const p of phases) {
+    const n = phaseNumber(p);
+    if (n !== Infinity) byNum.set(n, p);
+  }
+
+  const cycles: Array<{ cycle: number[] }> = [];
+  const visiting = new Set<number>();
+  const visited  = new Set<number>();
+
+  function dfs(num: number, ancestry: number[]): void {
+    if (visiting.has(num)) {
+      // We've looped back — slice off the cycle portion from the ancestry
+      const cycleStart = ancestry.indexOf(num);
+      cycles.push({ cycle: ancestry.slice(cycleStart) });
+      return;
+    }
+    if (visited.has(num)) return;
+
+    visiting.add(num);
+    const node = byNum.get(num);
+    if (node) {
+      const deps = node.frontmatter['depends_on'];
+      const depNums: number[] = (
+        Array.isArray(deps)
+          ? (deps as unknown[]).map(parsDepNum)
+          : [parsDepNum(deps)]
+      ).filter(n => n > 0);
+
+      for (const dep of depNums) {
+        dfs(dep, [...ancestry, num]);
+      }
+    }
+    visiting.delete(num);
+    visited.add(num);
+  }
+
+  for (const [num] of byNum) {
+    if (!visited.has(num)) dfs(num, []);
+  }
+
+  return cycles;
+}

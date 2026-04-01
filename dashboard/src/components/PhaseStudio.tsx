@@ -109,10 +109,12 @@ export default function PhaseStudio({ phase, onClose, onRunCLI }: Props) {
 
   const fetchLog = useCallback(async () => {
     setLogLoading(true);
-    const data = await fetch(`/api/gz/phase-logs?path=${encodeURIComponent(phase.path)}`).then(r => r.json()) as { exists: boolean; content: string | null };
-    setLogExists(data.exists);
-    setLogContent(data.content);
-    setLogLoading(false);
+    try {
+      const data = await fetch(`/api/gz/phase-logs?path=${encodeURIComponent(phase.path)}`).then(r => r.json()) as { exists: boolean; content: string | null };
+      setLogExists(data.exists);
+      setLogContent(data.content);
+    } catch { /* non-fatal */ }
+    finally { setLogLoading(false); }
   }, [phase.path]);
 
   // Auto-poll logs every 3s when active

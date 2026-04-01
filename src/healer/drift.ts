@@ -12,9 +12,10 @@ import type { HealAction } from './index.js';
 const NAV_BLOCK_RE = /## 🔗 Navigation[\s\S]*?(?=\n##|\n# (?!#)|$)/g;
 
 // Deduplicate wikilinks within all nav blocks in a file.
+// Uses the same pattern as NAV_BLOCK_RE — no 'm' flag, so '$' is end-of-string only.
 // Returns the original string if no changes were needed.
 function deduplicateNavLinks(raw: string): string {
-  return raw.replace(/## 🔗 Navigation([\s\S]*?)(?=\n##|\n# (?!#)|\s*$)/gm, (match, body) => {
+  return raw.replace(/## 🔗 Navigation([\s\S]*?)(?=\n##|\n# (?!#)|$)/g, (match, body) => {
     const lines = body.split('\n');
     const seen = new Set<string>();
     const deduped = lines.filter((line: string) => {
@@ -88,12 +89,13 @@ export function healDrift(vaultRoot: string, projectsGlob: string): HealAction[]
       });
     } else if (typeof fm['state'] === 'string' && normalizeTag(fm['state'] as string) !== canonicalState) {
       // state field exists but is out of sync with tags — tags win during migration
+      const oldState = fm['state'];
       fm['state'] = canonicalState;
       dirty = true;
       actions.push({
         type: 'frontmatter_drift_fixed',
         phaseNotePath: phase.path,
-        description: `state field "${fm['state']}" → "${canonicalState}" (aligned to phase tag)`,
+        description: `state field "${oldState}" → "${canonicalState}" (aligned to phase tag)`,
         applied: false,
       });
     }
@@ -170,11 +172,23 @@ export function healDrift(vaultRoot: string, projectsGlob: string): HealAction[]
         try {
           const parsed = matter(rawContent);
           const firstNav = navMatches[0]![0]!.trimEnd();
-          const cleanBody = parsed.content
-            .replace(NAV_BLOCK_RE, '')
-            .replace(/\n{3,}/g, '\n\n')
-            .trimStart();
-          writeFile(phase.path, matter.stringify(firstNav + '\n\n' + cleanBody, parsed.data as Record<string, unknown>));
+          // Replace all nav blocks with empty, then re-insert the first one at its original position
+          let fixedBody = parsed.content;
+          // Remove all nav blocks
+          const allNavs = [...fixedBody.matchAll(NAV_BLOCK_RE)];
+          // Replace from last to first to preserve offsets
+          for (let n = allNavs.length - 1; n >= 0; n--) {
+            const m = allNavs[n]!;
+            if (n === 0) {
+              // Keep the first nav block (deduplicated)
+              fixedBody = fixedBody.slice(0, m.index!) + firstNav + fixedBody.slice(m.index! + m[0].length);
+            } else {
+              // Remove duplicates
+              fixedBody = fixedBody.slice(0, m.index!) + fixedBody.slice(m.index! + m[0].length);
+            }
+          }
+          fixedBody = fixedBody.replace(/\n{3,}/g, '\n\n');
+          writeFile(phase.path, matter.stringify(fixedBody, parsed.data as Record<string, unknown>));
           action.applied = true;
         } catch { /* leave applied:false */ }
         actions.push(action);
@@ -244,11 +258,18 @@ export function healDrift(vaultRoot: string, projectsGlob: string): HealAction[]
       try {
         const parsed = matter(raw);
         const firstNav = navMatches[0]![0]!.trimEnd();
-        const cleanBody = parsed.content
-          .replace(NAV_BLOCK_RE, '')
-          .replace(/\n{3,}/g, '\n\n')
-          .trimStart();
-        writeFile(filePath, matter.stringify(firstNav + '\n\n' + cleanBody, parsed.data as Record<string, unknown>));
+        let fixedBody = parsed.content;
+        const allNavs = [...fixedBody.matchAll(NAV_BLOCK_RE)];
+        for (let n = allNavs.length - 1; n >= 0; n--) {
+          const m = allNavs[n]!;
+          if (n === 0) {
+            fixedBody = fixedBody.slice(0, m.index!) + firstNav + fixedBody.slice(m.index! + m[0].length);
+          } else {
+            fixedBody = fixedBody.slice(0, m.index!) + fixedBody.slice(m.index! + m[0].length);
+          }
+        }
+        fixedBody = fixedBody.replace(/\n{3,}/g, '\n\n');
+        writeFile(filePath, matter.stringify(fixedBody, parsed.data as Record<string, unknown>));
         action.applied = true;
       } catch { /* leave applied:false */ }
       actions.push(action);

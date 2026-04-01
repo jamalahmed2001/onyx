@@ -11,7 +11,7 @@ export async function runPhaseReview(
   runId: string,
   config: ControllerConfig,
 ): Promise<void> {
-  if (!config.llm?.apiKey) return;
+  if (!config.llm?.apiKey && !process.env['OPENROUTER_API_KEY']) return;
 
   const projectId = String(phaseNode.frontmatter['project'] ?? '');
   const phaseLabel = String(phaseNode.frontmatter['phase_name'] ?? '');

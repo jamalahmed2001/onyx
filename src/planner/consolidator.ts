@@ -3,7 +3,7 @@ import type { PhaseNode, VaultBundle } from '../vault/reader.js';
 import { readPhaseNode } from '../vault/reader.js';
 import type { ControllerConfig } from '../config/load.js';
 import { notify } from '../notify/notify.js';
-import { appendToLog, writeFile } from '../vault/writer.js';
+import { appendToLog, writeFile, deriveLogNotePath } from '../vault/writer.js';
 import { chatCompletion } from '../llm/client.js';
 import path from 'path';
 import fs from 'fs';
@@ -35,7 +35,7 @@ export async function consolidatePhase(
   const phaseLabel = String(phaseNode.frontmatter['phase_name'] ?? path.basename(phaseNode.path, '.md'));
   const phaseNumber = phaseNode.frontmatter['phase_number'] ?? 0;
 
-  const logNotePath = path.join(bundle.logsDir, `L${phaseNumber} - ${path.basename(phaseNode.path)}`);
+  const logNotePath = deriveLogNotePath(phaseNode.path, phaseNode.frontmatter);
   const logNode = readPhaseNode(logNotePath);
   const logContent = logNode.exists ? logNode.raw : `No log for: ${phaseLabel}`;
 
@@ -90,8 +90,8 @@ export async function consolidatePhase(
       const block = `\n\n${phaseRef}\n${items.map(i => `- ${i}`).join('\n')}`;
       if (new RegExp(`## ${heading}`).test(content)) {
         return content.replace(
-          new RegExp(`(## ${heading}[\\s\\S]*?)(\\n##|\\s*$)`),
-          `$1${block}$2`
+          new RegExp(`(## ${heading}[\\s\\S]*?)(\\n##|$)`),
+          `$1${block}\n$2`
         );
       }
       return content.trimEnd() + `\n\n## ${heading}\n${block}\n`;
@@ -130,7 +130,7 @@ export async function consolidatePhase(
     ].filter(Boolean).join(', ');
 
     appendToLog(phaseNode.path, { runId, event: 'consolidate_done', detail: `Knowledge updated: ${sections || 'nothing extracted'}` });
-    await notify({ event: 'atomise_done', projectId, phaseLabel, detail: 'Phase consolidated', runId }, config);
+    await notify({ event: 'consolidate_done', projectId, phaseLabel, detail: 'Phase consolidated', runId }, config);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     appendToLog(phaseNode.path, { runId, event: 'consolidate_done', detail: `Failed: ${detail}` });

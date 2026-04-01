@@ -14,12 +14,9 @@ import { spawnClaudeCode } from '../agents/claudeCodeSpawn.js';
  * because each task has a detailed spec to follow and a cheaper model suffices.
  */
 function planningModel(config: ControllerConfig): string {
-  // Explicit planning_model in config wins
-  if (config.modelTiers?.['planning' as keyof typeof config.modelTiers]) {
-    return config.modelTiers['planning' as keyof typeof config.modelTiers] as string;
-  }
-  // Otherwise use heavy tier — planning is always a high-complexity call
-  return config.modelTiers?.heavy ?? 'anthropic/claude-opus-4-6';
+  // Planning always uses the heavy tier — it requires the best reasoning available.
+  // light/standard are for execution tasks that have a concrete spec to follow.
+  return config.modelTiers.heavy;
 }
 
 /**

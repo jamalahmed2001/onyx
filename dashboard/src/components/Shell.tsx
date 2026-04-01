@@ -25,7 +25,7 @@ const NAV: { id: Tab; label: string; Icon: React.ElementType; shortcut: string }
   { id: 'system', label: 'System', Icon: Settings,         shortcut: '5' },
 ];
 
-interface CLIOut { cmd: string; output: string; exitCode: number; ts: number }
+interface CLIOut { cmd: string; output: string; exitCode: number; ts: number; id: string }
 
 // ─── Search constants ─────────────────────────────────────────────────────────
 
@@ -74,14 +74,20 @@ function QuickCapture({ onClose }: { onClose: () => void }) {
   const save = async () => {
     if (!text.trim()) return;
     setSaving(true);
-    await fetch('/api/gz/inbox', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text.trim() }),
-    });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(onClose, 600);
+    try {
+      const res = await fetch('/api/gz/inbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text.trim() }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setSaved(true);
+      setTimeout(onClose, 600);
+    } catch {
+      alert('Failed to save to inbox');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -160,7 +166,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
   const [saved, setSaved]   = useState(false);
 
   useEffect(() => {
-    fetch('/api/gz/settings').then(r => r.json()).then(d => setData(d));
+    fetch('/api/gz/settings').then(r => r.json()).then(d => setData(d)).catch(() => setData(null));
   }, []);
 
   const save = async () => {
@@ -176,14 +182,20 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
     if (linearApiKey)     body.linearApiKey     = linearApiKey;
     if (openrouterApiKey) body.openrouterApiKey = openrouterApiKey;
     body.modelTiers = data.modelTiers;
-    await fetch('/api/gz/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    try {
+      const res = await fetch('/api/gz/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      alert('Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -286,12 +298,12 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
               <div style={{ display: 'flex', gap: 8 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: 'var(--text-faint)', marginBottom: 4 }}>Latitude</div>
-                  <input value={data.lat} onChange={e => setData({ ...data, lat: parseFloat(e.target.value) || data.lat })}
+                  <input value={data.lat} onChange={e => { const v = parseFloat(e.target.value); setData({ ...data, lat: Number.isFinite(v) ? v : data.lat }); }}
                     style={{ width: '100%', padding: '6px 8px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-str)', fontSize: 11, outline: 'none', fontFamily: 'monospace' }}/>
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: 'var(--text-faint)', marginBottom: 4 }}>Longitude</div>
-                  <input value={data.lng} onChange={e => setData({ ...data, lng: parseFloat(e.target.value) || data.lng })}
+                  <input value={data.lng} onChange={e => { const v = parseFloat(e.target.value); setData({ ...data, lng: Number.isFinite(v) ? v : data.lng }); }}
                     style={{ width: '100%', padding: '6px 8px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-str)', fontSize: 11, outline: 'none', fontFamily: 'monospace' }}/>
                 </div>
               </div>
@@ -388,8 +400,14 @@ export default function Shell() {
       const tabKeys: Record<string, Tab> = { '1':'today','2':'kanban','3':'vault','4':'runs','5':'system' };
 
       if (e.key === 'Escape') {
-        setDrawerPath(null); setCliOpen(false); setSearchOpen(false);
-        setDetailProject(null); setLinearOpen(false); setCaptureOpen(false); setSettingsOpen(false);
+        // Dismiss topmost overlay only (priority order)
+        if (settingsOpen)          { setSettingsOpen(false); return; }
+        if (captureOpen)           { setCaptureOpen(false); return; }
+        if (linearOpen)            { setLinearOpen(false); return; }
+        if (searchOpen)            { setSearchOpen(false); setSearchQ(''); setSearchHits([]); return; }
+        if (detailProject)         { setDetailProject(null); return; }
+        if (drawerPath)            { setDrawerPath(null); return; }
+        if (cliOpen)               { setCliOpen(false); return; }
         return;
       }
       if (inInput) return;
@@ -405,19 +423,23 @@ export default function Shell() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [fetchData]);
+  }, [fetchData, settingsOpen, captureOpen, linearOpen, searchOpen, detailProject, drawerPath, cliOpen]);
 
   useEffect(() => { if (searchOpen) setTimeout(() => searchRef.current?.focus(), 40); }, [searchOpen]);
 
+  const cliIdRef = useRef(0);
   const runCLI = useCallback(async (cmd: string, args: string[] = []) => {
-    const entry: CLIOut = { cmd: [cmd, ...args].join(' '), output: '…running', exitCode: -1, ts: Date.now() };
+    const id = `cli_${++cliIdRef.current}_${Date.now()}`;
+    const entry: CLIOut = { cmd: [cmd, ...args].join(' '), output: '…running', exitCode: -1, ts: Date.now(), id };
     setCliLog(l => [entry, ...l.slice(0, 9)]);
     setCliOpen(true);
     try {
       const res = await fetch('/api/gz/cli', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cmd, args }) });
       const d = await res.json() as CLIOut;
-      setCliLog(l => l.map(x => x.ts === entry.ts ? { ...entry, ...d } : x));
-    } catch { /* ignore */ }
+      setCliLog(l => l.map(x => x.id === entry.id ? { ...entry, ...d } : x));
+    } catch {
+      setCliLog(l => l.map(x => x.id === entry.id ? { ...entry, output: 'Request failed', exitCode: 1 } : x));
+    }
     void fetchData();
   }, [fetchData]);
 
@@ -439,6 +461,7 @@ export default function Shell() {
       } catch { setSearchHits([]); }
       finally { setSearchLoading(false); }
     }, 260);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
   }, [searchQ]);
 
   return (

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import { getAllProjects, getVaultRoot } from '@/lib/vault';
 
 export const dynamic = 'force-dynamic';
@@ -39,9 +39,15 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ error: `git add failed: ${add.out}` }, { status: 500 });
   }
 
-  // Commit
-  const safeMsgArg = JSON.stringify(message.trim().replace(/"/g, '\\"'));
-  const commit = runGit(repoPath, `commit -m ${safeMsgArg}`);
+  // Commit — use execFileSync to avoid shell interpretation of message content
+  let commit: { out: string; ok: boolean };
+  try {
+    const out = execFileSync('git', ['commit', '-m', message.trim()], { cwd: repoPath, encoding: 'utf8', timeout: 20_000, stdio: ['ignore','pipe','pipe'] });
+    commit = { out: out.toString(), ok: true };
+  } catch (e: unknown) {
+    const err = e as { stdout?: string; stderr?: string };
+    commit = { out: (err.stdout ?? '') + (err.stderr ?? ''), ok: false };
+  }
 
   if (!commit.ok && !commit.out.includes('nothing to commit')) {
     return NextResponse.json({ error: `git commit failed: ${commit.out}` }, { status: 500 });

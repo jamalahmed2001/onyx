@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   }
 
   // Sanitise args
-  const safeArgs = args.map(a => a.replace(/[;&|`$<>\\]/g, '').trim()).filter(Boolean);
+  const safeArgs = args.map(a => a.replace(/[;&|`$<>\\"'(){}*?!\n\r]/g, '').trim()).filter(Boolean);
 
   if (ASYNC_CMDS.has(cmd)) {
     // Fire-and-forget: spawn detached, return jobId for polling

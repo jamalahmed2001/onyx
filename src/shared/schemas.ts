@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { PhaseState } from './types.js';
-import { canTransition } from '../fsm/states.js';
+import { canTransition, PHASE_TRANSITIONS } from '../fsm/states.js';
 
 export const PhaseTagSchema = z.enum([
   'phase-backlog', 'phase-planning', 'phase-ready',
@@ -154,13 +154,5 @@ export function validateFSMTransition(from: PhaseState, to: PhaseState): Validat
 }
 
 function getTransitionTargets(from: PhaseState): PhaseState[] {
-  const map: Record<PhaseState, PhaseState[]> = {
-    backlog:   ['planning', 'ready'],
-    planning:  ['ready', 'backlog'],
-    ready:     ['active', 'planning'],
-    active:    ['completed', 'blocked'],
-    blocked:   ['active', 'planning'],
-    completed: ['planning'],
-  };
-  return map[from] ?? [];
+  return PHASE_TRANSITIONS[from] ?? [];
 }

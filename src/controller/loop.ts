@@ -1,7 +1,7 @@
 import type { ControllerConfig } from '../config/load.js';
 import { runAllHeals } from '../healer/index.js';
 import { maintainVaultGraph } from '../vault/graphMaintainer.js';
-import { discoverAllPhases, dependenciesMet } from '../vault/discover.js';
+import { discoverAllPhases, dependenciesMet, detectDependencyCycles } from '../vault/discover.js';
 import { routePhase } from './router.js';
 import { runPhase } from '../executor/runPhase.js';
 import { atomisePhase } from '../planner/atomiser.js';
@@ -102,6 +102,23 @@ export async function runLoop(config: ControllerConfig, opts: RunOptions = {}): 
       }, config);
     }
 
+    // Cycle detection — a cycle in depends_on is a permanent deadlock.
+    // Check once at startup so operators get an immediate, clear error rather
+    // than a confusing "no actionable phases" message that gives no hint why.
+    {
+      const allPhasesForCycleCheck = discoverAllPhases(config.vaultRoot, config.projectsGlob);
+      const cycles = detectDependencyCycles(allPhasesForCycleCheck);
+      if (cycles.length > 0) {
+        for (const { cycle } of cycles) {
+          const msg = `Dependency cycle detected: P${cycle.join(' → P')} → P${cycle[0]} — these phases will never execute`;
+          console.error(`[gzos] ⚠  ${msg}`);
+          await notify({ event: 'phase_blocked', detail: msg, runId }, config);
+        }
+        // Don't abort — cycles only affect the phases involved, others can still run
+      }
+    }
+
+    let ranToLimit = false;
     for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
       // Check shutdown before each iteration
       if (_shutdownRequested) {
@@ -163,57 +180,62 @@ export async function runLoop(config: ControllerConfig, opts: RunOptions = {}): 
         }
 
         switch (operation.op) {
+
+          // ── atomise: phase is in backlog — generate a task plan ───────────
           case 'atomise': {
+            const phaseLabel = String(phase.frontmatter['phase_name'] ?? path.basename(phase.path, '.md'));
+            const projectId  = String(phase.frontmatter['project'] ?? '');
             const result = await atomisePhase(operation.phaseNode, runId, config);
             phasesActedOn.push(phase.path);
             anyWork = true;
             onceDone = true;
             await notify({
               event: result === 'ready' ? 'atomise_done' : 'phase_blocked',
-              projectId: String(phase.frontmatter['project'] ?? ''),
-              phaseLabel: String(phase.frontmatter['phase_name'] ?? path.basename(phase.path, '.md')),
+              projectId,
+              phaseLabel,
               runId,
             }, config);
             break;
           }
 
+          // ── execute: phase is ready/active — run tasks with agent ─────────
+          // On completion, extract knowledge and run review inline.
+          // completed is terminal: the router returns skip on subsequent iterations.
           case 'execute': {
+            const phaseLabel = String(phase.frontmatter['phase_name'] ?? '');
+            const projectId  = String(phase.frontmatter['project'] ?? '');
+            const bundleDir  = path.dirname(path.dirname(phase.path));
             const result = await runPhase(operation.phaseNode, runId, config);
             phasesActedOn.push(phase.path);
             anyWork = true;
             onceDone = true;
+
             if (result.status === 'completed') {
-              await notify({
-                event: 'phase_completed',
-                projectId: String(phase.frontmatter['project'] ?? ''),
-                phaseLabel: String(phase.frontmatter['phase_name'] ?? ''),
-                detail: `${result.tasksCompleted} tasks done`,
-                runId,
-              }, config);
-              // Auto-fire consolidator to extract learnings into Knowledge.md
+              await notify({ event: 'phase_completed', projectId, phaseLabel, detail: `${result.tasksCompleted} tasks done`, runId }, config);
+
+              // Extract structured learnings (decisions, gotchas, patterns) into Knowledge.md
               if (config.llm?.apiKey) {
-                try {
-                  const bundleDir = path.dirname(path.dirname(phase.path));
-                  const projectId = String(phase.frontmatter['project'] ?? path.basename(bundleDir));
-                  const bundle = readBundle(bundleDir, projectId);
-                  await consolidatePhase(operation.phaseNode, bundle, runId, config);
-                } catch (err) {
-                  console.warn('[gzos] Consolidation failed (non-fatal):', (err as Error).message);
-                }
+                const bundle = readBundle(bundleDir, projectId || path.basename(bundleDir));
+                await consolidatePhase(operation.phaseNode, bundle, runId, config).catch(err =>
+                  console.warn('[gzos] Knowledge extraction failed (non-fatal):', (err as Error).message)
+                );
               }
-              // Phase review skill — after consolidation
-              await runPhaseReview(operation.phaseNode, result.repoPath, runId, config).catch(() => {});
+
+              // Auto-review: diff the repo and log a verdict
+              await runPhaseReview(operation.phaseNode, result.repoPath, runId, config).catch(err =>
+                console.warn('[gzos] Phase review failed (non-fatal):', (err as Error).message)
+              );
+
             } else if (result.status === 'blocked') {
-              // Attempt auto-replan before giving up — rewrites task list, sets back to phase-ready
+              // Auto-replan: rewrite task list from failure evidence, set back to phase-ready
               const replanResult = await replanPhase(operation.phaseNode, runId, config);
               if (replanResult !== 'replanned') {
-                // Replan not possible — surface for human review
                 await notify({
                   event: 'phase_blocked',
-                  projectId: String(phase.frontmatter['project'] ?? ''),
-                  phaseLabel: String(phase.frontmatter['phase_name'] ?? ''),
+                  projectId,
+                  phaseLabel,
                   detail: replanResult === 'max_reached'
-                    ? `Max replans reached — needs human review`
+                    ? 'Max replans reached — needs human review'
                     : (result.blockers[0] ?? 'Blocked'),
                   runId,
                 }, config);
@@ -222,17 +244,7 @@ export async function runLoop(config: ControllerConfig, opts: RunOptions = {}): 
             break;
           }
 
-          case 'consolidate': {
-            const bundleDir = path.dirname(path.dirname(phase.path));
-            const projectId = String(phase.frontmatter['project'] ?? path.basename(bundleDir));
-            const bundle = readBundle(bundleDir, projectId);
-            await consolidatePhase(operation.phaseNode, bundle, runId, config);
-            phasesActedOn.push(phase.path);
-            anyWork = true;
-            onceDone = true;
-            break;
-          }
-
+          // ── surface_blocker: phase is blocked — notify operator ───────────
           case 'surface_blocker': {
             await notify({
               event: 'phase_blocked',
@@ -271,9 +283,12 @@ export async function runLoop(config: ControllerConfig, opts: RunOptions = {}): 
         await notify({ event: 'controller_idle', detail: 'No actionable phases', runId }, config);
         break;
       }
+
+      // Only mark as hitting the limit if we actually reached the last iteration without breaking
+      if (iteration === config.maxIterations) ranToLimit = true;
     }
 
-    if (results.length >= config.maxIterations && results[results.length - 1]?.halted === false) {
+    if (ranToLimit && results.length >= config.maxIterations && results[results.length - 1]?.halted === false) {
       const last = results[results.length - 1];
       if (last) {
         last.halted = true;

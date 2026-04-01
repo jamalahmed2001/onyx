@@ -77,10 +77,11 @@ export function selectNextTask(phaseContent: string): string | null {
   let foundTasksSection = false;
 
   // First pass: look for unchecked tasks in ## Tasks section only
-  for (const line of lines) {
-    const headingMatch = line.match(/^#{1,4}\s+(.+)$/);
-    if (headingMatch) {
-      const heading = normaliseHeading(headingMatch[1]!);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const h2Match = line.match(/^##\s+(.+)$/);
+    if (h2Match) {
+      const heading = normaliseHeading(h2Match[1]!);
       if (heading === 'tasks') {
         inTasksSection = true;
         inSkipSection  = false;
@@ -89,15 +90,19 @@ export function selectNextTask(phaseContent: string): string | null {
         inTasksSection = false;
         inSkipSection  = true;
       } else {
-        if (inTasksSection) inTasksSection = false;
+        inTasksSection = false;
         inSkipSection = false;
       }
       continue;
     }
+    // h3/h4 sub-headings inside ## Tasks do NOT exit the section
+    if (/^#{3,4}\s+/.test(line)) continue;
 
     if (inTasksSection && !inSkipSection) {
-      const uncheckedMatch = line.match(/^\s*[-*]\s*\[\s\]\s*(.+)$/);
-      if (uncheckedMatch) return line.trim();
+      if (/^\s*[-*]\s*\[\s\]/.test(line)) {
+        const task = collectBlockTask(lines, i);
+        return task;
+      }
     }
   }
 

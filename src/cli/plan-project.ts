@@ -1,57 +1,47 @@
-// gzos plan <project> [phase-number] [--extend]
+// gzos decompose / gzos atomise / gzos plan
 //
-// State-aware planning command:
-//   • No phases exist        → reads Overview + repo → creates P1..Pn phase stubs
-//   • Phases exist, backlog  → generates task plans for them → marks ready
-//   • All phases have tasks  → suggests --extend (or runs it if flag passed)
-//   • --extend               → reads current Overview + knowledge → adds new phases
+// Two explicit commands that give the user clear control:
 //
-// The Overview.md is the source of truth for project direction.
-// Update it with new scope, then run `gzos plan <project> --extend` to generate
-// additional phases that continue the work and reflect the updated scope.
+//   gzos decompose <project>            Overview → P1..Pn phase stubs (backlog)
+//   gzos decompose <project> --extend   Updated Overview → add new phases
+//   gzos atomise <project>              All backlog phases → tasks → ready
+//   gzos atomise <project> 3            Just P3 → tasks → ready
+//
+// `gzos plan` is a convenience shortcut that runs decompose then atomise.
 
 import { loadConfig } from '../config/load.js';
 import { discoverBundles } from '../vault/reader.js';
 import { discoverAllPhases } from '../vault/discover.js';
 import { planPhases, planNewPhases } from '../planner/phasePlanner.js';
 import { atomisePhase } from '../planner/atomiser.js';
-import { stateFromNode } from '../fsm/nodeAdapter.js';
+import { stateFromFrontmatter } from '../shared/vault-parse.js';
 import { generateRunId } from '../controller/loop.js';
+import type { ControllerConfig } from '../config/load.js';
+import type { VaultBundle } from '../vault/reader.js';
 import path from 'path';
 import fs from 'fs';
 
-export async function runPlanProject(projectArg?: string, phaseArg?: string, opts?: { extend?: boolean }): Promise<void> {
-  if (!projectArg) {
-    console.log('Usage: gzos plan <project> [phase-number] [--extend]');
-    console.log('');
-    console.log('  No flags:     creates phase stubs (if none exist) then atomises all backlog phases.');
-    console.log('  --extend:     reads current Overview + knowledge → adds new phases continuing the work.');
-    console.log('  phase-number: atomises that specific phase only (generates tasks, marks ready).');
-    console.log('');
-    console.log('The Overview.md is the source of truth. Update it with new scope, then run --extend.');
-    console.log('');
-    console.log('Examples:');
-    console.log('  gzos plan "GZ Demo"           — full plan: create phases + write tasks');
-    console.log('  gzos plan "GZ Demo" 2          — atomise P2 only');
-    console.log('  gzos plan "GZ Demo" --extend   — add new phases based on current Overview');
-    process.exit(0);
-  }
+// ── Shared: load config + resolve bundle ─────────────────────────────────────
 
-  let config;
+function loadConfigOrExit(): ControllerConfig {
   try {
-    config = loadConfig();
+    return loadConfig();
   } catch (err) {
     console.error('[gzos] Failed to load config:', (err as Error).message);
     console.error('       Run: gzos doctor');
     process.exit(1);
   }
+}
 
+function requireApiKey(config: ControllerConfig): void {
   const apiKey = config.llm?.apiKey ?? process.env['OPENROUTER_API_KEY'];
   if (!apiKey) {
     console.error('[gzos] No LLM API key configured. Set OPENROUTER_API_KEY in your .env');
     process.exit(1);
   }
+}
 
+function resolveBundle(projectArg: string, config: ControllerConfig): VaultBundle {
   const bundles = discoverBundles(config.vaultRoot, config.projectsGlob);
   const bundle = bundles.find(b => b.projectId.toLowerCase().includes(projectArg.toLowerCase()));
   if (!bundle) {
@@ -60,11 +50,95 @@ export async function runPlanProject(projectArg?: string, phaseArg?: string, opt
     for (const b of bundles) console.log(`  - ${b.projectId}`);
     process.exit(1);
   }
+  return bundle;
+}
 
+function findProjectPhases(config: ControllerConfig, bundle: VaultBundle) {
+  const allPhases = discoverAllPhases(config.vaultRoot, config.projectsGlob);
+  return allPhases.filter(p =>
+    String(p.frontmatter['project'] ?? '').toLowerCase() === bundle.projectId.toLowerCase() ||
+    p.path.startsWith(bundle.bundleDir)
+  );
+}
+
+// ── decompose: Overview → phase stubs ────────────────────────────────────────
+
+export async function runDecompose(projectArg?: string, opts?: { extend?: boolean }): Promise<void> {
+  if (!projectArg) {
+    console.log('Usage: gzos decompose <project> [--extend]');
+    console.log('');
+    console.log('  Reads the Overview and generates phase stubs (status: backlog).');
+    console.log('  --extend: reads updated Overview + knowledge → adds new phases.');
+    console.log('');
+    console.log('Examples:');
+    console.log('  gzos decompose "GZ Demo"           — create P1..Pn from Overview');
+    console.log('  gzos decompose "GZ Demo" --extend   — add new phases from updated scope');
+    process.exit(0);
+  }
+
+  const config = loadConfigOrExit();
+  requireApiKey(config);
+  const bundle = resolveBundle(projectArg, config);
   const runId = generateRunId();
-  const phasesDir = path.join(bundle.bundleDir, 'Phases');
 
-  // ── If targeting a specific phase, skip creation and just atomise it ────────
+  if (opts?.extend) {
+    console.log(`\nExtending "${bundle.projectId}" with new phases from Overview...`);
+    console.log('  (Overview.md is the source of truth — scope updates there drive new phases)');
+    const newPhases = await planNewPhases(bundle, runId, config);
+    if (newPhases.length === 0) {
+      console.error('  ✗ Extension failed — check your LLM API key and Overview content');
+      process.exit(1);
+    }
+    console.log(`  ✓ ${newPhases.length} new phase(s) added`);
+    console.log(`\n  Next: gzos atomise "${bundle.projectId}"  — to generate tasks for the new phases`);
+    return;
+  }
+
+  const phasesDir = path.join(bundle.bundleDir, 'Phases');
+  const existingPhaseFiles = fs.existsSync(phasesDir)
+    ? fs.readdirSync(phasesDir).filter(f => f.match(/^P\d+/) && f.endsWith('.md'))
+    : [];
+
+  if (existingPhaseFiles.length > 0) {
+    console.log(`\nPhases already exist (${existingPhaseFiles.length}) for "${bundle.projectId}".`);
+    console.log('  To add new phases: update Overview.md, then run:');
+    console.log(`    gzos decompose "${bundle.projectId}" --extend`);
+    console.log('  To generate tasks for existing backlog phases:');
+    console.log(`    gzos atomise "${bundle.projectId}"`);
+    return;
+  }
+
+  console.log(`\nDecomposing Overview into phases for "${bundle.projectId}"...`);
+  const created = await planPhases(bundle, runId, config);
+  if (created.length === 0) {
+    console.error('  ✗ Phase creation failed — check your LLM API key and Overview content');
+    process.exit(1);
+  }
+  console.log(`  ✓ ${created.length} phases created (all backlog)`);
+  console.log(`\n  Review in Obsidian, then run: gzos atomise "${bundle.projectId}"`);
+}
+
+// ── atomise: backlog phases → tasks → ready ──────────────────────────────────
+
+export async function runAtomiseCommand(projectArg?: string, phaseArg?: string): Promise<void> {
+  if (!projectArg) {
+    console.log('Usage: gzos atomise <project> [phase-number]');
+    console.log('');
+    console.log('  Generates concrete tasks for backlog phases and marks them ready.');
+    console.log('  With a phase number: atomises just that one phase.');
+    console.log('');
+    console.log('Examples:');
+    console.log('  gzos atomise "GZ Demo"     — all backlog phases → tasks → ready');
+    console.log('  gzos atomise "GZ Demo" 2   — just P2 → tasks → ready');
+    process.exit(0);
+  }
+
+  const config = loadConfigOrExit();
+  requireApiKey(config);
+  const bundle = resolveBundle(projectArg, config);
+  const runId = generateRunId();
+
+  // ── Single phase ──────────────────────────────────────────────────────────
   if (phaseArg) {
     const phaseNum = parseInt(phaseArg, 10);
     if (isNaN(phaseNum)) {
@@ -72,98 +146,52 @@ export async function runPlanProject(projectArg?: string, phaseArg?: string, opt
       process.exit(1);
     }
 
-    const allPhases = discoverAllPhases(config.vaultRoot, config.projectsGlob);
-    const projectPhases = allPhases.filter(p =>
-      String(p.frontmatter['project'] ?? '').toLowerCase() === bundle.projectId.toLowerCase() ||
-      p.path.startsWith(path.relative(config.vaultRoot, bundle.bundleDir))
-    );
-
+    const projectPhases = findProjectPhases(config, bundle);
     const phaseNode = projectPhases.find(p => Number(p.frontmatter['phase_number']) === phaseNum);
     if (!phaseNode) {
       console.error(`Phase ${phaseNum} not found in "${bundle.projectId}"`);
       console.log('Available phases:');
       for (const p of projectPhases) {
-        console.log(`  P${p.frontmatter['phase_number']} — ${p.frontmatter['phase_name']} [${stateFromNode(p)}]`);
+        console.log(`  P${p.frontmatter['phase_number']} — ${p.frontmatter['phase_name']} [${stateFromFrontmatter(p.frontmatter)}]`);
       }
       process.exit(1);
     }
 
-    const state = stateFromNode(phaseNode);
+    const state = stateFromFrontmatter(phaseNode.frontmatter);
     if (state !== 'backlog') {
-      console.log(`Phase P${phaseNum} is "${state}" — only backlog phases can be planned.`);
-      console.log(`  To re-plan it: gzos reset "${bundle.projectId}" ${phaseNum} → then re-run`);
+      console.log(`Phase P${phaseNum} is "${state}" — only backlog phases can be atomised.`);
+      console.log(`  To re-atomise: gzos reset "${bundle.projectId}" ${phaseNum} → then re-run`);
       return;
     }
 
-    console.log(`\nPlanning P${phaseNum} — ${phaseNode.frontmatter['phase_name']}...`);
+    console.log(`\nAtomising P${phaseNum} — ${phaseNode.frontmatter['phase_name']}...`);
     const result = await atomisePhase(phaseNode, runId, config);
     if (result === 'ready') {
-      console.log(`  ✓ Tasks written, phase marked ready`);
+      console.log('  ✓ Tasks written, phase marked ready');
       console.log(`\n  Next: gzos run --project "${bundle.projectId}"`);
     } else {
-      console.error('  ✗ Planning failed — check your LLM API key and try again');
+      console.error('  ✗ Atomisation failed — check your LLM API key and try again');
       process.exit(1);
     }
     return;
   }
 
-  // ── Full flow: create phases if needed, then atomise all backlog ────────────
-
-  // Step 1: create phase stubs if Phases/ is empty
-  const existingPhaseFiles = fs.existsSync(phasesDir)
-    ? fs.readdirSync(phasesDir).filter(f => f.match(/^P\d+/) && f.endsWith('.md'))
-    : [];
-
-  if (existingPhaseFiles.length === 0) {
-    console.log(`\n[1/2] No phases found — generating phase structure from Overview...`);
-    const created = await planPhases(bundle, runId, config);
-    if (created.length === 0) {
-      console.error('  ✗ Phase creation failed — check your LLM API key and Overview content');
-      process.exit(1);
-    }
-    console.log(`  ✓ ${created.length} phases created`);
-  } else {
-    console.log(`\n[1/2] Phases already exist (${existingPhaseFiles.length}) — skipping creation`);
-  }
-
-  // Step 2: atomise all backlog phases
-  const allPhases = discoverAllPhases(config.vaultRoot, config.projectsGlob);
-  const projectPhases = allPhases.filter(p =>
-    String(p.frontmatter['project'] ?? '').toLowerCase() === bundle.projectId.toLowerCase() ||
-    p.path.startsWith(path.relative(config.vaultRoot, bundle.bundleDir))
-  );
-
-  const backlogPhases = projectPhases.filter(p => stateFromNode(p) === 'backlog');
+  // ── All backlog phases ────────────────────────────────────────────────────
+  const projectPhases = findProjectPhases(config, bundle);
+  const backlogPhases = projectPhases.filter(p => stateFromFrontmatter(p.frontmatter) === 'backlog');
 
   if (backlogPhases.length === 0) {
-    if (opts?.extend) {
-      // --extend: Overview is source of truth — read it (may have new scope) and add phases
-      console.log(`\n[2/2] Extending project with new phases from Overview...`);
-      console.log(`  (Overview.md is the source of truth — scope updates there drive new phases)`);
-      const newPhases = await planNewPhases(bundle, runId, config);
-      if (newPhases.length === 0) {
-        console.error('  ✗ Extension failed — check your LLM API key and Overview content');
-        process.exit(1);
-      }
-      console.log(`  ✓ ${newPhases.length} new phase(s) added`);
-      console.log(`\n  Run: gzos plan "${bundle.projectId}"  to generate tasks for the new phases`);
-      console.log(`  Then: gzos run --project "${bundle.projectId}"`);
-      return;
-    }
-
-    console.log(`\n[2/2] No backlog phases to atomise — all phases already have tasks`);
+    console.log(`\nNo backlog phases to atomise in "${bundle.projectId}".`);
     console.log('\nPhase states:');
     for (const p of projectPhases) {
-      const icon = stateFromNode(p) === 'completed' ? '✓' : '○';
-      console.log(`  ${icon} P${p.frontmatter['phase_number']} — ${p.frontmatter['phase_name']} [${stateFromNode(p)}]`);
+      const icon = stateFromFrontmatter(p.frontmatter) === 'completed' ? '✓' : '○';
+      console.log(`  ${icon} P${p.frontmatter['phase_number']} — ${p.frontmatter['phase_name']} [${stateFromFrontmatter(p.frontmatter)}]`);
     }
-    console.log(`\n  To add new phases: update Overview.md with new scope, then run:`);
-    console.log(`    gzos plan "${bundle.projectId}" --extend`);
-    console.log(`\n  Next: gzos run --project "${bundle.projectId}"`);
+    console.log(`\n  To add new phases: gzos decompose "${bundle.projectId}" --extend`);
     return;
   }
 
-  console.log(`\n[2/2] Atomising ${backlogPhases.length} backlog phase(s)...`);
+  console.log(`\nAtomising ${backlogPhases.length} backlog phase(s) for "${bundle.projectId}"...`);
 
   let succeeded = 0;
   for (const phaseNode of backlogPhases) {
@@ -178,7 +206,87 @@ export async function runPlanProject(projectArg?: string, phaseArg?: string, opt
     }
   }
 
-  console.log(`\nDone. ${succeeded}/${backlogPhases.length} phases planned and ready.`);
+  console.log(`\nDone. ${succeeded}/${backlogPhases.length} phases atomised and ready.`);
+  if (succeeded > 0) {
+    console.log(`\n  Next: gzos run --project "${bundle.projectId}"`);
+  }
+}
+
+// ── plan: convenience shortcut (decompose + atomise) ─────────────────────────
+
+export async function runPlanProject(projectArg?: string, phaseArg?: string, opts?: { extend?: boolean }): Promise<void> {
+  if (!projectArg) {
+    console.log('Usage: gzos plan <project> [phase-number] [--extend]');
+    console.log('');
+    console.log('  Shortcut that runs decompose then atomise.');
+    console.log('  For more control, use the individual commands:');
+    console.log('    gzos decompose <project>     — Overview → phase stubs');
+    console.log('    gzos atomise <project> [n]    — backlog phases → tasks → ready');
+    process.exit(0);
+  }
+
+  // --extend is a decompose concern
+  if (opts?.extend) {
+    await runDecompose(projectArg, { extend: true });
+    return;
+  }
+
+  // Specific phase number → atomise only
+  if (phaseArg) {
+    await runAtomiseCommand(projectArg, phaseArg);
+    return;
+  }
+
+  // Full flow: decompose if needed, then atomise all backlog
+  const config = loadConfigOrExit();
+  requireApiKey(config);
+  const bundle = resolveBundle(projectArg, config);
+  const runId = generateRunId();
+  const phasesDir = path.join(bundle.bundleDir, 'Phases');
+
+  // Step 1: decompose (create phase stubs if none exist)
+  const existingPhaseFiles = fs.existsSync(phasesDir)
+    ? fs.readdirSync(phasesDir).filter(f => f.match(/^P\d+/) && f.endsWith('.md'))
+    : [];
+
+  if (existingPhaseFiles.length === 0) {
+    console.log(`\n[decompose] No phases found — generating from Overview...`);
+    const created = await planPhases(bundle, runId, config);
+    if (created.length === 0) {
+      console.error('  ✗ Phase creation failed — check your LLM API key and Overview content');
+      process.exit(1);
+    }
+    console.log(`  ✓ ${created.length} phases created`);
+  } else {
+    console.log(`\n[decompose] ${existingPhaseFiles.length} phases already exist — skipping`);
+  }
+
+  // Step 2: atomise all backlog phases
+  const projectPhases = findProjectPhases(config, bundle);
+  const backlogPhases = projectPhases.filter(p => stateFromFrontmatter(p.frontmatter) === 'backlog');
+
+  if (backlogPhases.length === 0) {
+    console.log(`[atomise] No backlog phases — all phases already have tasks`);
+    console.log(`\n  Next: gzos run --project "${bundle.projectId}"`);
+    return;
+  }
+
+  console.log(`\n[atomise] Writing tasks for ${backlogPhases.length} backlog phase(s)...`);
+
+  let succeeded = 0;
+  for (const phaseNode of backlogPhases) {
+    const label = `P${phaseNode.frontmatter['phase_number']} — ${phaseNode.frontmatter['phase_name']}`;
+    process.stdout.write(`  ${label}... `);
+    const result = await atomisePhase(phaseNode, runId, config);
+    if (result === 'ready') {
+      console.log('✓ ready');
+      succeeded++;
+    } else {
+      console.log('✗ failed');
+    }
+  }
+
+  console.log(`\nDone. ${succeeded}/${backlogPhases.length} phases atomised and ready.`);
   if (succeeded > 0) {
     console.log(`\n  Next: gzos run --project "${bundle.projectId}"`);
   }

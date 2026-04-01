@@ -1,6 +1,7 @@
 import os from 'os';
 import { readPhaseNode } from '../vault/reader.js';
 import { setLockFields, setPhaseTag, writeFrontmatter } from '../vault/writer.js';
+// setLockFields and setPhaseTag still used for TTL-expired lock clearing above
 import { appendAuditEvent } from '../audit/trail.js';
 import { validatePhaseForExecution } from '../shared/schemas.js';
 import type { PhaseTag } from '../fsm/states.js';
@@ -42,7 +43,7 @@ export function acquireLock(
     // Check TTL
     const lockedAt  = node.frontmatter['locked_at'];
     const lockTtl   = Number(node.frontmatter['lock_ttl_ms'] ?? DEFAULT_TTL_MS);
-    const elapsed   = lockedAt ? Date.now() - new Date(String(lockedAt)).getTime() : 0;
+    const elapsed   = lockedAt ? Date.now() - new Date(String(lockedAt)).getTime() : Infinity;
 
     if (elapsed > lockTtl) {
       // TTL expired — auto-clear
@@ -80,15 +81,19 @@ export function acquireLock(
     return { ok: false, reason: 'not_ready', currentTag };
   }
 
-  // Write the lock: set phase-active + locked_by + locked_at
+  // Single atomic write: state transition + all lock fields at once.
+  // No partial state visible to other processes between writes.
   const lockedAt = new Date().toISOString();
-  setPhaseTag(phaseNotePath, 'phase-active');
-  setLockFields(phaseNotePath, runId, lockedAt);
-
-  // Write extended lock metadata (pid, hostname, ttl)
-  const fresh = readPhaseNode(phaseNotePath);
+  const existingTags = Array.isArray(node.frontmatter['tags'])
+    ? (node.frontmatter['tags'] as string[])
+    : [];
   writeFrontmatter(phaseNotePath, {
-    ...fresh.frontmatter,
+    ...node.frontmatter,
+    state:         'active',
+    status:        'active',
+    tags:          [...existingTags.filter(t => !t.startsWith('phase-')), 'phase-active'],
+    locked_by:     runId,
+    locked_at:     lockedAt,
     lock_pid:      process.pid,
     lock_hostname: os.hostname(),
     lock_ttl_ms:   ttlMs,
@@ -110,7 +115,7 @@ export function acquireLock(
       ts:            new Date().toISOString(),
       event:         'lock_acquired',
       phaseNotePath,
-      projectId:     String(fresh.frontmatter['project_id'] ?? fresh.frontmatter['project'] ?? ''),
+      projectId:     String(node.frontmatter['project_id'] ?? node.frontmatter['project'] ?? ''),
       runId,
       pid:           process.pid,
       hostname:      os.hostname(),

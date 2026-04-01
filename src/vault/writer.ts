@@ -17,8 +17,13 @@ export function writeFrontmatter(absolutePath: string, frontmatter: Record<strin
   fs.writeFileSync(absolutePath, output, 'utf-8');
 }
 
-// Derive log note path from phase note path + phase_number frontmatter.
-function safeFileSegment(s: string): string {
+// ── Log path derivation (single source of truth) ─────────────────────────
+// Every file that reads or writes log notes must use these two functions.
+// They are exported so that healer, replan, consolidator, executor, and CLI
+// all derive the same path — preventing the class of bug where one module
+// computes a different filename than the module that created the file.
+
+export function safeFileSegment(s: string): string {
   return String(s)
     .trim()
     .replace(/[\\/:*?"<>|]/g, '-')
@@ -27,7 +32,7 @@ function safeFileSegment(s: string): string {
     .slice(0, 140);
 }
 
-function deriveLogNotePath(phaseNotePath: string, frontmatter: Record<string, unknown>): string {
+export function deriveLogNotePath(phaseNotePath: string, frontmatter: Record<string, unknown>): string {
   const phasesDir = path.dirname(phaseNotePath);
   const bundleDir = path.dirname(phasesDir);
   const logsDir = path.join(bundleDir, 'Logs');
@@ -220,13 +225,21 @@ export function resetAcceptanceCriteria(absolutePath: string): void {
   if (raw === null) return;
   const lines = raw.split('\n');
   let inAC = false;
+  let inHuman = false;
   const result = lines.map(line => {
-    const headingMatch = line.match(/^#{1,4}\s+(.+)$/);
-    if (headingMatch) {
-      inAC = headingMatch[1]!.trim().toLowerCase() === 'acceptance criteria';
+    const h2 = line.match(/^##\s+(.+)$/);
+    const h3 = line.match(/^###\s+(.+)$/);
+    if (h2) {
+      const t = h2[1]!.trim().toLowerCase();
+      inAC = t === 'acceptance criteria' || t === 'verification';
+      inHuman = false;
       return line;
     }
-    if (inAC && /^\s*-\s*\[\s*x\s*\]/i.test(line)) {
+    if (h3 && inAC) {
+      inHuman = h3[1]!.trim().toLowerCase() === 'human';
+      return line;
+    }
+    if (inAC && !inHuman && /^\s*-\s*\[\s*x\s*\]/i.test(line)) {
       return line.replace(/\[\s*x\s*\]/i, '[ ]');
     }
     return line;
@@ -266,14 +279,10 @@ export function backupPhaseFiles(phaseNotePath: string): string {
   const backupPath = path.join(backupDir, path.basename(phaseNotePath));
   if (fs.existsSync(phaseNotePath)) fs.copyFileSync(phaseNotePath, backupPath);
 
-  // Also backup log note
-  const phasesDir = path.dirname(phaseNotePath);
-  const logsDir = path.join(path.dirname(phasesDir), 'Logs');
+  // Also backup log note — use shared deriveLogNotePath to get the correct path
   const raw = readRawFile(phaseNotePath);
-  const phaseNum = raw ? (matter(raw).data as Record<string, unknown>)['phase_number'] ?? 0 : 0;
-  const phaseName = raw ? String((matter(raw).data as Record<string, unknown>)['phase_name'] ?? '').trim() : '';
-  const logName = phaseName ? `L${phaseNum} - ${phaseName}.md` : `L${phaseNum} - ${path.basename(phaseNotePath)}`;
-  const logPath = path.join(logsDir, logName);
+  const fm = raw ? (matter(raw).data as Record<string, unknown>) : {};
+  const logPath = deriveLogNotePath(phaseNotePath, fm);
   if (fs.existsSync(logPath)) {
     fs.copyFileSync(logPath, path.join(backupDir, path.basename(logPath)));
   }

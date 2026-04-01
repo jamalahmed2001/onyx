@@ -13,6 +13,7 @@ export type NotifyEvent =
   | 'phase_completed' | 'phase_blocked'
   | 'atomise_started' | 'atomise_done'
   | 'replan_started' | 'replan_done'
+  | 'consolidate_done'
   | 'linear_import_done' | 'linear_uplink_done';
 
 export interface NotifyPayload {
@@ -128,20 +129,31 @@ export async function notify(payload: NotifyPayload, config: ControllerConfig): 
   // If no remote channels are configured, stop here.
   if (!config.notify.whatsapp && !config.notify.openclaw) return;
 
-  // Batch by runId to avoid flooding — collect events for 500ms, then send once
+  // Batch by runId: collect events for 500ms then send once (avoids message floods).
   const key = payload.runId ?? 'global';
   const existing = batches.get(key);
-  const events = existing ? existing.events : [payload];
+
   if (existing) {
+    // Add to current batch and reset the send timer
     existing.events.push(payload);
     clearTimeout(existing.timer);
+    existing.timer = setTimeout(async () => {
+      batches.delete(key);
+      await Promise.all([
+        sendWhatsAppBatch(existing.events, config),
+        sendOpenClawBatch(existing.events, config),
+      ]);
+    }, 500);
+  } else {
+    // Start a new batch
+    const events = [payload];
+    const timer = setTimeout(async () => {
+      batches.delete(key);
+      await Promise.all([
+        sendWhatsAppBatch(events, config),
+        sendOpenClawBatch(events, config),
+      ]);
+    }, 500);
+    batches.set(key, { events, timer });
   }
-  const timer = setTimeout(async () => {
-    batches.delete(key);
-    await Promise.all([
-      sendWhatsAppBatch(events, config),
-      sendOpenClawBatch(events, config),
-    ]);
-  }, 500);
-  batches.set(key, { events: existing ? existing.events : events, timer });
 }

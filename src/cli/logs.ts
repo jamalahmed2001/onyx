@@ -1,7 +1,7 @@
 import { loadConfig } from '../config/load.js';
 import { discoverAllPhases } from '../vault/discover.js';
 import { readRawFile } from '../vault/reader.js';
-import path from 'path';
+import { deriveLogNotePath } from '../vault/writer.js';
 import fs from 'fs';
 
 export async function runLogs(phaseArg?: string): Promise<void> {
@@ -18,19 +18,12 @@ export async function runLogs(phaseArg?: string): Promise<void> {
     // Find most recently modified log note
     const activeLogs: Array<{ mtime: number; logPath: string; label: string }> = [];
     for (const phase of phases) {
-      const phasesDir = path.dirname(phase.path);
-      const bundleDir = path.dirname(phasesDir);
-      const logsDir = path.join(bundleDir, 'Logs');
-      const phaseNum = phase.frontmatter['phase_number'] ?? 0;
-      const phaseName = String(phase.frontmatter['phase_name'] ?? '').trim();
-      const safe = phaseName.replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').slice(0, 140);
-      const file = safe ? `L${phaseNum} - ${safe}.md` : `L${phaseNum}.md`;
-      const logPath = path.join(logsDir, file);
+      const logPath = deriveLogNotePath(phase.path, phase.frontmatter);
       if (fs.existsSync(logPath)) {
         activeLogs.push({
           mtime: fs.statSync(logPath).mtimeMs,
           logPath,
-          label: String(phase.frontmatter['phase_name'] ?? phaseName),
+          label: String(phase.frontmatter['phase_name'] ?? ''),
         });
       }
     }
@@ -57,14 +50,7 @@ export async function runLogs(phaseArg?: string): Promise<void> {
     return;
   }
 
-  const phasesDir = path.dirname(matched.path);
-  const bundleDir = path.dirname(phasesDir);
-  const logsDir = path.join(bundleDir, 'Logs');
-  const phaseNum = matched.frontmatter['phase_number'] ?? 0;
-  const phaseName = String(matched.frontmatter['phase_name'] ?? '').trim();
-  const safe = phaseName.replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').slice(0, 140);
-  const file = safe ? `L${phaseNum} - ${safe}.md` : `L${phaseNum}.md`;
-  const logPath = path.join(logsDir, file);
+  const logPath = deriveLogNotePath(matched.path, matched.frontmatter);
 
   if (!fs.existsSync(logPath)) {
     console.log(`No log found at: ${logPath}`);

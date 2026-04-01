@@ -1,26 +1,17 @@
 import { discoverActivePhases } from '../vault/discover.js';
 import { readPhaseNode } from '../vault/reader.js';
-import { setLockFields, setPhaseTag, appendToLog } from '../vault/writer.js';
+import { setLockFields, setPhaseTag, appendToLog, deriveLogNotePath } from '../vault/writer.js';
 import { appendAuditEvent } from '../audit/trail.js';
 import type { HealAction } from './index.js';
 import matter from 'gray-matter';
 import { readRawFile } from '../vault/reader.js';
-import path from 'path';
 import fs from 'fs';
 
-// Check the last modification time of the log note for a phase.
-// Returns 0 if the log note doesn't exist or can't be read.
 function getLastLogActivity(phaseNotePath: string): number {
   const raw = readRawFile(phaseNotePath);
   if (!raw) return 0;
-  const parsed = matter(raw);
-  const fm = parsed.data as Record<string, unknown>;
-  const phasesDir = path.dirname(phaseNotePath);
-  const bundleDir = path.dirname(phasesDir);
-  const logsDir = path.join(bundleDir, 'Logs');
-  const phaseNumber = fm['phase_number'] ?? 0;
-  const baseName = path.basename(phaseNotePath);
-  const logPath = path.join(logsDir, `L${phaseNumber} - ${baseName}`);
+  const fm = matter(raw).data as Record<string, unknown>;
+  const logPath = deriveLogNotePath(phaseNotePath, fm);
   try {
     return fs.statSync(logPath).mtimeMs;
   } catch {

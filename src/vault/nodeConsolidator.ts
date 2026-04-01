@@ -127,7 +127,8 @@ function isPhaseCompleted(phasePath: string): boolean {
     ? (node.frontmatter['tags'] as string[])
     : [];
   return tags.includes('phase-completed') ||
-    String(node.frontmatter['status'] ?? '').includes('complet');
+    String(node.frontmatter['status'] ?? '') === 'completed' ||
+    String(node.frontmatter['state'] ?? '') === 'completed';
 }
 
 function isPhaseArchived(phasePath: string): boolean {

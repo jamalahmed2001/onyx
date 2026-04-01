@@ -264,25 +264,34 @@ export default function Drawer({ path, onClose, onWikilinkClick }: Props) {
 
   const handleSave = async () => {
     setSaving(true);
-    await fetch(`/api/gz/vault-file?path=${encodeURIComponent(path)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: editContent }),
-    });
-    setSaving(false); setSaved(true);
-    setTimeout(() => { setSaved(false); load(); }, 1200);
+    try {
+      const res = await fetch(`/api/gz/vault-file?path=${encodeURIComponent(path)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: editContent }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setSaved(true);
+      setTimeout(() => { setSaved(false); load(); }, 1200);
+    } catch {
+      alert('Failed to save file');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleTaskToggle = useCallback(async (lineIdx: number, _done: boolean) => {
+  const handleTaskToggle = useCallback(async (lineIdx: number, done: boolean) => {
     if (!data) return;
-    const body = data.raw.replace(/^---[\s\S]*?---\n?/, '');
-    const bodyLines = body.split('\n');
-    const bodyStart = data.raw.indexOf(body);
-    const rawLines = data.raw.slice(0, bodyStart).split('\n');
-    const absLineIdx = rawLines.length + lineIdx;
+    const fmMatch = data.raw.match(/^---[\s\S]*?---\n?/);
+    const fmLineCount = fmMatch ? fmMatch[0].split('\n').length - 1 : 0;
+    const absLineIdx = fmLineCount + lineIdx;
     const rawAll = data.raw.split('\n');
     if (rawAll[absLineIdx]) {
-      rawAll[absLineIdx] = rawAll[absLineIdx].replace(/^(\s*-\s*)\[ \]/, '$1[x]');
+      if (done) {
+        rawAll[absLineIdx] = rawAll[absLineIdx].replace(/^(\s*-\s*)\[x\]/i, '$1[ ]');
+      } else {
+        rawAll[absLineIdx] = rawAll[absLineIdx].replace(/^(\s*-\s*)\[ \]/, '$1[x]');
+      }
     }
     const newRaw = rawAll.join('\n');
     await fetch(`/api/gz/vault-file?path=${encodeURIComponent(path)}`, {

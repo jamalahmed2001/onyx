@@ -156,18 +156,25 @@ function ScopeEditor({ project, onClose }: { project: GZProject; onClose: () => 
   }, [project.overviewPath]);
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Tab') { e.preventDefault(); const s = e.currentTarget.selectionStart; setContent(c => c.slice(0, s) + '  ' + c.slice(e.currentTarget.selectionEnd)); requestAnimationFrame(() => { if (ref.current) { ref.current.selectionStart = ref.current.selectionEnd = s + 2; } }); }
+    if (e.key === 'Tab') { e.preventDefault(); const s = e.currentTarget.selectionStart; const end = e.currentTarget.selectionEnd; setContent(c => c.slice(0, s) + '  ' + c.slice(end)); requestAnimationFrame(() => { if (ref.current) { ref.current.selectionStart = ref.current.selectionEnd = s + 2; } }); }
     if (e.key === 's' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void save(); }
   };
 
   const save = async () => {
     setSaving(true);
-    await fetch(`/api/gz/vault-file?path=${encodeURIComponent(project.overviewPath)}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
-    });
-    setSaving(false); setSaved(true);
-    setTimeout(() => { setSaved(false); onClose(); }, 1000);
+    try {
+      const res = await fetch(`/api/gz/vault-file?path=${encodeURIComponent(project.overviewPath)}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setSaved(true);
+      setTimeout(() => { setSaved(false); onClose(); }, 1000);
+    } catch {
+      alert('Failed to save');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return <div style={{ color: 'var(--text-faint)', fontSize: 12, padding: '12px 0' }}>Loading…</div>;
@@ -192,10 +199,13 @@ export default function ProjectDetail({ project, onClose, onOpenFile, onRunCLI, 
   const [tab, setTab] = useState<'phases' | 'scope' | 'diff' | 'actions'>(initialTab);
 
   const handleStatusChange = async (phase: GZPhase, newStatus: PhaseStatus) => {
-    await fetch(`/api/gz/projects/${encodeURIComponent(project.id)}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phasePath: phase.path, status: newStatus }),
-    });
+    try {
+      const res = await fetch(`/api/gz/projects/${encodeURIComponent(project.id)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phasePath: phase.path, status: newStatus }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error ?? 'Status change failed'); return; }
+    } catch { alert('Network error'); return; }
     onRefresh();
   };
 
@@ -276,7 +286,7 @@ export default function ProjectDetail({ project, onClose, onOpenFile, onRunCLI, 
                 { icon: Cpu,        label: 'Plan / atomise project',  cmd: 'plan', args: [project.id],                       color: 'var(--accent)'   },
                 { icon: GitBranch,  label: 'Extend phases',           cmd: 'plan', args: [project.id, '--extend'],           color: 'var(--planning)' },
               ].map(({ icon: Icon, label, cmd, args, color }) => (
-                <button key={cmd} onClick={() => { onRunCLI(cmd, args); onClose(); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderRadius: 'var(--r-md)', border: '1px solid var(--glass-b)', background: 'var(--glass)', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 12, fontFamily: 'inherit', textAlign: 'left', width: '100%', transition: 'border-color 0.15s, color 0.15s' }}
+                <button key={label} onClick={() => { onRunCLI(cmd, args); onClose(); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderRadius: 'var(--r-md)', border: '1px solid var(--glass-b)', background: 'var(--glass)', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 12, fontFamily: 'inherit', textAlign: 'left', width: '100%', transition: 'border-color 0.15s, color 0.15s' }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = color; e.currentTarget.style.color = 'var(--text-str)'; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--glass-b)'; e.currentTarget.style.color = 'var(--text-dim)'; }}
                 >

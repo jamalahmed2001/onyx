@@ -385,10 +385,11 @@ Generate the implementation task plan for this phase.`;
 
     // Post-generation validation: check if referenced files actually exist
     const finalContent = fs.readFileSync(phaseNode.path, 'utf8');
-    const planSection = finalContent.slice(
-      finalContent.indexOf(PLAN_START),
-      finalContent.indexOf(PLAN_END) + PLAN_END.length,
-    );
+    const planStartIdx = finalContent.indexOf(PLAN_START);
+    const planEndIdx = finalContent.indexOf(PLAN_END);
+    const planSection = (planStartIdx !== -1 && planEndIdx !== -1)
+      ? finalContent.slice(planStartIdx, planEndIdx + PLAN_END.length)
+      : '';
     const missingFiles = validatePlanFilePaths(planSection, repoPath);
     if (missingFiles.length > 0) {
       const warning = `<!-- gzos: WARNING — These file paths were not found in the repo and may be hallucinated:\n${missingFiles.map(f => `- ${f}`).join('\n')}\nConsider verifying before execution. -->`;
