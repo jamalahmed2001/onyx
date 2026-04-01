@@ -84,7 +84,7 @@ function walkForProjects(dir: string, vaultRoot: string): GZProject[] {
       const raw = fs.readFileSync(overviewAbs, 'utf8');
       const { data } = matter(raw);
       if (!data.type || data.type === 'overview' || data.type === 'project') {
-        const projectId = String(data.project || overviewFile.name.replace(/\s*-\s*Overview\.md$/i, '')).trim();
+        const projectId = String(data.project_id || data.project || overviewFile.name.replace(/\s*-\s*Overview\.md$/i, '')).trim();
         const phases = loadPhases(dir, vaultRoot);
         results.push({
           id: projectId,
@@ -130,6 +130,10 @@ function loadPhases(projectDir: string, vaultRoot: string): GZPhase[] {
         lockedBy: data.locked_by ? String(data.locked_by) : undefined,
         lockedAt: data.locked_at ? String(data.locked_at) : undefined,
         tasksDone: done, tasksTotal: total, nextTask,
+        milestone: data.milestone ? String(data.milestone) : undefined,
+        risk: data.risk ? String(data.risk) : undefined,
+        dependsOn: Array.isArray(data.depends_on) ? data.depends_on.map(Number) : undefined,
+        blockedReason: data.blocked_reason ? String(data.blocked_reason) : undefined,
       });
     } catch { /* skip */ }
   }
@@ -249,7 +253,7 @@ export function getRecentRuns(vaultRoot: string, limit = 30): RunEntry[] {
             const { lastEvent, lastDetail } = parseLastLogEvent(content);
             const phaseStatus = lookupPhaseStatus(dir, phaseNum);
             runs.push({
-              project: String(data.project || projectName),
+              project: String(data.project_id || data.project || projectName),
               phaseName, phaseNum,
               path: path.relative(vaultRoot, absPath),
               modifiedAt: stat.mtime.toISOString(),

@@ -120,7 +120,10 @@ function PhaseCard({ phase, onOpen, onOpenStudio, onStatusAnchor, onOpenProject,
       {phase.lockedBy && (
         <div style={{ fontSize: 9, color: 'var(--blocked)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.8 }}>🔒 {phase.lockedBy}</div>
       )}
-      {!phase.lockedBy && phase.nextTask && (
+      {!phase.lockedBy && phase.tasksTotal === 0 && phase.status !== 'completed' && (
+        <div style={{ fontSize: 9, color: 'var(--planning)', opacity: 0.75 }}>no tasks — needs planning</div>
+      )}
+      {!phase.lockedBy && phase.tasksTotal > 0 && phase.nextTask && (
         <div style={{ fontSize: 10, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↳ {phase.nextTask}</div>
       )}
 
@@ -134,8 +137,8 @@ function PhaseCard({ phase, onOpen, onOpenStudio, onStatusAnchor, onOpenProject,
           </>
         )}
 
-        {/* Plan Phase button — backlog phases: generate tasks then mark ready */}
-        {phase.status === 'backlog' && onPlanPhase && (
+        {/* Plan Phase button — backlog phases OR any phase with no tasks yet */}
+        {(phase.status === 'backlog' || phase.tasksTotal === 0) && phase.status !== 'completed' && phase.status !== 'active' && onPlanPhase && (
           <button onClick={e => { e.stopPropagation(); onPlanPhase(); }}
             style={{ border: '1px solid rgba(161,121,247,0.3)', background: 'rgba(161,121,247,0.08)', borderRadius: 4, cursor: 'pointer', color: 'var(--planning)', display: 'flex', alignItems: 'center', gap: 3, padding: '1px 6px', fontSize: 9 }}
             title="Generate tasks for this phase → mark ready"

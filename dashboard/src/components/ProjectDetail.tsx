@@ -91,7 +91,10 @@ function PhaseRow({ phase, onOpen, onStatusChange }: {
 
         <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => onOpen(phase.path)}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-str)', marginBottom: 2 }}>P{phase.phaseNum} — {phase.phaseName}</div>
-          {phase.nextTask && !tasksOpen && (
+          {phase.blockedReason && (
+            <div style={{ fontSize: 10, color: 'var(--blocked)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>⚠ {phase.blockedReason}</div>
+          )}
+          {!phase.blockedReason && phase.nextTask && !tasksOpen && (
             <div style={{ fontSize: 10, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↳ {phase.nextTask}</div>
           )}
         </div>
