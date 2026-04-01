@@ -10,6 +10,7 @@ import { notify } from '../notify/notify.js';
 // knowledgeIndex removed — agent reads Knowledge.md directly via file paths
 import { isShutdownRequested } from '../controller/loop.js';
 import { classifyComplexity, modelForTier } from '../utils/complexityClassifier.js';
+import { appendPhaseKnowledge } from '../planner/knowledgeWriter.js';
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
@@ -124,6 +125,55 @@ function tryRunShellTask(taskLine: string, cwd: string): { ok: boolean; output: 
   }
 }
 
+interface PreflightResult {
+  warnings: string[];
+  fatal: boolean;
+  fatalReason?: string;
+}
+
+function preflightCheck(phaseNode: PhaseNode, ctx: ContextPaths, allPhases: PhaseNode[]): PreflightResult {
+  const warnings: string[] = [];
+
+  // 1. Tasks exist?
+  const hasTasks = /^\s*-\s*\[\s*[x ]?\s*\]/m.test(phaseNode.content);
+  if (!hasTasks) {
+    warnings.push('No task checkboxes found in phase note — run `gzos plan "<project>" <n>` to atomise tasks');
+  }
+
+  // 2. Repo reachable?
+  if (ctx.repoPath && !fs.existsSync(ctx.repoPath)) {
+    return {
+      warnings,
+      fatal: true,
+      fatalReason: `Repo path does not exist: ${ctx.repoPath}\nUpdate repo_path in the Overview note.`,
+    };
+  }
+
+  // 3. depends_on phases all completed?
+  const deps = phaseNode.frontmatter['depends_on'];
+  if (deps) {
+    const depNums: number[] = Array.isArray(deps)
+      ? (deps as unknown[]).map(d => Number(d)).filter(n => !isNaN(n) && n > 0)
+      : [Number(deps)].filter(n => !isNaN(n) && n > 0);
+
+    for (const depNum of depNums) {
+      const dep = allPhases.find(p => Number(p.frontmatter['phase_number']) === depNum);
+      if (!dep) {
+        warnings.push(`depends_on P${depNum} but that phase doesn't exist`);
+      } else {
+        const depState = String(dep.frontmatter['state'] ?? dep.frontmatter['status'] ?? '');
+        const depTags = Array.isArray(dep.frontmatter['tags']) ? dep.frontmatter['tags'] as string[] : [];
+        const isCompleted = depState === 'completed' || depTags.includes('phase-completed');
+        if (!isCompleted) {
+          warnings.push(`depends_on P${depNum} ("${dep.frontmatter['phase_name'] ?? ''}") which is not yet completed [${depState || 'unknown'}]`);
+        }
+      }
+    }
+  }
+
+  return { warnings, fatal: false };
+}
+
 // Main executor:
 // 1. Backup phase files
 // 2. acquireLock → lock_contention if fails
@@ -172,6 +222,27 @@ export async function runPhase(
   appendToLog(phaseNode.path, { runId, event: 'lock_acquired' });
 
   const ctx = resolveContextPaths(projectId, bundleDir, phaseNum, phaseLabel);
+
+  // Pre-flight: warn on common setup mistakes before spawning any agent
+  {
+    const { discoverAllPhases } = await import('../vault/discover.js');
+    const allPhases = discoverAllPhases(config.vaultRoot, config.projectsGlob);
+    const preflight = preflightCheck(phaseNode, ctx, allPhases);
+
+    if (preflight.warnings.length > 0) {
+      for (const w of preflight.warnings) {
+        console.warn(`[gzos:preflight] ⚠  ${w}`);
+        appendToLog(phaseNode.path, { runId, event: 'phase_started', detail: `preflight warning: ${w}` });
+      }
+    }
+
+    if (preflight.fatal) {
+      appendToLog(phaseNode.path, { runId, event: 'phase_blocked', detail: preflight.fatalReason! });
+      releaseLock(phaseNode.path, runId, 'phase-blocked');
+      await notify({ event: 'phase_blocked', projectId, phaseLabel, detail: preflight.fatalReason!.slice(0, 80), runId }, config);
+      return { status: 'blocked', tasksCompleted: 0, blockers: [preflight.fatalReason!], logNotePath, repoPath: ctx.repoPath };
+    }
+  }
   const blockers: string[] = [];
   let tasksCompleted = 0;
   let consecutiveFailures = 0;
@@ -330,6 +401,33 @@ export async function runPhase(
   if (acceptanceMet(content)) {
     appendToLog(phaseNode.path, { runId, event: 'acceptance_verified' });
     releaseLock(phaseNode.path, runId, 'phase-completed');
+
+    // Auto-tag the repo at the point of phase completion
+    // Tag: gzos/P{n}-done — lets you roll back to "right after P3 completed"
+    try {
+      const tagName = `gzos/P${phaseNum}-done`;
+      const tagMsg  = `gzos: P${phaseNum} — ${phaseLabel} completed`;
+      execSync(`git tag -a "${tagName}" -m "${tagMsg}"`, {
+        cwd: ctx.repoPath,
+        stdio: 'ignore',
+        timeout: 10_000,
+      });
+      console.log(`[gzos] Tagged repo: ${tagName}`);
+    } catch {
+      // Non-fatal — repo may not be a git repo, or tag already exists
+    }
+
+    // Append a learning to Knowledge.md (best-effort, Haiku model)
+    await appendPhaseKnowledge({
+      projectId,
+      phaseNum,
+      phaseLabel,
+      phaseNotePath: phaseNode.path,
+      logNotePath,
+      bundleDir,
+      config,
+    }).catch(() => {/* never block on this */});
+
     await notify({ event: 'phase_completed', projectId, phaseLabel, detail: `${tasksCompleted} tasks done`, runId }, config);
     return { status: 'completed', tasksCompleted, blockers, logNotePath, repoPath: ctx.repoPath };
   }

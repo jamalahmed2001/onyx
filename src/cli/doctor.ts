@@ -196,6 +196,56 @@ export async function runDoctor(): Promise<void> {
     fix: 'Run: npm run build',
   });
 
+  // 10. Vault health (only if vault is configured and accessible)
+  if (resolvedVaultRoot && fs.existsSync(resolvedVaultRoot)) {
+    try {
+      const { discoverAllPhases, discoverActivePhases } = await import('../vault/discover.js');
+      const { loadConfig: lc } = await import('../config/load.js');
+      const cfg = lc();
+
+      // 10a. Stuck active phases (locked_at > 10min ago)
+      const activePhases = discoverActivePhases(cfg.vaultRoot, cfg.projectsGlob);
+      const now = Date.now();
+      const stuckPhases = activePhases.filter(p => {
+        const la = String(p.frontmatter['locked_at'] ?? '');
+        if (!la) return true; // no locked_at = stuck
+        const age = now - new Date(la).getTime();
+        return age > 10 * 60 * 1000; // > 10 min
+      });
+      checks.push({
+        label: stuckPhases.length === 0
+          ? 'No stuck active phases'
+          : `${stuckPhases.length} phase(s) stuck in phase-active`,
+        pass: stuckPhases.length === 0,
+        warn: stuckPhases.length > 0,
+        fix: stuckPhases.length > 0
+          ? `Run: gzos heal   (will clear stale locks)\n       Stuck: ${stuckPhases.map(p => p.frontmatter['phase_name'] ?? p.path.split('/').pop()).join(', ')}`
+          : undefined,
+      });
+
+      // 10b. Phases missing project_id
+      const allPhases = discoverAllPhases(cfg.vaultRoot, cfg.projectsGlob);
+      const missingId = allPhases.filter(p => !p.frontmatter['project_id'] && !p.frontmatter['project']);
+      checks.push({
+        label: missingId.length === 0
+          ? 'All phases have project_id'
+          : `${missingId.length} phase(s) missing project_id`,
+        pass: missingId.length === 0,
+        warn: missingId.length > 0,
+        fix: missingId.length > 0 ? 'Run: gzos heal   (will backfill project_id from Overview)' : undefined,
+      });
+
+      // 10c. Phase count
+      checks.push({
+        label: `Vault: ${allPhases.length} phase(s) found`,
+        pass: true,
+      });
+
+    } catch {
+      // vault health checks are best-effort — never fail doctor
+    }
+  }
+
   // Print results
   console.log('\ngzos doctor\n');
   let allPass = true;
