@@ -230,6 +230,7 @@ export async function runInit(projectNameArg?: string): Promise<void> {
 
     // Overview — main node + repo info (stack, key areas, constraints all live here now)
     writeFile(path.join(bundleDir, `${projectName} - Overview.md`), `---
+project_id: "${projectName}"
 project: "${projectName}"
 type: overview
 status: planning
