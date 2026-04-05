@@ -105,13 +105,17 @@ export function scoreRelevance(entry: KnowledgeEntry, taskText: string, projectI
   // Keyword overlap
   const overlap = entry.keywords.filter(k => taskKeywords.includes(k));
   score += overlap.length * 2;
-  // Same project bonus
-  if (entry.projectId === projectId) score += 3;
-  // Cross-project bonus for broad relevance
-  if (entry.projectId === 'cross-project') score += 1;
-  // Gotchas and decisions are higher-signal than general learnings — boost them
-  if (entry.section === 'gotchas') score += 2;
-  if (entry.section === 'decisions') score += 1;
+  // Strong same-project bonus — namespace isolation
+  if (entry.projectId === projectId) score += 10;
+  // Cross-project entries need high keyword overlap to surface (no free bonus)
+  if (entry.projectId === 'cross-project') score += 2;
+  // Different project: penalise unless very relevant (overlap >= 3)
+  if (entry.projectId !== projectId && entry.projectId !== 'cross-project' && overlap.length < 3) {
+    score = 0; // suppress low-relevance cross-project noise
+  }
+  // Gotchas and decisions are higher-signal than general learnings
+  if (entry.section === 'gotchas') score += 3;
+  if (entry.section === 'decisions') score += 2;
   return score;
 }
 

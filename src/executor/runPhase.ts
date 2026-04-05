@@ -9,6 +9,7 @@ import { runAgent } from '../agents/types.js';
 import { notify } from '../notify/notify.js';
 import { isShutdownRequested } from '../controller/loop.js';
 import { classifyComplexity, modelForTier } from '../utils/complexityClassifier.js';
+import { getRelevantKnowledge } from '../vault/knowledgeIndex.js';
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
@@ -321,7 +322,13 @@ export async function runPhase(
 
     // Lean prompt — point agent at vault files, it reads them natively
     const acceptanceCriteria = extractAcceptanceCriteria(freshNode.raw);
-    const prompt = buildPrompt({ projectId, phaseNum, phaseLabel, nextTask, phaseNotePath: phaseNode.path, ctx, failureContext: lastFailureContext, attemptNumber: taskAttemptNumber, checkpoint: checkpoint ?? undefined, acceptanceCriteria });
+    // Retrieve namespaced knowledge — same project prioritised, cross-project only if highly relevant
+    let relevantKnowledge = '';
+    try {
+      relevantKnowledge = getRelevantKnowledge(config.vaultRoot, config.projectsGlob, projectId, nextTask, 5, 1200);
+    } catch { /* non-fatal */ }
+
+    const prompt = buildPrompt({ projectId, phaseNum, phaseLabel, nextTask, phaseNotePath: phaseNode.path, ctx, failureContext: lastFailureContext, attemptNumber: taskAttemptNumber, checkpoint: checkpoint ?? undefined, acceptanceCriteria, relevantKnowledge });
 
     // Allow per-project override: agent_driver in Overview frontmatter
     let driver = config.agentDriver;
@@ -507,8 +514,9 @@ function buildPrompt(opts: {
   attemptNumber?: number;
   checkpoint?: string;
   acceptanceCriteria: string;
+  relevantKnowledge?: string;
 }): string {
-  const { projectId, phaseNum, phaseLabel, nextTask, phaseNotePath, ctx, failureContext, attemptNumber, checkpoint, acceptanceCriteria } = opts;
+  const { projectId, phaseNum, phaseLabel, nextTask, phaseNotePath, ctx, failureContext, attemptNumber, checkpoint, acceptanceCriteria, relevantKnowledge } = opts;
 
   const sep = '─'.repeat(40);
   const contextFiles: string[] = [
@@ -531,6 +539,7 @@ function buildPrompt(opts: {
     `${sep}\nCONTEXT (read before starting)\n${sep}`,
     ...contextFiles,
     '',
+    relevantKnowledge ? `\n${sep}\nRELEVANT KNOWLEDGE (from this project and related work)\n${sep}\n${relevantKnowledge}\n` : '',
     `${sep}\nINSTRUCTIONS\n${sep}`,
     `1. Read the phase note and project overview to understand scope, constraints, and architecture.`,
     ctx.knowledgePath ? `2. Read the knowledge file for prior learnings and gotchas.` : '',

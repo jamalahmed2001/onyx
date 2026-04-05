@@ -227,6 +227,14 @@ export async function runLoop(config: ControllerConfig, opts: RunOptions = {}): 
               );
 
             } else if (result.status === 'blocked') {
+              // Extract knowledge from the failed attempt before replanning
+              if (config.llm?.apiKey) {
+                const failBundle = readBundle(bundleDir, projectId || path.basename(bundleDir));
+                await consolidatePhase(operation.phaseNode, failBundle, runId, config).catch(err =>
+                  console.warn('[gzos] Knowledge extraction from blocked phase (non-fatal):', (err as Error).message)
+                );
+              }
+
               // Auto-replan: rewrite task list from failure evidence, set back to phase-ready
               const replanResult = await replanPhase(operation.phaseNode, runId, config);
               if (replanResult !== 'replanned') {

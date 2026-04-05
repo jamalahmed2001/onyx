@@ -8,20 +8,23 @@ import { chatCompletion } from '../llm/client.js';
 import path from 'path';
 import fs from 'fs';
 
-const CONSOLIDATE_SYSTEM_PROMPT = `You are a knowledge curator. Given a completed phase log and phase note, extract structured learnings into three categories.
+const CONSOLIDATE_SYSTEM_PROMPT = `You are a knowledge curator. Given a phase log and phase note from a software project, extract structured learnings into three categories.
+
+The phase may be completed or blocked/failed — extract knowledge from BOTH outcomes.
 
 Output ONLY a valid JSON object — no prose, no markdown fences:
 {
   "learnings": ["useful pattern or technique that worked — 1-2 sentences each, 2-5 items"],
   "decisions": ["architectural or design decision made — format: 'Chose X over Y because Z', 1-3 items or empty array"],
-  "gotchas": ["something that failed or surprised — format: 'X fails when Y, use Z instead', 1-3 items or empty array"]
+  "gotchas": ["something that failed, surprised, or blocked progress — format: 'X fails when Y, use Z instead', 1-3 items or empty array"]
 }
 
 Rules:
 - Be concrete and specific — not vague generalities
 - decisions: capture choices that would affect future phases (library, pattern, schema, approach)
-- gotchas: capture failure modes, API quirks, constraints discovered under load
+- gotchas: capture failure modes, API quirks, constraints, blockers discovered during execution
 - learnings: general reusable techniques and approaches
+- For blocked/failed phases: focus on gotchas and what caused the block
 - If a category has nothing worth capturing, return an empty array for it`;
 
 // P3: read phase log, summarise learnings via LLM, append to Knowledge.md.
