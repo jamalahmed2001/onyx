@@ -205,12 +205,12 @@ export function getAllProjects(vaultRoot: string): GZProject[] {
 export function getDailyPlan(vaultRoot: string): DailyPlan {
   const today = new Date().toISOString().split('T')[0];
 
-  // Check multiple locations for today's plan
+  // Check multiple locations for today's plan (priority order)
   const candidates = [
-    path.join(vaultRoot, '09 - Archive', 'Daily Archive (Legacy)', `Daily - ${today}.md`),
-    path.join(vaultRoot, '00 - Dashboard', 'Daily', `${today}.md`),
-    path.join(vaultRoot, '04 - Planning', 'Daily', `${today}.md`),
     path.join(vaultRoot, '04 - Planning', `Daily - ${today}.md`),
+    path.join(vaultRoot, '04 - Planning', `${today}.md`),
+    path.join(vaultRoot, '00 - Dashboard', 'Daily', `${today}.md`),
+    path.join(vaultRoot, '09 - Archive', 'Daily Archive (Legacy)', `Daily - ${today}.md`),
   ];
 
   for (const p of candidates) {
@@ -220,10 +220,11 @@ export function getDailyPlan(vaultRoot: string): DailyPlan {
     }
   }
 
-  // No plan for today — find the most recent plan to show as fallback
+  // No plan for today — find the most recent plan across all locations
   const searchDirs = [
-    path.join(vaultRoot, '09 - Archive', 'Daily Archive (Legacy)'),
+    path.join(vaultRoot, '04 - Planning'),
     path.join(vaultRoot, '00 - Dashboard', 'Daily'),
+    path.join(vaultRoot, '09 - Archive', 'Daily Archive (Legacy)'),
   ];
 
   let latestDate = '';
@@ -231,8 +232,9 @@ export function getDailyPlan(vaultRoot: string): DailyPlan {
   for (const dir of searchDirs) {
     if (!fs.existsSync(dir)) continue;
     for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith('.md')) continue;
       const m = f.match(/(\d{4}-\d{2}-\d{2})/);
-      if (m && m[1]! > latestDate) {
+      if (m && m[1]! <= today && m[1]! > latestDate) {
         latestDate = m[1]!;
         latestPath = path.join(dir, f);
       }
