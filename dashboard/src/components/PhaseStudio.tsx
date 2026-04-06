@@ -224,7 +224,7 @@ export default function PhaseStudio({ phase, onClose, onRunCLI }: Props) {
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, animation: 'fade-in 0.12s ease' }}/>
       <div className="gzos-studio" style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: 600,
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: 600, maxWidth: '100vw',
         background: 'rgba(10,14,22,0.97)', backdropFilter: 'blur(32px) saturate(180%)',
         WebkitBackdropFilter: 'blur(32px) saturate(180%)',
         borderLeft: '1px solid var(--glass-b-hi)',

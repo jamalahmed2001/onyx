@@ -317,7 +317,7 @@ export default function Drawer({ path, onClose, onWikilinkClick }: Props) {
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 100, animation: 'fade-in 0.12s ease' }}/>
       <div className="gzos-drawer" style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: 520,
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: 520, maxWidth: '100vw',
         background: 'rgba(10,14,22,0.94)',
         backdropFilter: 'blur(32px) saturate(180%)',
         WebkitBackdropFilter: 'blur(32px) saturate(180%)',

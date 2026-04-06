@@ -138,9 +138,9 @@ export default function LinearImportModal({ projects, onClose, onRefresh, onOpen
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 200, animation: 'fade-in 0.12s ease' }}/>
-      <div style={{
+      <div className="gzos-modal" style={{
         position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-        width: 560, maxHeight: '82vh', background: 'var(--bg-1)',
+        width: 560, maxWidth: 'calc(100vw - 24px)', maxHeight: '82vh', background: 'var(--bg-1)',
         border: '1px solid var(--border-hi)', borderRadius: 8, zIndex: 201,
         display: 'flex', flexDirection: 'column', boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
       }}>

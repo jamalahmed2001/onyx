@@ -449,10 +449,10 @@ export default function TodayView({ projects, onOpenFile, onRunCLI }: Props) {
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
-    <div style={{ height: '100%', display: 'flex', overflow: 'hidden' }}>
+    <div className="gzos-today" style={{ height: '100%', display: 'flex', overflow: 'hidden' }}>
 
       {/* ── Left: Live FSM ── */}
-      <div style={{ width: 300, flexShrink: 0, borderRight: '1px solid var(--border)', overflow: 'auto', padding: '14px 12px' }}>
+      <div className="gzos-today-left" style={{ width: 300, flexShrink: 0, borderRight: '1px solid var(--border)', overflow: 'auto', padding: '14px 12px' }}>
 
         {/* Stat pills */}
         <div style={{ display: 'flex', gap: 5, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -534,7 +534,7 @@ export default function TodayView({ projects, onOpenFile, onRunCLI }: Props) {
       </div>
 
       {/* ── Right: Daily Plan ── */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div className="gzos-today-right" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
         {/* Header */}
         <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>

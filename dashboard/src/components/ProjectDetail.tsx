@@ -219,8 +219,8 @@ export default function ProjectDetail({ project, onClose, onOpenFile, onRunCLI, 
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 50, animation: 'fade-in 0.12s ease' }}/>
-      <div style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: 500,
+      <div className="gzos-drawer" style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: 500, maxWidth: '100vw',
         background: 'rgba(10,14,22,0.95)', backdropFilter: 'blur(32px) saturate(180%)',
         WebkitBackdropFilter: 'blur(32px) saturate(180%)',
         borderLeft: '1px solid var(--glass-b-hi)',
