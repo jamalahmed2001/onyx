@@ -345,7 +345,7 @@ export default function TodayView({ projects, onOpenFile, onRunCLI }: Props) {
   const DIRECTION_PATH = '00 - Dashboard/.plan-direction.md';
 
   const loadDirection = () => {
-    fetch(`/api/gz/vault-file?path=${encodeURIComponent(DIRECTION_PATH)}`)
+    fetch(`/api/onyx/vault-file?path=${encodeURIComponent(DIRECTION_PATH)}`)
       .then(r => r.ok ? r.json() as Promise<{ content?: string }> : null)
       .then(d => {
         if (!d?.content) { setSavedDirections([]); return; }
@@ -356,11 +356,11 @@ export default function TodayView({ projects, onOpenFile, onRunCLI }: Props) {
   };
 
   useEffect(() => {
-    fetch('/api/gz/today')
+    fetch('/api/onyx/today')
       .then(r => r.json())
       .then((d: { plan: DailyPlan; inbox: InboxItem[] }) => { setPlan(d.plan); setInbox(d.inbox); })
       .catch(console.error);
-    fetch('/api/gz/settings')
+    fetch('/api/onyx/settings')
       .then(r => r.json())
       .then((d: { lat?: number; lng?: number }) => setSettings({ lat: d.lat ?? 51.5074, lng: d.lng ?? -0.1278 }))
       .catch(() => setSettings({ lat: 51.5074, lng: -0.1278 }));
@@ -378,7 +378,7 @@ export default function TodayView({ projects, onOpenFile, onRunCLI }: Props) {
     const newContent = lines.join('\n');
     setPlan({ ...plan, raw: newContent }); // optimistic
     try {
-      const res = await fetch(`/api/gz/vault-file?path=${encodeURIComponent(planPath)}`, {
+      const res = await fetch(`/api/onyx/vault-file?path=${encodeURIComponent(planPath)}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: newContent }),
       });
@@ -392,11 +392,11 @@ export default function TodayView({ projects, onOpenFile, onRunCLI }: Props) {
   const generatePlan = async () => {
     setGenerating(true);
     try {
-      const res = await fetch('/api/gz/generate-day-plan', { method: 'POST' });
+      const res = await fetch('/api/onyx/generate-day-plan', { method: 'POST' });
       const data = await res.json() as { content?: string; path?: string; date?: string; error?: string };
       if (!res.ok || data.error) throw new Error(data.error ?? 'Failed');
       // Refresh the plan from vault
-      const r2 = await fetch('/api/gz/today');
+      const r2 = await fetch('/api/onyx/today');
       const d2 = await r2.json() as { plan: DailyPlan; inbox: InboxItem[] };
       setPlan(d2.plan);
       toast(`Plan saved → 00 - Dashboard/Daily/${data.date ?? todayKey}.md`, 'success');
@@ -412,7 +412,7 @@ export default function TodayView({ projects, onOpenFile, onRunCLI }: Props) {
     setSending(true);
     try {
       const newLines = [...savedDirections, direction.trim()];
-      const res = await fetch('/api/gz/vault-file?path=' + encodeURIComponent('00 - Dashboard/.plan-direction.md'), {
+      const res = await fetch('/api/onyx/vault-file?path=' + encodeURIComponent('00 - Dashboard/.plan-direction.md'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: newLines.join('\n') + '\n' }),
@@ -431,7 +431,7 @@ export default function TodayView({ projects, onOpenFile, onRunCLI }: Props) {
     const remaining = savedDirections.filter((_, i) => i !== idx);
     setSavedDirections(remaining);
     try {
-      await fetch('/api/gz/vault-file?path=' + encodeURIComponent('00 - Dashboard/.plan-direction.md'), {
+      await fetch('/api/onyx/vault-file?path=' + encodeURIComponent('00 - Dashboard/.plan-direction.md'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: remaining.length > 0 ? remaining.join('\n') + '\n' : '' }),
@@ -449,10 +449,10 @@ export default function TodayView({ projects, onOpenFile, onRunCLI }: Props) {
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
-    <div className="gzos-today" style={{ height: '100%', display: 'flex', overflow: 'hidden' }}>
+    <div className="onyx-today" style={{ height: '100%', display: 'flex', overflow: 'hidden' }}>
 
       {/* ── Left: Live FSM ── */}
-      <div className="gzos-today-left" style={{ width: 300, flexShrink: 0, borderRight: '1px solid var(--border)', overflow: 'auto', padding: '14px 12px' }}>
+      <div className="onyx-today-left" style={{ width: 300, flexShrink: 0, borderRight: '1px solid var(--border)', overflow: 'auto', padding: '14px 12px' }}>
 
         {/* Stat pills */}
         <div style={{ display: 'flex', gap: 5, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -534,7 +534,7 @@ export default function TodayView({ projects, onOpenFile, onRunCLI }: Props) {
       </div>
 
       {/* ── Right: Daily Plan ── */}
-      <div className="gzos-today-right" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div className="onyx-today-right" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
         {/* Header */}
         <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>

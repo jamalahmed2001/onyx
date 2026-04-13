@@ -5,8 +5,8 @@ import { getVaultRoot, getAllProjects } from '@/lib/vault';
 
 export const dynamic = 'force-dynamic';
 
-const GZOS_ROOT = path.resolve(process.cwd(), '..');
-const GZOS_BIN  = path.join(GZOS_ROOT, 'dist', 'cli', 'gzos.js');
+const ONYX_ROOT = path.resolve(process.cwd(), '..');
+const ONYX_BIN  = path.join(ONYX_ROOT, 'dist', 'cli', 'onyx.js');
 
 export async function GET() {
   const vaultRoot = getVaultRoot();
@@ -30,7 +30,7 @@ export async function GET() {
 
   let doctorOutput = '';
   try {
-    doctorOutput = execSync(`node "${GZOS_BIN}" doctor`, { cwd: GZOS_ROOT, timeout: 15_000, encoding: 'utf8' });
+    doctorOutput = execSync(`node "${ONYX_BIN}" doctor`, { cwd: ONYX_ROOT, timeout: 15_000, encoding: 'utf8' });
   } catch (e: unknown) {
     const err = e as { stdout?: string; stderr?: string };
     doctorOutput = (err.stdout ?? '') + (err.stderr ?? '');

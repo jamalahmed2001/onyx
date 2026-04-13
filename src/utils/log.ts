@@ -8,8 +8,8 @@ export function setVerbose(v: boolean): void {
 }
 
 export const log = {
-  info: (...args: unknown[]): void => { console.log('[gzos]', ...args); },
-  debug: (...args: unknown[]): void => { if (_verbose) console.log('[gzos:debug]', ...args); },
-  warn: (...args: unknown[]): void => { console.warn('[gzos:warn]', ...args); },
-  error: (...args: unknown[]): void => { console.error('[gzos:error]', ...args); },
+  info: (...args: unknown[]): void => { console.log('[onyx]', ...args); },
+  debug: (...args: unknown[]): void => { if (_verbose) console.log('[onyx:debug]', ...args); },
+  warn: (...args: unknown[]): void => { console.warn('[onyx:warn]', ...args); },
+  error: (...args: unknown[]): void => { console.error('[onyx:error]', ...args); },
 };

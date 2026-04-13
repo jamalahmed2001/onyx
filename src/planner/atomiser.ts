@@ -328,7 +328,7 @@ Generate the implementation task plan for this phase.`;
           const planSection = written.slice(blockStart, blockEnd + PLAN_END.length);
           const missingFiles = validatePlanFilePaths(planSection, repoPath);
           if (missingFiles.length > 0) {
-            const warning = `<!-- gzos: WARNING — These file paths were not found in the repo and may be hallucinated:\n${missingFiles.map(f => `- ${f}`).join('\n')}\nConsider verifying before execution. -->`;
+            const warning = `<!-- onyx: WARNING — These file paths were not found in the repo and may be hallucinated:\n${missingFiles.map(f => `- ${f}`).join('\n')}\nConsider verifying before execution. -->`;
             const withWarning = written.replace(PLAN_END, `${PLAN_END}\n\n${warning}`);
             fs.writeFileSync(phaseNode.path, withWarning, 'utf8');
             appendToLog(phaseNode.path, { runId, event: 'atomise_done', detail: `Plan written directly by agent with ${missingFiles.length} unverified file path(s): ${missingFiles.join(', ')}` });
@@ -343,7 +343,7 @@ Generate the implementation task plan for this phase.`;
           return 'ready';
         }
         // Block not found — fall through to OpenRouter path
-        console.warn('[gzos] Agent did not write plan block — falling back to LLM text output');
+        console.warn('[onyx] Agent did not write plan block — falling back to LLM text output');
       }
       // On failure, fall through to OpenRouter path
     }
@@ -384,7 +384,7 @@ Generate the implementation task plan for this phase.`;
       : '';
     const missingFiles = validatePlanFilePaths(planSection, repoPath);
     if (missingFiles.length > 0) {
-      const warning = `<!-- gzos: WARNING — These file paths were not found in the repo and may be hallucinated:\n${missingFiles.map(f => `- ${f}`).join('\n')}\nConsider verifying before execution. -->`;
+      const warning = `<!-- onyx: WARNING — These file paths were not found in the repo and may be hallucinated:\n${missingFiles.map(f => `- ${f}`).join('\n')}\nConsider verifying before execution. -->`;
       // Append warning after the plan block
       const withWarning = finalContent.replace(PLAN_END, `${PLAN_END}\n\n${warning}`);
       fs.writeFileSync(phaseNode.path, withWarning, 'utf8');

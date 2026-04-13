@@ -6,13 +6,13 @@
  * is never touched.
  *
  * Syntax in markdown:
- *   <!-- GZOS_MANAGED_START:section_name -->
+ *   <!-- ONYX_MANAGED_START:section_name -->
  *   ...auto-generated content...
- *   <!-- GZOS_MANAGED_END:section_name -->
+ *   <!-- ONYX_MANAGED_END:section_name -->
  */
 
-export const MANAGED_START_TAG = (name: string) => `<!-- GZOS_MANAGED_START:${name} -->`;
-export const MANAGED_END_TAG   = (name: string) => `<!-- GZOS_MANAGED_END:${name} -->`;
+export const MANAGED_START_TAG = (name: string) => `<!-- ONYX_MANAGED_START:${name} -->`;
+export const MANAGED_END_TAG   = (name: string) => `<!-- ONYX_MANAGED_END:${name} -->`;
 
 /** True if content already contains a managed block with this name. */
 export function hasManagedBlock(content: string, name: string): boolean {

@@ -1,6 +1,6 @@
-// gzos plan — daily planning command
+// onyx plan — daily planning command
 //
-// Spawns the plan-my-day skill via claude, pre-populated with gzos ready phases
+// Spawns the plan-my-day skill via claude, pre-populated with onyx ready phases
 // as additional context. The skill handles prayer times, time-blocking, inbox
 // reads, vault write-back — the full experience.
 
@@ -30,13 +30,13 @@ export async function runPlan(config: ControllerConfig, date?: string): Promise<
     : path.join(process.cwd(), 'skills', 'plan-my-day', 'SKILL.md');
 
   if (!fs.existsSync(skillPath)) {
-    console.error('[gzos plan] SKILL.md not found at:', skillPath);
+    console.error('[onyx plan] SKILL.md not found at:', skillPath);
     process.exit(1);
   }
 
   const skillContent = fs.readFileSync(skillPath, 'utf8');
 
-  // Build gzos phase context to inject
+  // Build onyx phase context to inject
   const readyPhases = discoverReadyPhases(config.vaultRoot, config.projectsGlob);
   let phaseContext = '';
   if (readyPhases.length > 0) {
@@ -53,7 +53,7 @@ export async function runPlan(config: ControllerConfig, date?: string): Promise<
 
 ---
 
-## gzos Phase Context (auto-injected)
+## onyx Phase Context (auto-injected)
 
 The following phases are currently **phase-ready** in the vault. Use these as the source of work tasks when building the plan — they replace reading Kanban files manually for these projects.
 
@@ -68,7 +68,7 @@ ${phaseLines}
 
 Run this plan for date: ${targetDate}`;
 
-  console.log(`[gzos plan] Generating daily plan for ${targetDate}...`);
+  console.log(`[onyx plan] Generating daily plan for ${targetDate}...`);
   console.log(`  ${readyPhases.length} ready phases injected as work context`);
   console.log(`  Spawning claude with plan-my-day skill...\n`);
 
@@ -81,7 +81,7 @@ Run this plan for date: ${targetDate}`;
     });
 
     child.on('error', err => {
-      console.error('[gzos plan] Failed to spawn claude:', err.message);
+      console.error('[onyx plan] Failed to spawn claude:', err.message);
       console.error('  Make sure claude is installed: npm install -g @anthropic-ai/claude-code');
       reject(err);
     });

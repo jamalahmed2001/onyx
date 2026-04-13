@@ -15,7 +15,7 @@ created: YYYY-MM-DD
 ## Entries
 
 <!-- Executor appends entries here. Format:
-### YYYY-MM-DD HH:MM — gz-runId
+### YYYY-MM-DD HH:MM — onyx-runId
 **Event:** event_type
 **Detail:** one-liner
 -->

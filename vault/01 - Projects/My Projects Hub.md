@@ -45,4 +45,4 @@ created: 2026-01-01T00:00:00.000Z
 ## Projects
 
 - [[My First Project - Overview|My First Project]]
-- [[GroundZero Core - Overview|GroundZero Core]]
+- [[ONYX Core - Overview|ONYX Core]]

@@ -69,13 +69,13 @@ export function mergeLinearIntoPhase(
       body = body.replace(
         /(## Overview\s*\n)([\s\S]*?)(\n## |\n---|\s*$)/,
         (_match, heading, _oldBody, tail) => {
-          const managedBlock = `<!-- GZOS_MANAGED_START:linear-overview -->\n${descContent}\n<!-- GZOS_MANAGED_END:linear-overview -->`;
+          const managedBlock = `<!-- ONYX_MANAGED_START:linear-overview -->\n${descContent}\n<!-- ONYX_MANAGED_END:linear-overview -->`;
           return `${heading}${managedBlock}\n${tail}`;
         },
       );
     } else {
       // No ## Overview section — append one with a managed block
-      body = `${body.trimEnd()}\n\n## Overview\n\n<!-- GZOS_MANAGED_START:linear-overview -->\n${descContent}\n<!-- GZOS_MANAGED_END:linear-overview -->\n`;
+      body = `${body.trimEnd()}\n\n## Overview\n\n<!-- ONYX_MANAGED_START:linear-overview -->\n${descContent}\n<!-- ONYX_MANAGED_END:linear-overview -->\n`;
     }
   }
 

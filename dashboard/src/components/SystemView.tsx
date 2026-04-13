@@ -18,7 +18,7 @@ export default function SystemView({ onRunCLI }: { onRunCLI: (cmd: string, args?
 
   const load = () => {
     setLoading(true);
-    fetch('/api/gz/doctor').then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+    fetch('/api/onyx/doctor').then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);

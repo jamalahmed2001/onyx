@@ -38,7 +38,7 @@ const PHASE_TAGS = [
 
 const REQUIRED_SECTIONS = ['## Tasks', '## Acceptance Criteria'];
 
-// Fix frontmatter drift across all GZ phase notes:
+// Fix frontmatter drift across all ONYX phase notes:
 // 1. status field out of sync with phase tag → rewrite status to match tag
 // 2. Multiple phase-* tags → normalise to one
 // 3. locked_by present but tag !== phase-active → clear lock fields

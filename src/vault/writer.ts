@@ -57,9 +57,32 @@ export function appendToLog(phaseNotePath: string, entry: LogEntry): void {
   fs.mkdirSync(path.dirname(logNotePath), { recursive: true });
 
   const timestamp = new Date().toISOString();
-  const filesLine = entry.filesChanged && entry.filesChanged.length > 0
-    ? `\n  files: ${entry.filesChanged.join(', ')}`
-    : '';
+
+  // Filter out build artifacts and dep directories — they blow up log file sizes
+  // (e.g. `npm install` adds 10k+ files in node_modules which is meaningless for an audit trail).
+  const FILE_IGNORE_PATTERNS = [
+    /(?:^|\/)node_modules(?:\/|$)/,
+    /(?:^|\/)\.next(?:\/|$)/,
+    /(?:^|\/)dist(?:\/|$)/,
+    /(?:^|\/)build(?:\/|$)/,
+    /(?:^|\/)coverage(?:\/|$)/,
+    /(?:^|\/)\.cache(?:\/|$)/,
+    /(?:^|\/)\.turbo(?:\/|$)/,
+    /(?:^|\/)\.vercel(?:\/|$)/,
+    /(?:^|\/)\.git(?:\/|$)/,
+    /package-lock\.json$/,
+    /pnpm-lock\.yaml$/,
+    /yarn\.lock$/,
+  ];
+  const MAX_FILES_LOGGED = 50;
+  const rawFiles = entry.filesChanged ?? [];
+  const filteredFiles = rawFiles.filter(f => !FILE_IGNORE_PATTERNS.some(re => re.test(f)));
+  const loggedFiles = filteredFiles.slice(0, MAX_FILES_LOGGED);
+  const truncated = filteredFiles.length - loggedFiles.length;
+  const ignored = rawFiles.length - filteredFiles.length;
+  const filesLine = loggedFiles.length > 0
+    ? `\n  files: ${loggedFiles.join(', ')}${truncated > 0 ? ` (+${truncated} more)` : ''}${ignored > 0 ? ` [${ignored} build/dep files omitted]` : ''}`
+    : (ignored > 0 ? `\n  files: [${ignored} build/dep files omitted]` : '');
   const detailLine = entry.detail ? `\n  detail: ${entry.detail}` : '';
   const logLine = `\n- [${timestamp}] **${entry.event}** (run: ${entry.runId})${detailLine}${filesLine}`;
 
@@ -268,7 +291,7 @@ export function writeFile(absolutePath: string, content: string): void {
   fs.writeFileSync(absolutePath, content, 'utf-8');
 }
 
-// Backup phase note + its log note to a timestamped .gzos-backups/ directory.
+// Backup phase note + its log note to a timestamped .onyx-backups/ directory.
 // Stored OUTSIDE the vault (sibling of vaultRoot) so Obsidian never indexes them.
 // Returns the backup directory path.
 export function backupPhaseFiles(phaseNotePath: string): string {
@@ -277,7 +300,7 @@ export function backupPhaseFiles(phaseNotePath: string): string {
   // Walk up to find vaultRoot (the dir that contains the bundle's project folder).
   // bundleDir is typically vaultRoot/XX - Category/Project — go up 2 levels.
   const vaultRoot = path.dirname(path.dirname(bundleDir));
-  const backupsRoot = path.join(path.dirname(vaultRoot), '.gzos-backups');
+  const backupsRoot = path.join(path.dirname(vaultRoot), '.onyx-backups');
   const backupDir = path.join(backupsRoot, path.basename(vaultRoot), timestamp);
   fs.mkdirSync(backupDir, { recursive: true });
 
@@ -298,21 +321,21 @@ export function backupPhaseFiles(phaseNotePath: string): string {
 // Write a continue-here checkpoint when the controller is interrupted mid-task.
 export function writeCheckpoint(phaseNotePath: string, content: string): void {
   const phasesDir = path.dirname(phaseNotePath);
-  const checkpointPath = path.join(phasesDir, `.gzos-continue-${path.basename(phaseNotePath)}`);
+  const checkpointPath = path.join(phasesDir, `.onyx-continue-${path.basename(phaseNotePath)}`);
   fs.writeFileSync(checkpointPath, content, 'utf-8');
 }
 
 // Read a checkpoint written by a prior interrupted run. Returns null if absent.
 export function readCheckpoint(phaseNotePath: string): string | null {
   const phasesDir = path.dirname(phaseNotePath);
-  const checkpointPath = path.join(phasesDir, `.gzos-continue-${path.basename(phaseNotePath)}`);
+  const checkpointPath = path.join(phasesDir, `.onyx-continue-${path.basename(phaseNotePath)}`);
   return readRawFile(checkpointPath);
 }
 
 // Delete the checkpoint (consumed on resume).
 export function clearCheckpoint(phaseNotePath: string): void {
   const phasesDir = path.dirname(phaseNotePath);
-  const checkpointPath = path.join(phasesDir, `.gzos-continue-${path.basename(phaseNotePath)}`);
+  const checkpointPath = path.join(phasesDir, `.onyx-continue-${path.basename(phaseNotePath)}`);
   try { fs.unlinkSync(checkpointPath); } catch { /* ok */ }
 }
 

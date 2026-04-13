@@ -1,6 +1,6 @@
 # vault-architect
 
-Maintains the Obsidian graph pattern for all project bundles. Three subsystems run automatically inside the controller loop (and via `groundzeros heal`):
+Maintains the Obsidian graph pattern for all project bundles. Three subsystems run automatically inside the controller loop (and via `onyx heal`):
 
 1. **Graph Maintainer** — enforces fractal nav links, removes wrong links, auto-creates missing hub nodes
 2. **Hub Splitter** — splits overpopulated sub-hubs into groups (Phase Groups, Log Groups, Doc Categories)
@@ -161,7 +161,7 @@ Consolidated nav: [[PROJECT - Docs Hub|Docs Hub]]
 ## What Runs Each Loop Cycle
 
 ```
-groundzeros run:
+onyx run:
   1. runAllHeals()            — stale locks, frontmatter drift, tag normalisation
   2. maintainVaultGraph()     — nav rewrites, wrong link removal, hub splitting, auto-create missing hubs
   3. consolidateVaultNodes()  — phase group archiving, doc consolidation
@@ -169,14 +169,14 @@ groundzeros run:
 ```
 
 ```
-groundzeros heal:
+onyx heal:
   Runs steps 1-3 only (no executor).
 ```
 
 Output format:
 ```
-[GroundZeroOS] heal_complete · graph: 3 link repairs, 2 wrong links removed
-[GroundZeroOS] heal_complete · consolidate: 8 phases archived, 2 docs merged
+[ONYX] heal_complete · graph: 3 link repairs, 2 wrong links removed
+[ONYX] heal_complete · consolidate: 8 phases archived, 2 docs merged
 ```
 
 ---
@@ -203,7 +203,7 @@ Obsidian resolves wikilinks by basename — folder path is irrelevant. Every fil
       L{N} - P{N} - {Phase Name}.md
 ```
 
-Bundle folder name must match `project:` frontmatter field. Domain hub is auto-created by `groundzeros init`.
+Bundle folder name must match `project:` frontmatter field. Domain hub is auto-created by `onyx init`.
 
 ---
 
@@ -212,8 +212,8 @@ Bundle folder name must match `project:` frontmatter field. Domain hub is auto-c
 For best graph appearance:
 - Graph view → Filters: enable "Existing files only"
 - Graph view → Filters: hide `project-log` tagged notes to reveal hub shapes
-- Graph view → Groups: colour `gz-project` (Overview nodes) differently — they are the flower centers
-- Graph view → Groups: colour `gz-phase` nodes as petals
+- Graph view → Groups: colour `onyx-project` (Overview nodes) differently — they are the flower centers
+- Graph view → Groups: colour `onyx-phase` nodes as petals
 - Graph view → Display: node size by degree (Overview nodes become largest per project)
 - Appearance → Link style: arrows on (the directed hierarchy is meaningful)
 - Core plugins → Templates: point at `vault/08 - System/Agent Directives/Templates/`

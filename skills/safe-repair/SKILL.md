@@ -4,7 +4,7 @@
 Apply deterministic, safe fixes to drift detected by M2.
 
 ## When to invoke
-Runs automatically after M2 scan via `npm run groundzeros:heal`.
+Runs automatically after M2 scan via `npm run onyx:heal`.
 
 ## Safe to auto-apply
 

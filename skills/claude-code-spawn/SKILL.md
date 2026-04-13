@@ -4,7 +4,7 @@
 Spawn a Claude Code CLI agent to execute a coding task.
 
 ## When to invoke
-When `agent_driver: "claude-code"` is set in `groundzero.config.json` (this is the default).
+When `agent_driver: "claude-code"` is set in `onyx.config.json` (this is the default).
 
 ## Prerequisites
 - Claude Code must be installed: `npm install -g @anthropic-ai/claude-code`

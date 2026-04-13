@@ -60,7 +60,7 @@ export interface ConsolidationResult {
 // Helpers
 // ---------------------------------------------------------------------------
 function ensureTrashRoot(vaultRoot: string): string {
-  const trashRoot = path.join(vaultRoot, '.trash', '_gzos_consolidated');
+  const trashRoot = path.join(vaultRoot, '.trash', '_onyx_consolidated');
   fs.mkdirSync(trashRoot, { recursive: true });
   return trashRoot;
 }

@@ -10,4 +10,4 @@ export type {
   InboxItem,
   GraphNode,
   GraphEdge,
-} from '@gzos/shared/types';
+} from '@onyx/shared/types';

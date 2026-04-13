@@ -5,11 +5,11 @@ Import a Linear project as a vault bundle. Vault stays authoritative after impor
 
 ## When to invoke
 ```bash
-npm run groundzeros:import-linear -- <linearProjectId>
+npm run onyx:import-linear -- <linearProjectId>
 ```
 
 ## Prerequisites
-Linear config in `groundzero.config.json`:
+Linear config in `onyx.config.json`:
 ```json
 {
   "linear": {
@@ -31,7 +31,7 @@ Linear config in `groundzero.config.json`:
 The vault is the authority. Linear is now a display layer.
 Run the controller to atomise phases and sync back:
 ```bash
-npm run groundzeros:run
+npm run onyx:run
 ```
 
 The Atomiser will replace task stubs with codebase-grounded tasks,

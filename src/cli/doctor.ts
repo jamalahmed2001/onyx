@@ -1,4 +1,4 @@
-// gzos doctor — pre-flight checks
+// onyx doctor — pre-flight checks
 // Validates everything needed before first run.
 // No config required to run — that's the point.
 
@@ -27,7 +27,7 @@ function which(binary: string): boolean {
 export async function runDoctor(): Promise<void> {
   const checks: Check[] = [];
   const cwd = process.cwd();
-  const configPath = path.join(cwd, 'groundzero.config.json');
+  const configPath = path.join(cwd, 'onyx.config.json');
 
   // Load .env + config early so env vars are populated for the checks below
   try { loadConfig(); } catch { /* ignore — we'll surface missing fields as failed checks */ }
@@ -35,9 +35,9 @@ export async function runDoctor(): Promise<void> {
   // 1. Config file
   const configExists = fs.existsSync(configPath);
   checks.push({
-    label: 'groundzero.config.json found',
+    label: 'onyx.config.json found',
     pass: configExists,
-    fix: 'Copy the template: cp groundzero.config.json.example groundzero.config.json',
+    fix: 'Copy the template: cp onyx.config.json.example onyx.config.json',
   });
 
   let vaultRoot: string | undefined;
@@ -49,7 +49,7 @@ export async function runDoctor(): Promise<void> {
       vaultRoot = (raw['vault_root'] ?? raw['vaultRoot']) as string | undefined;
       agentDriver = String(raw['agent_driver'] ?? raw['agentDriver'] ?? 'claude-code');
     } catch {
-      checks.push({ label: 'groundzero.config.json is valid JSON', pass: false, fix: 'Check for syntax errors in groundzero.config.json' });
+      checks.push({ label: 'onyx.config.json is valid JSON', pass: false, fix: 'Check for syntax errors in onyx.config.json' });
     }
   }
 
@@ -62,12 +62,12 @@ export async function runDoctor(): Promise<void> {
   });
 
   // 3. vault_root set
-  const envVaultRoot = process.env['GROUNDZERO_VAULT_ROOT'];
+  const envVaultRoot = process.env['ONYX_VAULT_ROOT'];
   const resolvedVaultRoot = envVaultRoot ?? vaultRoot;
   checks.push({
     label: 'vault_root is configured',
     pass: Boolean(resolvedVaultRoot),
-    fix: 'Set vault_root in groundzero.config.json, or GROUNDZERO_VAULT_ROOT in .env',
+    fix: 'Set vault_root in onyx.config.json, or ONYX_VAULT_ROOT in .env',
   });
 
   // 4. vault_root exists on disk
@@ -83,7 +83,7 @@ export async function runDoctor(): Promise<void> {
     if (vaultExists) {
       let writeOk = false;
       try {
-        const testPath = path.join(resolvedVaultRoot, '.gzos-write-test');
+        const testPath = path.join(resolvedVaultRoot, '.onyx-write-test');
         fs.writeFileSync(testPath, 'ok');
         fs.unlinkSync(testPath);
         writeOk = true;
@@ -189,9 +189,9 @@ export async function runDoctor(): Promise<void> {
   });
 
   // 9. Built (dist exists)
-  const distExists = fs.existsSync(path.join(cwd, 'dist', 'cli', 'gzos.js'));
+  const distExists = fs.existsSync(path.join(cwd, 'dist', 'cli', 'onyx.js'));
   checks.push({
-    label: 'Built (dist/cli/gzos.js exists)',
+    label: 'Built (dist/cli/onyx.js exists)',
     pass: distExists,
     fix: 'Run: npm run build',
   });
@@ -219,7 +219,7 @@ export async function runDoctor(): Promise<void> {
         pass: stuckPhases.length === 0,
         warn: stuckPhases.length > 0,
         fix: stuckPhases.length > 0
-          ? `Run: gzos heal   (will clear stale locks)\n       Stuck: ${stuckPhases.map(p => p.frontmatter['phase_name'] ?? p.path.split('/').pop()).join(', ')}`
+          ? `Run: onyx heal   (will clear stale locks)\n       Stuck: ${stuckPhases.map(p => p.frontmatter['phase_name'] ?? p.path.split('/').pop()).join(', ')}`
           : undefined,
       });
 
@@ -232,7 +232,7 @@ export async function runDoctor(): Promise<void> {
           : `${missingId.length} phase(s) missing project_id`,
         pass: missingId.length === 0,
         warn: missingId.length > 0,
-        fix: missingId.length > 0 ? 'Run: gzos heal   (will backfill project_id from Overview)' : undefined,
+        fix: missingId.length > 0 ? 'Run: onyx heal   (will backfill project_id from Overview)' : undefined,
       });
 
       // 10c. Phase count
@@ -247,7 +247,7 @@ export async function runDoctor(): Promise<void> {
   }
 
   // Print results
-  console.log('\ngzos doctor\n');
+  console.log('\nonyx doctor\n');
   let allPass = true;
   for (const check of checks) {
     const icon = check.pass ? (check.warn ? '⚠' : '✓') : '✗';
@@ -262,10 +262,10 @@ export async function runDoctor(): Promise<void> {
 
   if (allPass) {
     console.log('\n  All checks passed. Ready to run:\n');
-    console.log('    gzos init "My Project"');
-    console.log('    gzos run\n');
+    console.log('    onyx init "My Project"');
+    console.log('    onyx run\n');
   } else {
-    console.log('\n  Fix the issues above, then run: gzos doctor\n');
+    console.log('\n  Fix the issues above, then run: onyx doctor\n');
     process.exit(1);
   }
 }

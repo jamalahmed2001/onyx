@@ -7,7 +7,7 @@ import type { PhaseState } from '../shared/types.js';
 // Re-export shared helpers so existing imports keep working
 export { normalizeState as normalizeTag, stateToTag as toTag } from '../shared/vault-parse.js';
 
-// Authoritative transition table — mirrors GroundZeroOS - Scoping (KISS).md §10.1
+// Authoritative transition table — mirrors ONYX - Scoping (KISS).md §10.1
 export const PHASE_TRANSITIONS: Record<PhaseState, PhaseState[]> = {
   backlog:   ['planning', 'ready'],
   planning:  ['ready', 'backlog'],

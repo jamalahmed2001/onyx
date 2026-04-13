@@ -1,11 +1,11 @@
 # M2 — Drift Scan
 
 ## Purpose
-Detect vault drift without touching non-GroundZeroOS notes.
+Detect vault drift without touching non-ONYX notes.
 
 ## When to invoke
 ```bash
-npm run groundzeros:heal
+npm run onyx:heal
 ```
 (M2 scan runs automatically before M3 repair)
 

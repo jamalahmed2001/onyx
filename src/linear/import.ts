@@ -37,7 +37,7 @@ status: backlog
 locked_by: ""
 locked_at: ""
 tags:
-  - gz-phase
+  - onyx-phase
   - phase-backlog
 created: ${new Date().toISOString().slice(0, 10)}
 ---
@@ -51,9 +51,9 @@ created: ${new Date().toISOString().slice(0, 10)}
 
 ## Overview
 
-<!-- GZOS_MANAGED_START:linear-overview -->
+<!-- ONYX_MANAGED_START:linear-overview -->
 ${desc}
-<!-- GZOS_MANAGED_END:linear-overview -->
+<!-- ONYX_MANAGED_END:linear-overview -->
 
 ## Human Requirements
 
@@ -122,7 +122,7 @@ linear_project_id: "${linearProjectId}"
 type: overview
 status: planning
 tags:
-  - gz-project
+  - onyx-project
 ---
 ## 🔗 Navigation
 

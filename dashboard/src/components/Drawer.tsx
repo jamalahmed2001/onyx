@@ -240,7 +240,7 @@ export default function Drawer({ path, onClose, onWikilinkClick }: Props) {
 
   const load = useCallback(() => {
     setLoading(true); setData(null); setEditMode(false); setSaved(false);
-    fetch(`/api/gz/vault-file?path=${encodeURIComponent(path)}`)
+    fetch(`/api/onyx/vault-file?path=${encodeURIComponent(path)}`)
       .then(r => { if (!r.ok) throw new Error('Not found'); return r.json(); })
       .then((d: FileData & { resolvedPath?: string }) => {
         setData(d);
@@ -269,7 +269,7 @@ export default function Drawer({ path, onClose, onWikilinkClick }: Props) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/gz/vault-file?path=${encodeURIComponent(path)}`, {
+      const res = await fetch(`/api/onyx/vault-file?path=${encodeURIComponent(path)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: editContent }),
@@ -298,7 +298,7 @@ export default function Drawer({ path, onClose, onWikilinkClick }: Props) {
       }
     }
     const newRaw = rawAll.join('\n');
-    await fetch(`/api/gz/vault-file?path=${encodeURIComponent(path)}`, {
+    await fetch(`/api/onyx/vault-file?path=${encodeURIComponent(path)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: newRaw }),
@@ -316,7 +316,7 @@ export default function Drawer({ path, onClose, onWikilinkClick }: Props) {
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 100, animation: 'fade-in 0.12s ease' }}/>
-      <div className="gzos-drawer" style={{
+      <div className="onyx-drawer" style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, width: 520, maxWidth: '100vw',
         background: 'rgba(10,14,22,0.94)',
         backdropFilter: 'blur(32px) saturate(180%)',
@@ -402,7 +402,7 @@ export default function Drawer({ path, onClose, onWikilinkClick }: Props) {
                 {renderMarkdown(body, {
                   onWikilink: target => onWikilinkClick
                     ? onWikilinkClick(target)
-                    : void fetch(`/api/gz/vault-file?path=${encodeURIComponent(target + '.md')}`),
+                    : void fetch(`/api/onyx/vault-file?path=${encodeURIComponent(target + '.md')}`),
                   onTaskToggle: handleTaskToggle,
                 })}
               </div>

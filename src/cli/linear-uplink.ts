@@ -4,14 +4,14 @@ import { uplinkPhasesToLinear } from '../linear/uplink.js';
 
 export async function runLinearUplink(projectArg?: string): Promise<void> {
   if (!projectArg) {
-    console.log('Usage: gzos linear-uplink <project-name>');
+    console.log('Usage: onyx linear-uplink <project-name>');
     return;
   }
 
   const config = loadConfig();
 
   if (!config.linear) {
-    console.error('Linear not configured. Add "linear": { "api_key": "...", "team_id": "..." } to groundzero.config.json');
+    console.error('Linear not configured. Add "linear": { "api_key": "...", "team_id": "..." } to onyx.config.json');
     process.exit(1);
   }
 

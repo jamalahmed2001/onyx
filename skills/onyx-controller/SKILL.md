@@ -1,10 +1,10 @@
-# GroundZero Controller
+# ONYX Controller
 
 ## Purpose
 Autonomous orchestration loop. Discovers executable work across all project bundles, routes to the correct agent, executes, and repeats until done or halted.
 
 ## When to invoke
-- `npm run groundzeros:run` — start the full controller loop
+- `npm run onyx:run` — start the full controller loop
 - Triggered automatically on schedule (configure your own cron)
 
 ## What it does
@@ -16,7 +16,7 @@ Autonomous orchestration loop. Discovers executable work across all project bund
 6. **Repeat** — loop until no work found or `max_iterations` hit
 
 ## Hard limits
-- Maximum 20 iterations per run (configurable in `groundzero.config.json`)
+- Maximum 20 iterations per run (configurable in `onyx.config.json`)
 - Exceeding limit: halt + notify human + surface in log
 
 ## Config

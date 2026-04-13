@@ -9,7 +9,7 @@ created: 2026-03-30
 
 # Skills Index
 
-All agent skills available in this GroundZeroOS installation. Each skill is a composable capability invoked by the controller or manually via its SKILL.md.
+All agent skills available in this ONYX installation. Each skill is a composable capability invoked by the controller or manually via its SKILL.md.
 
 ---
 
@@ -17,10 +17,10 @@ All agent skills available in this GroundZeroOS installation. Each skill is a co
 
 | Skill | Command | What it does |
 |-------|---------|-------------|
-| groundzero-controller | `gzos run` | Main orchestration loop: heal → graph → discover → route → act |
-| drift-scan | `gzos heal` | Detect vault drift (stale locks, tag mismatches) without touching notes |
-| safe-repair | `gzos heal` | Apply deterministic fixes to detected drift |
-| init-bundle | `gzos init` | Create a new project bundle with full hub structure |
+| onyx-controller | `onyx run` | Main orchestration loop: heal → graph → discover → route → act |
+| drift-scan | `onyx heal` | Detect vault drift (stale locks, tag mismatches) without touching notes |
+| safe-repair | `onyx heal` | Apply deterministic fixes to detected drift |
+| init-bundle | `onyx init` | Create a new project bundle with full hub structure |
 
 ## Planning Skills
 
@@ -29,7 +29,7 @@ All agent skills available in this GroundZeroOS installation. Each skill is a co
 | phase-planner | auto (P1) | Break project overview into numbered phases |
 | atomiser | auto (P2) | Break a phase into 6–12 atomic executable tasks |
 | consolidator | auto (P3) | Extract learnings after phase completion → Knowledge.md |
-| plan-my-day | `gzos plan` | Rank all ready phases into a prioritised daily plan |
+| plan-my-day | `onyx plan` | Rank all ready phases into a prioritised daily plan |
 
 ## Execution Skills
 
@@ -43,7 +43,7 @@ All agent skills available in this GroundZeroOS installation. Each skill is a co
 
 | Skill | Command | What it does |
 |-------|---------|-------------|
-| linear-import | `gzos import <id>` | Import Linear project → vault bundle |
+| linear-import | `onyx import <id>` | Import Linear project → vault bundle |
 | linear-uplink | auto (post-atomise) | Sync vault phases back to Linear |
 | notify-phase | auto | Emit notifications on every controller action |
 
@@ -51,7 +51,7 @@ All agent skills available in this GroundZeroOS installation. Each skill is a co
 
 ## Agent Driver Selection
 
-Set in `groundzero.config.json`:
+Set in `onyx.config.json`:
 ```json
 { "agent_driver": "claude-code" }
 ```

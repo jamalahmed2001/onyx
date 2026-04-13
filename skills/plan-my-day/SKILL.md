@@ -1,6 +1,6 @@
 ---
 name: plan-my-day
-description: Generate an energy-optimised, time-blocked daily plan from your GroundZeroOS vault. Reads active project phases, inbox captures, and personal commitments — writes a full day plan back to the vault.
+description: Generate an energy-optimised, time-blocked daily plan from your ONYX vault. Reads active project phases, inbox captures, and personal commitments — writes a full day plan back to the vault.
 ---
 
 # Plan My Day
@@ -13,9 +13,9 @@ Generate a realistic, hour-by-hour plan for today (or a given date). Reads from 
 
 ## Configuration (read first)
 
-Read the vault root from `GROUNDZERO_VAULT_ROOT` environment variable or from `groundzero.config.json`:
+Read the vault root from `ONYX_VAULT_ROOT` environment variable or from `onyx.config.json`:
 ```bash
-node -e "const c=require('./groundzero.config.json'); console.log(c.vault_root || process.env.GROUNDZERO_VAULT_ROOT)"
+node -e "const c=require('./onyx.config.json'); console.log(c.vault_root || process.env.ONYX_VAULT_ROOT)"
 ```
 
 All vault paths below are relative to that root.

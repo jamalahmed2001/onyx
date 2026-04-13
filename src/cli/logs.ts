@@ -9,8 +9,8 @@ export async function runLogs(phaseArg?: string): Promise<void> {
   const phases = discoverAllPhases(config.vaultRoot, config.projectsGlob);
 
   if (!phaseArg) {
-    console.log('Usage: gzos logs <phase-name-or-number>');
-    console.log('       gzos logs --recent   (show last active log)');
+    console.log('Usage: onyx logs <phase-name-or-number>');
+    console.log('       onyx logs --recent   (show last active log)');
     return;
   }
 

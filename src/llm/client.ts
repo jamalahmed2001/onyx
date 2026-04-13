@@ -81,8 +81,8 @@ export async function chatCompletion(opts: LLMCallOptions): Promise<string> {
     headers: {
       'Authorization': `Bearer ${opts.apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://github.com/groundzeroOS',
-      'X-Title': 'GroundZeroOS',
+      'HTTP-Referer': 'https://github.com/onyx',
+      'X-Title': 'ONYX',
     },
     body: JSON.stringify(body),
   });

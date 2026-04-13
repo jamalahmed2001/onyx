@@ -6,8 +6,8 @@ import os from 'os';
 
 export const dynamic = 'force-dynamic';
 
-const GZOS_ROOT = path.resolve(process.cwd(), '..');
-const GZOS_BIN  = path.join(GZOS_ROOT, 'dist', 'cli', 'gzos.js');
+const ONYX_ROOT = path.resolve(process.cwd(), '..');
+const ONYX_BIN  = path.join(ONYX_ROOT, 'dist', 'cli', 'onyx.js');
 
 // Commands that complete quickly — use execSync
 const SYNC_CMDS = new Set(['status', 'heal', 'doctor', 'logs', 'capture', 'set-state']);
@@ -43,10 +43,10 @@ export async function POST(req: Request) {
   if (ASYNC_CMDS.has(cmd)) {
     // Fire-and-forget: spawn detached, return jobId for polling
     const jobId = nextJobId();
-    const logFile = path.join(os.tmpdir(), `gzos_${jobId}.log`);
+    const logFile = path.join(os.tmpdir(), `onyx_${jobId}.log`);
 
-    const child = spawn('node', [GZOS_BIN, cmd, ...safeArgs], {
-      cwd: GZOS_ROOT,
+    const child = spawn('node', [ONYX_BIN, cmd, ...safeArgs], {
+      cwd: ONYX_ROOT,
       env: { ...process.env },
       detached: true,
       stdio: ['ignore', fs.openSync(logFile, 'w'), fs.openSync(logFile, 'a')],
@@ -68,8 +68,8 @@ export async function POST(req: Request) {
 
   // Synchronous — fast commands
   try {
-    const output = execSync(`node "${GZOS_BIN}" ${cmd} ${safeArgs.map(a => `"${a}"`).join(' ')}`.trim(), {
-      cwd: GZOS_ROOT,
+    const output = execSync(`node "${ONYX_BIN}" ${cmd} ${safeArgs.map(a => `"${a}"`).join(' ')}`.trim(), {
+      cwd: ONYX_ROOT,
       timeout: 30_000,
       env: { ...process.env },
       encoding: 'utf8',

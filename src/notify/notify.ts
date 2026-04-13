@@ -24,9 +24,9 @@ export interface NotifyPayload {
   runId?: string;
 }
 
-// Format for stdout: [GroundZeroOS] event · project · phase · detail (#runId)
+// Format for stdout: [ONYX] event · project · phase · detail (#runId)
 export function formatStdout(payload: NotifyPayload): string {
-  const parts: string[] = [`[GroundZeroOS] ${payload.event}`];
+  const parts: string[] = [`[ONYX] ${payload.event}`];
   if (payload.projectId) parts.push(payload.projectId);
   if (payload.phaseLabel) parts.push(payload.phaseLabel);
   if (payload.detail) parts.push(payload.detail);
@@ -35,9 +35,9 @@ export function formatStdout(payload: NotifyPayload): string {
 }
 
 // Format for WhatsApp (concise, mobile-friendly):
-// GroundZeroOS\nproject · phase\nevent — detail\nRun: #runId
+// ONYX\nproject · phase\nevent — detail\nRun: #runId
 export function formatWhatsApp(payload: NotifyPayload): string {
-  const lines: string[] = ['GroundZeroOS'];
+  const lines: string[] = ['ONYX'];
 
   const projectParts: string[] = [];
   if (payload.projectId) projectParts.push(payload.projectId);
@@ -106,7 +106,7 @@ async function sendOpenClawBatch(events: NotifyPayload[], config: ControllerConf
   const lines = meaningful.map(e =>
     `${eventEmoji(e.event)} ${e.projectId ?? ''} · ${e.event}${e.detail ? ` — ${e.detail}` : ''}`
   );
-  const message = `GroundZeroOS\n${lines.join('\n')}`;
+  const message = `ONYX\n${lines.join('\n')}`;
 
   // Shell out to the openclaw CLI.
   // `openclaw message send --target <E.164> --message <text>`

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, CheckCircle, Circle, GitCommit, Loader } from 'lucide-react';
-import type { DiffFile, DiffResult } from '@/app/api/gz/projects/[id]/git/diff/route';
+import type { DiffFile, DiffResult } from '@/app/api/onyx/projects/[id]/git/diff/route';
 
 interface Props {
   projectId: string;
@@ -101,7 +101,7 @@ export default function GitDiffPanel({ projectId }: Props) {
 
   useEffect(() => {
     setLoading(true); setError(null); setResult(null); setReviewed(new Set()); setCommitted(false);
-    fetch(`/api/gz/projects/${encodeURIComponent(projectId)}/git/diff`)
+    fetch(`/api/onyx/projects/${encodeURIComponent(projectId)}/git/diff`)
       .then(r => r.json())
       .then((d: DiffResult & { error?: string }) => {
         if (d.error) { setError(d.error); return; }
@@ -124,7 +124,7 @@ export default function GitDiffPanel({ projectId }: Props) {
     if (!commitMsg.trim() || !result) return;
     setCommitting(true);
     try {
-      const res = await fetch(`/api/gz/projects/${encodeURIComponent(projectId)}/git/commit`, {
+      const res = await fetch(`/api/onyx/projects/${encodeURIComponent(projectId)}/git/commit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: commitMsg.trim() }),

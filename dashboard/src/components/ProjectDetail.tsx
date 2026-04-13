@@ -23,7 +23,7 @@ function TaskList({ phasePath }: { phasePath: string }) {
   const [tasks, setTasks] = useState<{ text: string; done: boolean }[] | null>(null);
 
   useEffect(() => {
-    fetch(`/api/gz/vault-file?path=${encodeURIComponent(phasePath)}`)
+    fetch(`/api/onyx/vault-file?path=${encodeURIComponent(phasePath)}`)
       .then(r => r.json())
       .then((d: { raw: string }) => {
         const lines = d.raw?.split('\n') ?? [];
@@ -149,7 +149,7 @@ function ScopeEditor({ project, onClose }: { project: GZProject; onClose: () => 
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    fetch(`/api/gz/vault-file?path=${encodeURIComponent(project.overviewPath)}`)
+    fetch(`/api/onyx/vault-file?path=${encodeURIComponent(project.overviewPath)}`)
       .then(r => r.json())
       .then((d: { raw: string }) => { setContent(d.raw ?? ''); setLoading(false); })
       .catch(() => setLoading(false));
@@ -163,7 +163,7 @@ function ScopeEditor({ project, onClose }: { project: GZProject; onClose: () => 
   const save = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/gz/vault-file?path=${encodeURIComponent(project.overviewPath)}`, {
+      const res = await fetch(`/api/onyx/vault-file?path=${encodeURIComponent(project.overviewPath)}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
       });
@@ -200,7 +200,7 @@ export default function ProjectDetail({ project, onClose, onOpenFile, onRunCLI, 
 
   const handleStatusChange = async (phase: GZPhase, newStatus: PhaseStatus) => {
     try {
-      const res = await fetch(`/api/gz/projects/${encodeURIComponent(project.id)}`, {
+      const res = await fetch(`/api/onyx/projects/${encodeURIComponent(project.id)}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phasePath: phase.path, status: newStatus }),
       });
@@ -219,7 +219,7 @@ export default function ProjectDetail({ project, onClose, onOpenFile, onRunCLI, 
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 50, animation: 'fade-in 0.12s ease' }}/>
-      <div className="gzos-drawer" style={{
+      <div className="onyx-drawer" style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, width: 500, maxWidth: '100vw',
         background: 'rgba(10,14,22,0.95)', backdropFilter: 'blur(32px) saturate(180%)',
         WebkitBackdropFilter: 'blur(32px) saturate(180%)',

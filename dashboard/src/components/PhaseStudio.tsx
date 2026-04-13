@@ -93,8 +93,8 @@ export default function PhaseStudio({ phase, onClose, onRunCLI }: Props) {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetch(`/api/gz/vault-file?path=${encodeURIComponent(phase.path)}`).then(r => r.json()),
-      fetch(`/api/gz/phase-files?path=${encodeURIComponent(phase.path)}`).then(r => r.json()),
+      fetch(`/api/onyx/vault-file?path=${encodeURIComponent(phase.path)}`).then(r => r.json()),
+      fetch(`/api/onyx/phase-files?path=${encodeURIComponent(phase.path)}`).then(r => r.json()),
     ]).then(([fd, fsd]) => {
       const content: string = fd.raw ?? '';
       setRaw(content);
@@ -110,7 +110,7 @@ export default function PhaseStudio({ phase, onClose, onRunCLI }: Props) {
   const fetchLog = useCallback(async () => {
     setLogLoading(true);
     try {
-      const data = await fetch(`/api/gz/phase-logs?path=${encodeURIComponent(phase.path)}`).then(r => r.json()) as { exists: boolean; content: string | null };
+      const data = await fetch(`/api/onyx/phase-logs?path=${encodeURIComponent(phase.path)}`).then(r => r.json()) as { exists: boolean; content: string | null };
       setLogExists(data.exists);
       setLogContent(data.content);
     } catch { /* non-fatal */ }
@@ -130,7 +130,7 @@ export default function PhaseStudio({ phase, onClose, onRunCLI }: Props) {
   const killReset = async () => {
     if (!confirm(`Kill the running agent and reset "${phase.phaseName}" back to ready?`)) return;
     try {
-      await fetch(`/api/gz/projects/${encodeURIComponent(phase.projectId)}`, {
+      await fetch(`/api/onyx/projects/${encodeURIComponent(phase.projectId)}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phasePath: phase.path, status: 'ready' }),
       });
@@ -144,7 +144,7 @@ export default function PhaseStudio({ phase, onClose, onRunCLI }: Props) {
 
   const markComplete = async () => {
     try {
-      const res = await fetch(`/api/gz/projects/${encodeURIComponent(phase.projectId)}`, {
+      const res = await fetch(`/api/onyx/projects/${encodeURIComponent(phase.projectId)}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phasePath: phase.path, status: 'completed' }),
       });
@@ -169,7 +169,7 @@ export default function PhaseStudio({ phase, onClose, onRunCLI }: Props) {
     setRaw(next);
     setTasks(parseTasks(next));
     try {
-      const res = await fetch(`/api/gz/vault-file?path=${encodeURIComponent(phase.path)}`, {
+      const res = await fetch(`/api/onyx/vault-file?path=${encodeURIComponent(phase.path)}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: next }),
       });
@@ -184,7 +184,7 @@ export default function PhaseStudio({ phase, onClose, onRunCLI }: Props) {
 
   const openFile = useCallback(async (f: PhaseFile) => {
     setActiveFile(f.path);
-    const data = await fetch(`/api/gz/vault-file?path=${encodeURIComponent(f.path)}`).then(r => r.json()) as { raw?: string };
+    const data = await fetch(`/api/onyx/vault-file?path=${encodeURIComponent(f.path)}`).then(r => r.json()) as { raw?: string };
     setFileRaw(data.raw ?? '');
   }, []);
 
@@ -203,7 +203,7 @@ export default function PhaseStudio({ phase, onClose, onRunCLI }: Props) {
     setChatMsgs(m => [...m, { role: 'user', text: msg }]);
     const appended = (raw ?? '') + `\n\n> **Agent note (${new Date().toLocaleTimeString()}):** ${msg}\n`;
     try {
-      const res = await fetch(`/api/gz/vault-file?path=${encodeURIComponent(phase.path)}`, {
+      const res = await fetch(`/api/onyx/vault-file?path=${encodeURIComponent(phase.path)}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: appended }),
       });
@@ -223,7 +223,7 @@ export default function PhaseStudio({ phase, onClose, onRunCLI }: Props) {
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, animation: 'fade-in 0.12s ease' }}/>
-      <div className="gzos-studio" style={{
+      <div className="onyx-studio" style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, width: 600, maxWidth: '100vw',
         background: 'rgba(10,14,22,0.97)', backdropFilter: 'blur(32px) saturate(180%)',
         WebkitBackdropFilter: 'blur(32px) saturate(180%)',

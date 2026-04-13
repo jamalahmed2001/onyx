@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChevronRight, ChevronDown, FileText, Folder, FolderOpen } from 'lucide-react';
 import type { VaultFileNode } from '@/lib/types';
-import type { VaultGraphNode, VaultGraphLink } from '@/app/api/gz/vault-graph/route';
+import type { VaultGraphNode, VaultGraphLink } from '@/app/api/onyx/vault-graph/route';
 import {
   forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, forceX, forceY,
   type Simulation,
@@ -380,7 +380,7 @@ function VaultGraph({ onOpenFile }: { onOpenFile: (p: string) => void }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/gz/vault-graph').then(r => r.json()).then(
+    fetch('/api/onyx/vault-graph').then(r => r.json()).then(
       ({ nodes, links }: { nodes: VaultGraphNode[]; links: VaultGraphLink[] }) => {
         if (cancelled) return;
         setRawNodes(nodes);

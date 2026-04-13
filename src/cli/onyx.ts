@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// gzos — GroundZeroOS CLI (commander-based)
+// onyx — ONYX CLI (commander-based)
 //
-// Consistent arg pattern: gzos <verb> [project] [--flags]
+// Consistent arg pattern: onyx <verb> [project] [--flags]
 // Global flags: --json (machine-readable output), --verbose/-v
 
 import { runInit } from './init.js';
@@ -72,8 +72,8 @@ function renderPhaseLine(phase: ReturnType<typeof discoverAllPhases>[number], in
 
 const program = new Command();
 program
-  .name('gzos')
-  .description('GroundZeroOS — vault-native AI agent orchestration')
+  .name('onyx')
+  .description('ONYX — vault-native AI agent orchestration')
   .version('0.1.0')
   .option('-v, --verbose', 'debug logging')
   .option('--json', 'machine-readable output');
@@ -102,7 +102,7 @@ program
     const { execSync: execDash } = await import('child_process');
     const dashDir = new URL('../../dashboard', import.meta.url).pathname;
     const dashPort = port ?? '7070';
-    console.log(`[gzos] Dashboard → http://localhost:${dashPort}`);
+    console.log(`[onyx] Dashboard → http://localhost:${dashPort}`);
     try { execDash(`npm run dev -- --port ${dashPort}`, { cwd: dashDir, stdio: 'inherit' }); } catch { /* killed */ }
   });
 
@@ -128,16 +128,16 @@ program
     const phaseFilter: number | undefined = opts.phase;
     if (phaseFilter !== undefined) once = true;
     if (!isJson()) {
-      if (dryRun) console.log('[gzos] Dry run — showing what would execute without running agents');
-      if (once) console.log('[gzos] --once mode: will stop after first actionable phase');
-      console.log('[gzos] Starting controller loop...');
+      if (dryRun) console.log('[onyx] Dry run — showing what would execute without running agents');
+      if (once) console.log('[onyx] --once mode: will stop after first actionable phase');
+      console.log('[onyx] Starting controller loop...');
     }
     const results = await runLoop(config, { projectFilter, phaseFilter, dryRun, once });
     const acted = results.reduce((n, r) => n + r.phasesActedOn.length, 0);
     if (isJson()) {
       console.log(JSON.stringify(results, null, 2));
     } else {
-      console.log(`[gzos] Done. ${results.length} iteration(s), ${acted} phases acted on.`);
+      console.log(`[onyx] Done. ${results.length} iteration(s), ${acted} phases acted on.`);
     }
   });
 
@@ -147,7 +147,7 @@ program
   .description('Fix stale locks, vault drift, graph links')
   .action(async () => {
     const config = loadConfig();
-    if (!isJson()) console.log('[gzos] Running healer...');
+    if (!isJson()) console.log('[onyx] Running healer...');
     const healResult = runAllHeals(config);
     const graphResult = await maintainVaultGraph(config);
     const consolidateResult = await consolidateVaultNodes(config);
@@ -168,7 +168,7 @@ program
       if (consolidateResult.actions.length > 0) {
         console.log(`  Consolidate: ${consolidateResult.phasesArchived} phases archived, ${consolidateResult.docsMerged} docs merged`);
       }
-      console.log('[gzos] Vault is healthy.');
+      console.log('[onyx] Vault is healthy.');
     }
   });
 
@@ -231,7 +231,7 @@ program
       };
       console.log(JSON.stringify(snapshot, null, 2));
     } else if (phases.length === 0) {
-      console.log('No project phases found. Run: gzos init "My Project"');
+      console.log('No project phases found. Run: onyx init "My Project"');
     } else {
       // Human-readable output with milestone grouping
       const byProject = new Map<string, typeof phases>();
@@ -338,12 +338,12 @@ program
   .action(async (linearId) => {
     const config = loadConfig();
     if (!config.linear) {
-      console.error('Linear not configured. Add linear config to groundzero.config.json');
+      console.error('Linear not configured. Add linear config to onyx.config.json');
       process.exit(1);
     }
-    console.log(`[gzos] Importing Linear project ${linearId}...`);
+    console.log(`[onyx] Importing Linear project ${linearId}...`);
     const bundle = await importLinearProject(linearId, config);
-    console.log(`[gzos] Imported "${bundle.projectId}"`);
+    console.log(`[onyx] Imported "${bundle.projectId}"`);
     console.log(`  ${bundle.phases.length} phases created in: ${bundle.bundleDir}`);
   });
 
@@ -363,13 +363,13 @@ program
     if (!node.exists) {
       const msg = `Phase note not found: ${phasePath}`;
       if (isJson()) console.log(JSON.stringify({ error: msg }));
-      else console.error(`[gzos] ${msg}`);
+      else console.error(`[onyx] ${msg}`);
       process.exit(1);
     }
     const previous = stateFromFrontmatter(node.frontmatter);
     setPhaseTag(phasePath, toTag(normalized));
     if (isJson()) console.log(JSON.stringify({ path: phasePath, previous, new: normalized }));
-    else console.log(`[gzos] ${phasePath}: ${previous} → ${normalized}`);
+    else console.log(`[onyx] ${phasePath}: ${previous} → ${normalized}`);
   });
 
 // ── logs ──────────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-const CFG_PATH = join(process.cwd(), '..', 'groundzero.config.json');
+const CFG_PATH = join(process.cwd(), '..', 'onyx.config.json');
 
 export function getConfigPath(): string {
   return CFG_PATH;

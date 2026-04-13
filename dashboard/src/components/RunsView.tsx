@@ -191,7 +191,7 @@ export default function RunsView({ runs, onOpenFile }: Props) {
       {diffProject && (
         <>
           <div onClick={() => setDiffProject(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200 }}/>
-          <div className="gzos-drawer" style={{
+          <div className="onyx-drawer" style={{
             position: 'fixed', top: 0, right: 0, bottom: 0, width: 540, maxWidth: '100vw',
             background: 'rgba(10,14,22,0.97)', backdropFilter: 'blur(32px) saturate(180%)',
             WebkitBackdropFilter: 'blur(32px) saturate(180%)',

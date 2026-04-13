@@ -5,7 +5,7 @@ Create a new project bundle with the correct folder structure.
 
 ## When to invoke
 ```bash
-npm run groundzeros:init -- "Project Name"
+npm run onyx:init -- "Project Name"
 ```
 
 ## What it creates
@@ -25,4 +25,4 @@ npm run groundzeros:init -- "Project Name"
 
 ## Next step after init
 Open `Project Name - Overview.md` and write your goal, scope, and why.
-Then run `npm run groundzeros:run` — the controller will detect no phases exist and invoke P1 Phase Planner.
+Then run `npm run onyx:run` — the controller will detect no phases exist and invoke P1 Phase Planner.

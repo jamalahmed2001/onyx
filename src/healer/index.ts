@@ -26,7 +26,7 @@ export interface HealResult {
   detected: number;
 }
 
-// Run all healers. Called at controller startup and by `groundzeros heal` CLI.
+// Run all healers. Called at controller startup and by `onyx heal` CLI.
 export function runAllHeals(config: ControllerConfig): HealResult {
   const staleLockActions = healStaleLocks(
     config.vaultRoot,

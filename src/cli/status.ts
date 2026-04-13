@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// groundzeros status
+// onyx status
 // Show all projects and their phase states.
 
 import { loadConfig } from '../config/load.js';
@@ -11,7 +11,7 @@ const config = loadConfig();
 const phases = discoverAllPhases(config.vaultRoot, config.projectsGlob);
 
 if (phases.length === 0) {
-  console.log('No GroundZeroOS phase notes found.');
+  console.log('No ONYX phase notes found.');
 } else {
   for (const phase of phases) {
     const state = stateFromFrontmatter(phase.frontmatter);

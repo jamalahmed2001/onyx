@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// groundzeros run
+// onyx run
 // Loads config, runs controller loop.
 
 import { loadConfig } from '../config/load.js';

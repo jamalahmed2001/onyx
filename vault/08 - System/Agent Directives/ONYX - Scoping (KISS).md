@@ -1,5 +1,5 @@
 ---
-tags: [system, groundzeroos, directive, status-active]
+tags: [system, onyx, directive, status-active]
 graph_domain: system
 created: 2026-03-30
 updated: 2026-03-30
@@ -11,9 +11,9 @@ up: Agent Directives Hub
 
 **UP:** [[08 - System/Agent Directives/Agent Directives Hub.md|Agent Directives Hub]]
 
-# GroundZeroOS — Scoping (KISS)
+# ONYX — Scoping (KISS)
 
-GroundZeroOS is a **minimal**, directive-driven way to keep an Obsidian vault in a shape where agents can reliably:
+ONYX is a **minimal**, directive-driven way to keep an Obsidian vault in a shape where agents can reliably:
 - discover executable work (phase nodes)
 - plan + atomize tasks against a real codebase
 - execute tasks and **append full outputs** to log nodes
@@ -88,7 +88,7 @@ flowchart TD
 - A project folder can move; links can be rebuilt by maintenance.
 
 ### 1.4 Opt-in Enforcement
-Only enforce GroundZeroOS rules for notes that are explicitly part of the execution system:
+Only enforce ONYX rules for notes that are explicitly part of the execution system:
 - either by **tags**
 - or by explicit frontmatter fields
 
@@ -103,7 +103,7 @@ If code and vault diverge on what a state means, the vault wins.
 
 ## 2) Interfaces (Execution Surfaces)
 
-GroundZeroOS must be operable from:
+ONYX must be operable from:
 - **Claude Code** (coding execution)
 - **Cursor** (coding execution)
 - **Web dashboard** (visibility + quick actions)

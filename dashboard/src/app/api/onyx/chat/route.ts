@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     .map(m => m.role === 'user' ? `Human: ${m.content}` : `Assistant: ${m.content}`)
     .join('\n\n');
 
-  const systemPrompt = `You are a senior technical advisor embedded in GroundZeroOS, a project orchestration dashboard.
+  const systemPrompt = `You are a senior technical advisor embedded in ONYX, a project orchestration dashboard.
 
 You have access to the project context below AND full read access to the repo via your tools (Read, Glob, Grep).
 

@@ -1,383 +1,326 @@
-# Getting Started with GroundZeroOS
+# Getting Started with ONYX
 
-A human-in-the-loop agentic workflow for software development. AI agents do the implementation work; you stay in control of what gets built and when.
-
----
-
-## What this is
-
-GroundZeroOS lets you run AI coding agents (Claude Code or Cursor) against your repos — but instead of letting an agent roam freely, you define the work in structured **phase notes** in your Obsidian vault. The agent gets exactly what you wrote, does that work, logs what it did, and stops. You review. You decide what runs next.
-
-The vault is the source of truth. Every project, every phase, every task, every agent action lives there as plain Markdown. No dashboard required. No separate database. Open Obsidian and you can see everything.
+> The orchestration layer for Obsidian. Install in 10 minutes. First project running in another 5.
 
 ---
 
-## 1. Prerequisites
+## What you're setting up
 
-| Requirement | Why |
-|---|---|
-| [Obsidian](https://obsidian.md) | Where your projects live — the vault is the source of truth |
-| [Node.js 18+](https://nodejs.org) | Runs gzos |
-| [OpenRouter API key](https://openrouter.ai) | LLM calls for planning and atomising phases |
-| **One of the agent drivers below** | Executes tasks in your repo |
+ONYX is a local CLI that runs AI agents against your projects — phase by phase, under your direction — with an Obsidian vault as the single source of truth. After setup:
 
-### Agent driver — pick one
+- `onyx run` — executes all `phase-ready` phases autonomously
+- `onyx status` — shows every project and its current state
+- Obsidian — shows the live execution, logs, and accumulated knowledge
 
-**Claude Code** (recommended)
+---
+
+## Prerequisites
+
+| Requirement | Minimum | Install |
+|---|---|---|
+| Node.js | 18+ | https://nodejs.org |
+| npm | 8+ | comes with Node |
+| Claude Code | latest | `npm install -g @anthropic-ai/claude-code` |
+| Obsidian | latest | https://obsidian.md (recommended, not required for headless use) |
+| OpenRouter API key | — | https://openrouter.ai |
+
+Verify:
+```bash
+node --version    # v18+
+npm --version     # v8+
+claude --version  # installed
+```
+
+If `claude` isn't installed: `npm install -g @anthropic-ai/claude-code`, then `claude login`.
+
+---
+
+## Step 1 — Install
 
 ```bash
-npm install -g @anthropic-ai/claude-code
-claude login
-```
-
-Runs headlessly. No desktop app needed. Uses your `claude login` session — no extra API key required.
-
-**Cursor** (alternative)
-
-1. Download and install [Cursor](https://cursor.sh)
-2. Open Cursor → **Cursor menu → Install Shell Command**
-3. Confirm: `cursor --version`
-
-The **shell command** (step 2) is mandatory — GroundZeroOS calls `cursor` in your terminal PATH. Installing the desktop app alone is not enough.
-
-Set your chosen driver in `groundzero.config.json`:
-```json
-{ "agent_driver": "claude-code" }
-```
-or
-```json
-{ "agent_driver": "cursor" }
-```
-
-Run `gzos doctor` at any point to confirm the selected driver is found.
-
----
-
-Optional:
-- **Linear API key** — to import projects from Linear (`gzos import <id>`)
-
----
-
-## 2. Installation
-
-```bash
-git clone https://github.com/jamalahmed2001/groundzeroOS-starter
-cd groundzeroOS-starter
+git clone https://github.com/jamalahmed2001/onyx
+cd onyx
 npm install
 ```
 
-`npm install` also runs `npm run build` via postinstall, so `gzos` is ready immediately.
+`npm install` triggers `postinstall` which runs `tsc`. Build output goes to `dist/`. The `onyx` binary is now available locally.
+
+Verify:
+```bash
+node dist/cli/onyx.js --help | head -5
+```
 
 ---
 
-## 3. Configure
+## Step 2 — Configure `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and set:
+Edit `.env`:
 
-```env
-GROUNDZERO_VAULT_ROOT=/absolute/path/to/your/obsidian/vault
+```bash
+ONYX_VAULT_ROOT=/absolute/path/to/your/obsidian/vault
 OPENROUTER_API_KEY=sk-or-...
 ```
 
-Then open `groundzero.config.json` and update `vault_root` to the same path:
+Don't have an Obsidian vault? Use the bundled starter vault:
+```bash
+ONYX_VAULT_ROOT=/absolute/path/to/onyx/vault
+```
+
+**Agent driver keys are not required if you're logged in:**
+- Claude Code uses session auth from `claude login`
+- Cursor uses your Cursor account session
+
+---
+
+## Step 3 — Configure `onyx.config.json`
 
 ```json
 {
-  "vault_root": "/absolute/path/to/your/obsidian/vault",
+  "vault_root": "/absolute/path/to/your/vault",
   "agent_driver": "claude-code",
-  "projects_glob": "01 - Projects/**"
+  "llm": { "model": "anthropic/claude-sonnet-4-6" },
+  "model_tiers": {
+    "planning": "anthropic/claude-opus-4-6",
+    "light":    "anthropic/claude-haiku-4-5-20251001",
+    "standard": "anthropic/claude-sonnet-4-6",
+    "heavy":    "anthropic/claude-opus-4-6"
+  },
+  "max_iterations": 20,
+  "stale_lock_threshold_ms": 300000,
+  "projects_glob": "{02 - Fanvue/**,03 - Ventures/**,10 - OpenClaw/**}"
 }
 ```
 
-**Check everything is wired up:**
-```bash
-gzos doctor
-```
-
-All green? You're ready.
+Match `vault_root` to `ONYX_VAULT_ROOT` from `.env`. The `projects_glob` defines which vault areas ONYX scans for project bundles.
 
 ---
 
-## 4. Open the starter vault in Obsidian
-
-The `vault/` folder in this repo is a ready-to-use Obsidian vault. Open it:
-
-1. Open Obsidian → **Open another vault** → **Open folder as vault**
-2. Select the `vault/` folder inside this repo
-3. Browse to `00 - Dashboard/Dashboard.md` — your home base
-
-You'll see **My First Project** already set up as an example. It has an Overview, Kanban, Knowledge note, and one phase note ready to run.
-
-Alternatively, point `vault_root` in your `.env` at an existing Obsidian vault you already use. GroundZeroOS will work alongside anything already there.
-
----
-
-## 5. Your first project
-
-### Option A — Use the example
-
-`My First Project` is already in `01 - Projects/`. Open `Phases/P1 - Example Phase.md` in Obsidian. It has a task ready: create a file. Run it:
+## Step 4 — Make `onyx` global
 
 ```bash
-gzos run
+# Option A: npm link (recommended)
+npm link
+
+# Option B: shell alias
+echo 'alias onyx="node /absolute/path/to/onyx/dist/cli/onyx.js"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
-The agent picks up the `phase-ready` phase, executes the task, and writes a log to `Logs/L1 - P1 - Example Phase.md`. Open that log in Obsidian after it finishes.
+Verify:
+```bash
+onyx --help
+```
 
-### Option B — Start your own
+---
+
+## Step 5 — Run doctor
 
 ```bash
-gzos init "My App"
+onyx doctor
 ```
 
-Interactive prompt: enter the repo path (where your code lives). GroundZeroOS scans the repo and creates:
+Every dependency gets a green ✓ or a red ✗ with the exact fix command. Fix everything red before proceeding.
 
-```
-01 - Projects/
-  My App/
-    My App - Overview.md       ← describe what you're building
-    My App - Repo Context.md   ← auto-filled: stack, key files, architecture
-    My App - Kanban.md         ← your phases, all states at a glance
-    My App - Knowledge.md      ← learnings agents write back here
-    My App - Agent Log Hub.md  ← links to all execution logs
-    Phases/                    ← one note per phase
-    Logs/                      ← one log per phase execution
-```
+Common issues:
+
+| Error | Fix |
+|---|---|
+| `vault_root not set` | Set in `.env` and `onyx.config.json` |
+| `claude CLI not found` | `npm install -g @anthropic-ai/claude-code` |
+| `OPENROUTER_API_KEY missing` | Set in `.env` |
+| `vault_root path does not exist` | Create the directory or correct the path |
 
 ---
 
-## 6. The human-in-the-loop workflow
-
-This is the core loop. The human decides what to build. The agent builds it. The human reviews.
-
-### Step 1 — Write a phase
-
-Open the Kanban (`My App - Kanban.md`) and create a new phase note, or duplicate the template from `08 - System/Agent Directives/Templates/Phase Note Template.md`.
-
-A good phase note looks like this:
-
-```markdown
----
-tags: [phase-backlog]
-locked_by: ""
-locked_at: ""
----
-
-# Phase 3 — Add authentication
-
-## Human Requirements
-<!-- Leave blank. Agents write here when they are stuck and need you. -->
-
-## Tasks
-- [ ] Install NextAuth and configure GitHub OAuth provider
-- [ ] Add session middleware to the Express app
-- [ ] Protect /dashboard route — redirect unauthenticated requests to /login
-- [ ] Write a test that confirms the redirect fires
-
-## Acceptance Criteria
-- [ ] User can sign in with GitHub from the home page
-- [ ] Unauthenticated requests to /dashboard return a 302 to /login
-- [ ] npm test passes
-
-## Blockers
-<!-- Note anything the agent will need before it starts -->
-```
-
-**Writing good tasks is the main skill.** Tasks should be specific enough that a developer who doesn't know the project could follow them. The agent gets the task text, the Repo Context, and any Knowledge already written — nothing else.
-
-### Step 2 — Set it ready
-
-When you're happy with the phase, change the frontmatter tag from `phase-backlog` to `phase-ready`:
-
-```yaml
-tags: [phase-ready]
-```
-
-That's the signal to the system that this phase is approved to run.
-
-### Step 3 — Run
+## Step 6 — Create your first project
 
 ```bash
-gzos run
+onyx init "My First Project"
 ```
 
-The system:
-1. Runs the healer (clears any stale locks, fixes broken links)
-2. Discovers all `phase-ready` phases across all projects
-3. Picks the highest-priority one
-4. Locks it (`phase-active`)
-5. Spawns the agent with: task text + Repo Context + Knowledge snippets from past phases
-6. Agent works through tasks one by one, ticking checkboxes as it goes
-7. Agent writes a timestamped entry to the Log note for each action
-8. When all tasks and acceptance criteria are done: phase marked `phase-completed`, lock released
+Interactive prompt asks for the repo path. Enter the absolute path to the codebase you want ONYX to work on.
 
-You can watch stdout for live updates. WhatsApp notifications fire on every task completion if configured.
-
-### Step 4 — Review
-
-Open the Log note in Obsidian. It contains every tool call, every file touched, every decision the agent made. This is your audit trail.
-
-If everything looks good: move on, write the next phase.
-
-If something looks off: open the phase note, add more context to the task text, reset the tag to `phase-ready`, and re-run.
-
-### Step 5 — Handle blocks
-
-If the agent cannot complete a task, it writes exactly what it needs into `## Human Requirements` and marks the phase `phase-blocked`. You will see this in stdout and get a WhatsApp notification.
-
-Open the phase note, read `## Human Requirements`, and fix the issue:
-- Add a missing environment variable
-- Clarify an ambiguous task
-- Make a design decision it was waiting on
-
-Then reset to `phase-ready` and run again. The agent picks up where it left off.
-
----
-
-## 7. Staying in control
-
-**You decide what runs.** Nothing executes without a `phase-ready` tag. Setting that tag is your explicit approval.
-
-**You see everything.** Every action the agent takes is in the Log note. The Kanban shows all phases at a glance.
-
-**You can stop at any time.** `Ctrl+C` stops the run. The lock will be cleared by the healer on the next run (`gzos heal` or `gzos run`).
-
-**You own the tasks.** The atomiser can generate tasks from your Overview note automatically, but you should always read and edit them before setting `phase-ready`. Treat generated tasks as a first draft.
-
-**The vault is your memory.** If you want agents to know something (an architectural decision, a constraint, a past mistake), write it in the Knowledge note or the Repo Context. Agents read these at the start of every task.
-
----
-
-## 8. Daily workflow
+ONYX auto-scans `package.json`, `README.md`, and directory structure. It detects stack, extracts key areas, and creates a full bundle in your vault:
 
 ```
-Morning
-  gzos status          — see all projects and phase states at a glance
-  Open Obsidian        — review any blocked phases, check logs from last night
-
-Planning
-  Write phase notes    — define what you want built next
-  Set phase-ready      — approve phases you're confident in
-
-Running
-  gzos run             — let the agents work
-  Watch notifications  — WhatsApp fires on every task completion and block
-
-Review
-  Open Log notes       — audit what the agent did
-  Check the code       — open a PR or review the diff
-
-Maintenance
-  gzos heal            — if anything looks off in the vault graph
+{Area}/My First Project/
+├── My First Project - Overview.md          ← source of truth
+├── My First Project - Knowledge.md         ← learnings compound here
+├── My First Project - Kanban.md            ← phase state board
+├── My First Project - Agent Log Hub.md     ← log index
+├── My First Project - Repo Context.md      ← engineering profile doc
+├── Phases/
+└── Logs/
 ```
 
 ---
 
-## 9. Commands
+## Step 7 — Review the Overview
 
-**Planning**
+Open Obsidian and find `My First Project - Overview.md`.
 
-| Command | What it does |
+This is the **source of truth for project direction**. Verify the auto-detected fields. Add:
+- `## Scope` — what you want built
+- `## Goals` — success criteria
+- `## Architecture Notes` — patterns agents must follow
+- `## Agent Constraints` — hard rules agents must never violate
+
+Everything ONYX does flows from this file.
+
+---
+
+## Step 8 — Generate phases
+
+```bash
+onyx plan "My First Project"
+```
+
+ONYX reads your Overview and proposes 4-8 phase stubs. Each appears under `Phases/` as `P{n} - {name}.md` tagged `phase-backlog`.
+
+Run the command again to atomise each backlog phase into tasks:
+
+```bash
+onyx plan "My First Project"
+```
+
+Each phase now has atomic tasks with files, steps, validation, and definition of done.
+
+---
+
+## Step 9 — Review tasks
+
+Open each phase note in Obsidian. Under `## Tasks` you'll see checkboxes the agent will execute.
+
+**Edit anything that looks wrong before running.** The agent treats these tasks as the contract.
+
+When a phase looks ready, change its tag from `phase-backlog` to `phase-ready` in frontmatter.
+
+---
+
+## Step 10 — Execute
+
+```bash
+onyx run
+```
+
+ONYX now loops over all `phase-ready` phases, acquires locks, spawns Claude Code, runs the task loop, verifies acceptance, consolidates learnings, and moves to the next phase.
+
+Watch the log note fill up in real time in Obsidian.
+
+---
+
+## What success looks like
+
+| During execution | Obsidian shows |
 |---|---|
-| `gzos plan "<project>"` | Scan Overview → generate phases → atomise tasks → set phase-ready. All in one. |
-| `gzos plan "<project>" <n>` | Atomise a single phase number only. |
-| `gzos plan "<project>" --extend` | Add new phases to an in-progress project from an updated Overview. |
-| `gzos daily-plan [date]` | Write a time-blocked daily plan to the vault (LLM-assisted). |
-
-**Execution**
-
-| Command | What it does |
-|---|---|
-| `gzos run` | Main loop — heal, discover, execute, log. |
-| `gzos run --project <name>` | Scope execution to one project. |
-| `gzos run --phase <n>` | Execute a specific phase number (auto-implies --once). |
-| `gzos run --dry-run` | Preview what would run without executing. |
-| `gzos run --once` | Single iteration then exit (good for cron). |
-
-**Monitoring**
-
-| Command | What it does |
-|---|---|
-| `gzos status` | All projects and phase states with task progress. |
-| `gzos logs [project]` | Show execution log for a project or phase. |
-
-**Maintenance**
-
-| Command | What it does |
-|---|---|
-| `gzos doctor` | Pre-flight checks. Run this first, and whenever something feels wrong. |
-| `gzos heal` | Fix stale locks, broken links, graph drift. Safe to run any time. |
-| `gzos reset "<project>"` | Reset a blocked or stuck phase back to phase-ready. |
-| `gzos refresh-context "<proj>"` | Re-scan the repo and update the Repo Context note. |
-| `gzos consolidate` | Manually trigger vault consolidation. |
-
-**Other**
-
-| Command | What it does |
-|---|---|
-| `gzos init "Name"` | Create a new project bundle interactively. |
-| `gzos import <id>` | Import a Linear project as a vault bundle. |
-| `gzos linear-uplink "<proj>"` | Sync vault phases to Linear issues. |
-| `gzos research <topic>` | Run a research step and write findings to vault. |
-| `gzos capture "<text>"` | Quick-capture a note to the vault Inbox. |
-| `gzos dashboard [port]` | Launch the web dashboard (default: port 7070). |
+| Lock acquired | `locked_by` + `locked_at` appear in phase frontmatter; tag flips to `phase-active` |
+| Task started | New timestamped entry in log note |
+| Task completed | Checkbox ticks in phase note |
+| Acceptance passed | All acceptance checkboxes tick, tag flips to `phase-completed` |
+| Learnings extracted | New entries in `Knowledge.md` under `## Learnings`, `## Decisions`, `## Gotchas` |
 
 ---
 
-## 10. Vault viewer
+## Everyday commands
 
-Open `vault-viewer.html` in Chrome or Edge to browse your vault in a browser:
-
-- **File tree** — collapsible, with search
-- **Markdown reader** — renders notes with frontmatter badges, task checkboxes, wikilink navigation
-- **Force graph** — colour-coded by phase status and domain. Phase nodes show active (blue), complete (green), ready (cyan), blocked (red).
-- **Edit + save** — click the pencil icon to edit any note and save it back to disk
-
-Click a node in the graph to jump to that note in the file view.
-
-> Works in Chrome and Edge only (uses the File System Access API). Your vault location is remembered after the first open — one click to reconnect on subsequent visits.
+```bash
+onyx run                                # full autonomous loop
+onyx run --once                         # single pass then exit (for cron)
+onyx run --project "My First Project"   # scope to one project
+onyx run --dry-run                      # preview without executing
+onyx status                             # all projects + states
+onyx logs --recent                      # most recent execution logs
+onyx heal                               # fix vault drift, stale locks
+onyx reset <phase-number>               # reset blocked/active to ready
+```
 
 ---
 
-## 11. Phase FSM
+## When scope changes
 
-Phases move through a simple state machine. You control transitions by editing the `tags` frontmatter field.
+Update `Overview.md` first. Add the new direction. Then:
 
-```
-phase-backlog  →  phase-ready     (you: approved to run)
-phase-ready    →  phase-active    (system: agent claimed it)
-phase-active   →  phase-completed (system: all tasks + acceptance done)
-phase-active   →  phase-blocked   (system: agent hit a blocker)
-phase-blocked  →  phase-ready     (you: resolved the blocker)
-phase-completed → (terminal)
+```bash
+onyx plan "My First Project" --extend
 ```
 
-The healer monitors `phase-active` phases. If `locked_at` is older than 5 minutes with no recent log entry, the lock is cleared automatically and the phase resets to `phase-ready`.
+ONYX reads the updated Overview + existing phases + Knowledge.md and proposes 2-4 new phases aligned with the new scope.
 
 ---
 
-## 12. Running on a schedule (cron)
+## When a phase blocks
 
-Add to crontab (`crontab -e`):
+Agent writes the blocker under `## Human Requirements` and sets tag to `phase-blocked`.
 
-```
-# Run gzos every 30 minutes, single iteration
-*/30 * * * * cd /path/to/groundzeroOS-starter && gzos run --once >> /var/log/gzos.log 2>&1
-```
+You:
+1. Read the blocker in Obsidian
+2. Resolve it (add info, update Overview, fix environment, etc.)
+3. Change tag back to `phase-ready`
+4. `onyx run` again
 
-`--once` ensures each cron invocation processes exactly one phase then exits cleanly. Without it, `gzos run` continues until no work remains, which may overlap with the next cron trigger.
+The replanner retries 2 times automatically before blocking.
 
 ---
 
-## 13. Tips
+## Running unattended
 
-- **Keep phases small.** One clear goal, 4–8 tasks. Larger phases are harder to review and more likely to go off-track.
-- **Write acceptance criteria.** Agents check these before marking a phase done. Vague criteria leads to vague completion.
-- **Read the Repo Context after `gzos init`.** Auto-detection is good but not perfect. Add architecture notes, constraints, and anything non-obvious.
-- **Use the Knowledge note.** After a phase completes, write a one-liner about what was learned or decided. Agents read this in future phases.
-- **Run `gzos heal` after anything unexpected.** It's safe to run any time and fixes most graph issues automatically.
-- **Don't fight the lock.** If a phase is stuck in `phase-active`, run `gzos heal` — it clears stale locks cleanly.
+Cron:
+```bash
+*/30 * * * * cd ~/clawd/onyx && onyx run --once >> /var/log/onyx.log 2>&1
+```
+
+Persistent:
+```bash
+onyx run   # loops until idle
+```
+
+---
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `onyx run` exits immediately | No `phase-ready` phases. Edit a phase note's tags in Obsidian |
+| Phase stuck as `phase-active` | `onyx heal` — auto-clears locks older than 5 min |
+| Agent failed 3x on a task | Edit task in Obsidian to be more specific, `onyx reset <n>`, rerun |
+| Atomiser wrote bad tasks | Improve Overview Summary/Scope, reset to backlog, rerun `onyx plan` |
+| Knowledge.md not updating | Consolidator runs automatically on `phase-completed`; check lock status |
+| TypeScript build fails | `npm run build` and read errors |
+| `onyx doctor` shows red | Follow the printed fix command |
+
+---
+
+## Next steps
+
+- Open `./vault/` in Obsidian → read `00 - Dashboard/What is ONYX.md`
+- Read `08 - System/ONYX - Summary.md` for one-page reference
+- Read `08 - System/ONYX - Inner Workings.md` for the complete technical reference
+- Read `08 - System/ONYX — The Orchestration Layer for Obsidian.md` for full philosophy + architecture
+
+---
+
+## Architecture glance
+
+```
+ONYX Core (shared)
+├── phase lifecycle
+├── logging
+├── knowledge compounding
+├── FSM
+└── healing
+
++ Profile (engineering, content, research, operations, ...)
+├── extra frontmatter keys
+├── extra templates
+└── verification strategy
+
+= Bundle (your project in the vault)
+```
+
+**Core = nervous system. Profile = specialized region. Bundle = instantiated project.**
+
+That's ONYX.

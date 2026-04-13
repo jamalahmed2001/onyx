@@ -3,15 +3,15 @@ import path from 'path';
 import matter from 'gray-matter';
 import glob from 'fast-glob';
 import type { GZProject, GZPhase, PhaseStatus, RunEntry, VaultFileNode, DailyPlan, InboxItem, GraphNode, GraphEdge } from './types';
-import { stateFromFrontmatter, countTasks as sharedCountTasks, stateToTag } from '@gzos/shared/vault-parse';
+import { stateFromFrontmatter, countTasks as sharedCountTasks, stateToTag } from '@onyx/shared/vault-parse';
 import { readConfig } from './config';
 
 // ---------------------------------------------------------------------------
 // Root resolution — env var for overrides, config file for default
 // ---------------------------------------------------------------------------
 export function getVaultRoot(): string {
-  if (process.env.GROUNDZERO_VAULT_ROOT) return process.env.GROUNDZERO_VAULT_ROOT;
-  const cfgPath = path.resolve(process.cwd(), '..', 'groundzero.config.json');
+  if (process.env.ONYX_VAULT_ROOT) return process.env.ONYX_VAULT_ROOT;
+  const cfgPath = path.resolve(process.cwd(), '..', 'onyx.config.json');
   if (fs.existsSync(cfgPath)) {
     try {
       const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
@@ -19,7 +19,7 @@ export function getVaultRoot(): string {
     } catch { /* ignore */ }
   }
   throw new Error(
-    '[gzos dashboard] vault_root not found. Set GROUNDZERO_VAULT_ROOT env var or vault_root in groundzero.config.json'
+    '[onyx dashboard] vault_root not found. Set ONYX_VAULT_ROOT env var or vault_root in onyx.config.json'
   );
 }
 
@@ -71,7 +71,7 @@ export function updatePhaseStatus(vaultRoot: string, relPath: string, newStatus:
 // ---------------------------------------------------------------------------
 // Project scanner
 // ---------------------------------------------------------------------------
-const SKIP_DIRS = new Set(['.git', '.obsidian', '.trash', 'node_modules', '.gzos-backups']);
+const SKIP_DIRS = new Set(['.git', '.obsidian', '.trash', 'node_modules', '.onyx-backups']);
 
 function walkForProjects(dir: string, vaultRoot: string): GZProject[] {
   const results: GZProject[] = [];

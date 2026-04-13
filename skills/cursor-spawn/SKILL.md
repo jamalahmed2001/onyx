@@ -4,7 +4,7 @@
 Spawn a Cursor Composer CLI agent to execute a coding task.
 
 ## When to invoke
-When `agent_driver: "cursor"` is set in `groundzero.config.json` and the executor needs to run a task.
+When `agent_driver: "cursor"` is set in `onyx.config.json` and the executor needs to run a task.
 
 ## Prerequisites
 - Cursor must be installed: https://cursor.sh
@@ -37,7 +37,7 @@ Default: 10 minutes (600000ms). Override via `agent_driver_timeout_ms` in config
 On timeout: task marked as blocked, executor sets phase-blocked.
 
 ## To switch to Cursor
-Edit `groundzero.config.json`:
+Edit `onyx.config.json`:
 ```json
 {
   "agent_driver": "cursor"

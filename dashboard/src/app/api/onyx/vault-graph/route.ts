@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import { getVaultRoot } from '@/lib/vault';
-import { stateFromFrontmatter } from '@gzos/shared/vault-parse';
+import { stateFromFrontmatter } from '@onyx/shared/vault-parse';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +29,7 @@ const RE_MDLINK = /\[(?:[^\]]*)\]\(([^)]+\.md)\)/g;
 const RE_FM = /^---\n([\s\S]*?)\n---/;
 const RE_ALIAS_BRACKET = /^aliases:\s*\[([^\]]*)\]/m;
 const RE_ALIAS_LIST = /^aliases:\s*\n((?:\s*-\s*.+\n?)+)/m;
-const SKIP = new Set(['.git', '.obsidian', '.trash', 'node_modules', '.gzos-backups', 'dist', '.next']);
+const SKIP = new Set(['.git', '.obsidian', '.trash', 'node_modules', '.onyx-backups', 'dist', '.next']);
 const MAX_FILES = 2000;
 const MAX_FILE_SIZE = 200 * 1024; // 200 KB
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, RefreshCw } from 'lucide-react';
 import type { GZProject } from '@/lib/types';
-import type { LinearIssue } from '@/app/api/gz/linear/my-issues/route';
+import type { LinearIssue } from '@/app/api/onyx/linear/my-issues/route';
 
 interface LinearProject {
   id: string;
@@ -56,7 +56,7 @@ export default function LinearImportModal({ projects, onClose, onRefresh, onOpen
 
   const loadProjects = () => {
     setProjectsState('loading');
-    fetch('/api/gz/linear')
+    fetch('/api/onyx/linear')
       .then(r => r.json())
       .then((d: { projects: LinearProject[]; configured: boolean; error?: string; teamScoped?: boolean }) => {
         if (!d.configured) { setProjectsState('unconfigured'); return; }
@@ -70,7 +70,7 @@ export default function LinearImportModal({ projects, onClose, onRefresh, onOpen
 
   const loadMyIssues = () => {
     setIssuesState('loading');
-    fetch('/api/gz/linear/my-issues')
+    fetch('/api/onyx/linear/my-issues')
       .then(r => r.json())
       .then((d: { issues: LinearIssue[]; viewerName: string; configured: boolean; error?: string }) => {
         if (!d.configured) { setIssuesState('unconfigured'); return; }
@@ -92,7 +92,7 @@ export default function LinearImportModal({ projects, onClose, onRefresh, onOpen
     setImporting(true);
     setOutput('');
     try {
-      const res = await fetch('/api/gz/linear/import-issue', {
+      const res = await fetch('/api/onyx/linear/import-issue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -117,9 +117,9 @@ export default function LinearImportModal({ projects, onClose, onRefresh, onOpen
   const runProjectImport = async () => {
     if (!selectedProject) return;
     setImporting(true);
-    setOutput('Running gzos import…\n');
+    setOutput('Running onyx import…\n');
     try {
-      const res = await fetch('/api/gz/cli', {
+      const res = await fetch('/api/onyx/cli', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cmd: 'import', args: [selectedProject.id] }),
@@ -138,7 +138,7 @@ export default function LinearImportModal({ projects, onClose, onRefresh, onOpen
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 200, animation: 'fade-in 0.12s ease' }}/>
-      <div className="gzos-modal" style={{
+      <div className="onyx-modal" style={{
         position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
         width: 560, maxWidth: 'calc(100vw - 24px)', maxHeight: '82vh', background: 'var(--bg-1)',
         border: '1px solid var(--border-hi)', borderRadius: 8, zIndex: 201,

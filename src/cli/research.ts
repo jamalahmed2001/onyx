@@ -1,4 +1,4 @@
-// gzos research <phase>
+// onyx research <phase>
 // Pre-execution codebase research: scouts the repo and writes a Research note
 // to the project bundle that gets auto-injected into agent prompts.
 
@@ -14,7 +14,7 @@ import fs from 'fs';
 
 export async function runResearch(phaseArg?: string): Promise<void> {
   if (!phaseArg) {
-    console.log('Usage: gzos research <phase-name-or-number>');
+    console.log('Usage: onyx research <phase-name-or-number>');
     console.log('       Scouts the repo and writes a Research note for agent context.');
     return;
   }
@@ -23,7 +23,7 @@ export async function runResearch(phaseArg?: string): Promise<void> {
   try {
     config = loadConfig();
   } catch (err) {
-    console.error('[gzos] Failed to load config:', (err as Error).message);
+    console.error('[onyx] Failed to load config:', (err as Error).message);
     process.exit(1);
   }
 
@@ -95,7 +95,7 @@ export async function runResearch(phaseArg?: string): Promise<void> {
 
   const apiKey = config.llm.apiKey ?? process.env['OPENROUTER_API_KEY'];
   if (!apiKey) {
-    console.error('[gzos] No LLM API key configured. Set OPENROUTER_API_KEY in your .env');
+    console.error('[onyx] No LLM API key configured. Set OPENROUTER_API_KEY in your .env');
     process.exit(1);
   }
 

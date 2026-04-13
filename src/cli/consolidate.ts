@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// gzos consolidate
+// onyx consolidate
 // Run the node consolidator (phase group archiving + doc merges).
 // Defaults to dry-run.
 
@@ -16,7 +16,7 @@ export async function runConsolidate(args: string[]): Promise<void> {
   const result = await consolidateVaultNodes(config, { dryRun, projectFilter, includeLogs: true, includeDocsHubCleanup: true });
 
   const mode = dryRun ? 'DRY RUN' : 'APPLY';
-  console.log(`\n[gzos] Consolidator (${mode})`);
+  console.log(`\n[onyx] Consolidator (${mode})`);
   console.log(`  actions: ${result.actions.length}`);
   console.log(`  phases archived: ${result.phasesArchived}`);
   console.log(`  docs merged: ${result.docsMerged}`);

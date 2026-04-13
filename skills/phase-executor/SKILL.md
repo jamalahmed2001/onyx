@@ -53,7 +53,7 @@ After all tasks ticked:
 - Notify: `phase_blocked`
 
 ## Agent driver
-Configured in `groundzero.config.json` → `agent_driver`:
+Configured in `onyx.config.json` → `agent_driver`:
 - `"claude-code"` → spawns `claude --print "<task>"` (default)
 - `"cursor"` → spawns `cursor --headless --prompt "<task>"`
 

@@ -1,4 +1,4 @@
-// gzos init [project-name]
+// onyx init [project-name]
 // Creates a project bundle in the vault.
 // Interactive: prompts for project name and repo path if not supplied.
 // Auto-scans repo to populate Repo Context (stack, key areas, architecture notes).
@@ -24,7 +24,7 @@ export function scanRepo(repoPath: string): RepoScan {
   const stack: string[] = [];
   const keyAreas: string[] = [];
   let architectureNotes = '_Fill in key decisions, patterns, and constraints._';
-  let constraints = '- Commit after each task: `git commit -m "gzos: PHASE — TASK"`\n- Run tests after each task if a test suite exists\n- No breaking changes to public API without noting it here';
+  let constraints = '- Commit after each task: `git commit -m "onyx: PHASE — TASK"`\n- Run tests after each task if a test suite exists\n- No breaking changes to public API without noting it here';
 
   // Detect stack from package.json
   const pkgPath = path.join(repoPath, 'package.json');
@@ -101,7 +101,7 @@ export function scanRepo(repoPath: string): RepoScan {
     const claudeMd = fs.readFileSync(claudeMdPath, 'utf-8');
     const constraintSection = claudeMd.match(/## (?:Constraints?|Rules?|Guidelines?)([\s\S]*?)(?=\n##|\s*$)/i)?.[1]?.trim();
     if (constraintSection) {
-      constraints = constraintSection + '\n- Commit after each task: `git commit -m "gzos: PHASE — TASK"`';
+      constraints = constraintSection + '\n- Commit after each task: `git commit -m "onyx: PHASE — TASK"`';
     }
   }
 
@@ -183,7 +183,7 @@ export async function runInit(projectNameArg?: string): Promise<void> {
       config = null;
     }
 
-    console.log('\ngzos init — Create a new project bundle\n');
+    console.log('\nonyx init — Create a new project bundle\n');
 
     // Project name
     let projectName = projectNameArg?.trim() ?? '';
@@ -237,7 +237,7 @@ status: planning
 repo_path: "${repoPath}"
 stack: "${scan.stack}"
 tags:
-  - gz-project
+  - onyx-project
 created: ${today}
 ---
 ## 🔗 Navigation
@@ -305,7 +305,7 @@ type: kanban
 
 # Kanban — ${projectName}
 
-_Phase status is managed by \`gzos\` via frontmatter tags. Open the GZOS dashboard for a live view._
+_Phase status is managed by \`onyx\` via frontmatter tags. Open the ONYX dashboard for a live view._
 `);
 
     // Agent Log Hub — log aggregator
@@ -342,7 +342,7 @@ locked_by: ""
 locked_at: ""
 replan_count: 0
 tags:
-  - gz-phase
+  - onyx-phase
   - phase-backlog
 created: ${today}
 ---
@@ -396,7 +396,7 @@ created: ${today}
 
 ## Log
 
-- [${today}] **bundle_created** — Bundle initialised by \`gzos init\`
+- [${today}] **bundle_created** — Bundle initialised by \`onyx init\`
 `);
 
     console.log(`
@@ -414,7 +414,7 @@ created: ${today}
     1. Fill in Goal and Success Criteria in Overview
     2. Fill in Context Pack in P1 — describe what the agent needs to know
     3. Set P1 tag to phase-ready when ready to execute
-    4. Run: gzos run --project "${projectName}"
+    4. Run: onyx run --project "${projectName}"
 `);
 
   } finally {

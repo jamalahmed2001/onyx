@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// groundzeros heal
+// onyx heal
 // M2 + M3: Scan and repair vault drift.
 
 import { loadConfig } from '../config/load.js';

@@ -1,4 +1,4 @@
-// gzos reset [phase-name]
+// onyx reset [phase-name]
 // Sets a blocked/completed phase back to phase-ready,
 // clears lock fields, and resets replan_count.
 
@@ -12,8 +12,8 @@ export async function runReset(phaseArg?: string): Promise<void> {
   try {
     config = loadConfig();
   } catch (err) {
-    console.error('[gzos] Failed to load config:', (err as Error).message);
-    console.error('       Run: gzos doctor');
+    console.error('[onyx] Failed to load config:', (err as Error).message);
+    console.error('       Run: onyx doctor');
     process.exit(1);
   }
 

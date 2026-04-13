@@ -64,7 +64,7 @@ function hasStatus(node: PhaseNode, status: string): boolean {
 
 function isPhaseNote(node: PhaseNode): boolean {
   return node.exists && (
-    hasTag(node, 'gz-phase') ||
+    hasTag(node, 'onyx-phase') ||
     typeof node.frontmatter['phase_number'] !== 'undefined' ||
     typeof node.frontmatter['phase_num'] !== 'undefined' ||
     // Heuristic: it lives in a Phases/ directory
@@ -89,7 +89,7 @@ function discoverPhaseNodes(vaultRoot: string, projectsGlob: string): PhaseNode[
     const vr = validatePhaseFrontmatter(node.frontmatter);
     if (!vr.valid) {
       _lastViolations.push({ path: node.path, noteType: 'phase', errors: vr.errors, warnings: vr.warnings });
-      console.warn(`[gzos] schema warning — skipping ${path.basename(node.path)}: ${vr.errors.join(', ')}`);
+      console.warn(`[onyx] schema warning — skipping ${path.basename(node.path)}: ${vr.errors.join(', ')}`);
       continue;
     }
     nodes.push(node);
@@ -130,7 +130,7 @@ export function discoverActivePhases(vaultRoot: string, projectsGlob: string): P
     .sort((a, b) => phaseNumber(a) - phaseNumber(b));
 }
 
-// Scan vault for all GZ phase notes.
+// Scan vault for all ONYX phase notes.
 // Returns sorted by phase_number ascending.
 export function discoverAllPhases(vaultRoot: string, projectsGlob: string): PhaseNode[] {
   return discoverPhaseNodes(vaultRoot, projectsGlob)

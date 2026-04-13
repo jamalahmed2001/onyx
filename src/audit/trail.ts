@@ -3,7 +3,7 @@ import fs from 'fs';
 import type { AuditEvent } from '../shared/types.js';
 
 export function getAuditPath(vaultRoot: string): string {
-  return path.join(vaultRoot, '.gzos-audit', 'audit.jsonl');
+  return path.join(vaultRoot, '.onyx-audit', 'audit.jsonl');
 }
 
 export function appendAuditEvent(vaultRoot: string, event: AuditEvent): void {

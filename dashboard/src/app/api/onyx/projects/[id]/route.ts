@@ -47,12 +47,12 @@ export async function PATCH(req: Request) {
     }
   }
 
-  // Use gzos set-state as the single write path for state mutations.
+  // Use onyx set-state as the single write path for state mutations.
   // This ensures state, tags, and status are all written consistently.
   try {
-    const gzosPath = path.resolve(process.cwd(), '..', 'dist', 'cli', 'gzos.js');
+    const onyxPath = path.resolve(process.cwd(), '..', 'dist', 'cli', 'onyx.js');
     const result = execSync(
-      `node "${gzosPath}" set-state "${absPath}" ${status} --json`,
+      `node "${onyxPath}" set-state "${absPath}" ${status} --json`,
       { encoding: 'utf8', timeout: 10_000 }
     );
     const parsed = JSON.parse(result);

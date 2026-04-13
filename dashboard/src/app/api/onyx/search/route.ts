@@ -113,7 +113,7 @@ export async function GET(req: Request) {
   const grepCmd = `grep -r -i -l --include="*.md" \
     --exclude-dir=".git" --exclude-dir=".obsidian" \
     --exclude-dir="node_modules" --exclude-dir=".trash" \
-    --exclude-dir=".gzos-backups" --exclude-dir="dist" \
+    --exclude-dir=".onyx-backups" --exclude-dir="dist" \
     -e ${JSON.stringify(safeQ)} .`;
 
   let matchedFiles: string[] = [];

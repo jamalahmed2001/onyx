@@ -43,7 +43,7 @@ export interface RunOptions {
 }
 
 export function generateRunId(): string {
-  return 'gz-' + Date.now() + '-' + randomBytes(3).toString('hex');
+  return 'onyx-' + Date.now() + '-' + randomBytes(3).toString('hex');
 }
 
 // Main controller loop:
@@ -65,7 +65,7 @@ export async function runLoop(config: ControllerConfig, opts: RunOptions = {}): 
 
   // Register SIGINT/SIGTERM handlers for graceful shutdown
   const sigintHandler = () => {
-    console.log('\n[gzos] Shutdown requested — finishing current task then exiting cleanly...');
+    console.log('\n[onyx] Shutdown requested — finishing current task then exiting cleanly...');
     _shutdownRequested = true;
   };
   process.once('SIGINT', sigintHandler);
@@ -111,7 +111,7 @@ export async function runLoop(config: ControllerConfig, opts: RunOptions = {}): 
       if (cycles.length > 0) {
         for (const { cycle } of cycles) {
           const msg = `Dependency cycle detected: P${cycle.join(' → P')} → P${cycle[0]} — these phases will never execute`;
-          console.error(`[gzos] ⚠  ${msg}`);
+          console.error(`[onyx] ⚠  ${msg}`);
           await notify({ event: 'phase_blocked', detail: msg, runId }, config);
         }
         // Don't abort — cycles only affect the phases involved, others can still run
@@ -217,13 +217,13 @@ export async function runLoop(config: ControllerConfig, opts: RunOptions = {}): 
               if (config.llm?.apiKey) {
                 const bundle = readBundle(bundleDir, projectId || path.basename(bundleDir));
                 await consolidatePhase(operation.phaseNode, bundle, runId, config).catch(err =>
-                  console.warn('[gzos] Knowledge extraction failed (non-fatal):', (err as Error).message)
+                  console.warn('[onyx] Knowledge extraction failed (non-fatal):', (err as Error).message)
                 );
               }
 
               // Auto-review: diff the repo and log a verdict
               await runPhaseReview(operation.phaseNode, result.repoPath, runId, config).catch(err =>
-                console.warn('[gzos] Phase review failed (non-fatal):', (err as Error).message)
+                console.warn('[onyx] Phase review failed (non-fatal):', (err as Error).message)
               );
 
             } else if (result.status === 'blocked') {
@@ -231,7 +231,7 @@ export async function runLoop(config: ControllerConfig, opts: RunOptions = {}): 
               if (config.llm?.apiKey) {
                 const failBundle = readBundle(bundleDir, projectId || path.basename(bundleDir));
                 await consolidatePhase(operation.phaseNode, failBundle, runId, config).catch(err =>
-                  console.warn('[gzos] Knowledge extraction from blocked phase (non-fatal):', (err as Error).message)
+                  console.warn('[onyx] Knowledge extraction from blocked phase (non-fatal):', (err as Error).message)
                 );
               }
 

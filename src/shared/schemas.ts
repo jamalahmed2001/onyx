@@ -9,7 +9,7 @@ export const PhaseTagSchema = z.enum([
 
 // ─── Soft schema ─────────────────────────────────────────────────────────────
 // Used by discover.ts — structural correctness only.
-// project_id optional here so notes still surface in `gzos status`.
+// project_id optional here so notes still surface in `onyx status`.
 export const PhaseFrontmatterSchema = z.object({
   phase_number: z.union([z.number(), z.string().regex(/^\d+$/).transform(Number)]),
   phase_name:   z.string().min(1),
@@ -38,7 +38,7 @@ export const PhaseFrontmatterSchema = z.object({
 // ─── Strict schema ────────────────────────────────────────────────────────────
 // Used at lock acquisition — refuses to run if these are missing.
 const PhaseFrontmatterStrictSchema = PhaseFrontmatterSchema.extend({
-  project_id: z.string().min(1, 'project_id is required — run `gzos heal` to auto-repair'),
+  project_id: z.string().min(1, 'project_id is required — run `onyx heal` to auto-repair'),
 });
 
 export const OverviewFrontmatterSchema = z.object({
@@ -68,9 +68,9 @@ export function validatePhaseFrontmatter(fm: Record<string, unknown>): Validatio
 
   // project_id: warn (not fail) at discovery — healer will backfill
   if (!fm['project_id'] && !fm['project']) {
-    warnings.push('project_id missing — run `gzos heal` to auto-repair (phase will not execute until fixed)');
+    warnings.push('project_id missing — run `onyx heal` to auto-repair (phase will not execute until fixed)');
   } else if (!fm['project_id'] && fm['project']) {
-    warnings.push('project_id not set; using legacy `project` field — run `gzos heal` to migrate');
+    warnings.push('project_id not set; using legacy `project` field — run `onyx heal` to migrate');
   }
 
   // Exactly one phase-* tag sanity check

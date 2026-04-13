@@ -1,6 +1,6 @@
 {
-  "_comment": "GroundZeroOS config. Secrets go in .env (never commit .env). Set vault_root here OR via GROUNDZERO_VAULT_ROOT in .env.",
-  "vault_root": "",
+  "_comment": "ONYX config. Secrets go in .env (never commit .env). Set vault_root here OR via ONYX_VAULT_ROOT in .env.",
+  "vault_root": "/home/jamal/Obsidian/OnyxVault",
   "agent_driver": "claude-code",
   "_agent_driver_options": "claude-code | cursor",
   "llm": {
@@ -16,8 +16,8 @@
   },
   "max_iterations": 20,
   "stale_lock_threshold_ms": 300000,
-  "projects_glob": "{01 - Projects/**,02 - Areas/**}",
-  "repos_root": "",
+  "projects_glob": "{02 - Fanvue/**,03 - Ventures/**,05 - Finance/**,10 - OpenClaw/**}",
+  "repos_root": "/home/jamal/clawd/openclaw/projects",
   "notify": {
     "stdout": true,
     "_openclaw_comment": "Set target to your E.164 number. Requires openclaw CLI installed + logged in. Alternatively set OPENCLAW_NOTIFY_TARGET env var.",
@@ -25,7 +25,7 @@
       "target": "+447..."
     }
   },
-  "_linear_comment": "Uncomment and fill in to enable Linear integration (gzos import + phase uplink).",
+  "_linear_comment": "Uncomment and fill in to enable Linear integration (onyx import + phase uplink).",
   "_linear": {
     "enabled": true,
     "api_key": "lin_api_...",
@@ -34,5 +34,9 @@
   "location": {
     "lat": 51.5074,
     "lng": -0.1278
+  },
+  "linear": {
+    "_comment": "Credentials come from LINEAR_API_KEY and LINEAR_TEAM_ID env vars (set in .env, never commit).",
+    "enabled": true
   }
 }

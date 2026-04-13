@@ -54,7 +54,7 @@ function resolveContextPaths(projectId: string, bundleDir: string, phaseNum: str
   const knowledgePath = path.join(bundleDir, `${projectId} - Knowledge.md`);
   const decisionsPath = path.join(bundleDir, `${projectId} - Decisions.md`);
   const researchPath = path.join(bundleDir, 'Phases', `P${phaseNum} - ${phaseLabel} - Research.md`);
-  const checkpointPath = path.join(bundleDir, 'Phases', `.gzos-continue-P${phaseNum} - ${phaseLabel}.md`);
+  const checkpointPath = path.join(bundleDir, 'Phases', `.onyx-continue-P${phaseNum} - ${phaseLabel}.md`);
 
   return {
     repoPath,
@@ -118,7 +118,7 @@ function preflightCheck(phaseNode: PhaseNode, ctx: ContextPaths, allPhases: Phas
   // 1. Tasks exist?
   const hasTasks = /^\s*-\s*\[\s*[x ]?\s*\]/m.test(phaseNode.content);
   if (!hasTasks) {
-    warnings.push('No task checkboxes found in phase note — run `gzos plan "<project>" <n>` to atomise tasks');
+    warnings.push('No task checkboxes found in phase note — run `onyx plan "<project>" <n>` to atomise tasks');
   }
 
   // 2. Repo path set and valid?
@@ -180,20 +180,20 @@ export async function runPhase(
   // 0. Backup phase files before acquiring lock
   try {
     const backupDir = backupPhaseFiles(phaseNode.path);
-    console.log(`[gzos:debug] Backup created at: ${backupDir}`);
+    console.log(`[onyx:debug] Backup created at: ${backupDir}`);
   } catch (backupErr) {
-    console.warn('[gzos] Backup failed (non-fatal):', (backupErr as Error).message);
+    console.warn('[onyx] Backup failed (non-fatal):', (backupErr as Error).message);
   }
 
   // 1. Acquire lock
   const lockResult = acquireLock(phaseNode.path, runId);
   if (!lockResult.ok) {
     if (lockResult.reason === 'schema_invalid') {
-      console.error(`[gzos] Cannot execute phase — schema validation failed:`);
+      console.error(`[onyx] Cannot execute phase — schema validation failed:`);
       for (const err of lockResult.errors) {
         console.error(`  • ${err}`);
       }
-      console.error(`[gzos] Fix the phase note frontmatter and re-run. Use \`gzos heal\` to auto-repair project_id.`);
+      console.error(`[onyx] Fix the phase note frontmatter and re-run. Use \`onyx heal\` to auto-repair project_id.`);
       return { status: 'error', tasksCompleted: 0, blockers: lockResult.errors, logNotePath, repoPath: bundleDir };
     }
     const reason = lockResult.reason === 'already_locked'
@@ -215,7 +215,7 @@ export async function runPhase(
 
     if (preflight.warnings.length > 0) {
       for (const w of preflight.warnings) {
-        console.warn(`[gzos:preflight] ⚠  ${w}`);
+        console.warn(`[onyx:preflight] ⚠  ${w}`);
         appendToLog(phaseNode.path, { runId, event: 'phase_started', detail: `preflight warning: ${w}` });
       }
     }
@@ -238,7 +238,7 @@ export async function runPhase(
   const checkpoint = readCheckpoint(phaseNode.path);
   if (checkpoint) {
     clearCheckpoint(phaseNode.path);
-    console.log(`[gzos] Resuming from checkpoint for P${phaseNum} — ${phaseLabel}`);
+    console.log(`[onyx] Resuming from checkpoint for P${phaseNum} — ${phaseLabel}`);
   }
 
   // 3. Task loop — wrapped in try/finally to guarantee lock release on unexpected errors
@@ -267,7 +267,7 @@ export async function runPhase(
         nextTaskForCheckpoint ?? '(all tasks done)',
         ``,
         `## Remaining Tasks`,
-        `(run gzos run to continue from where this left off)`,
+        `(run onyx run to continue from where this left off)`,
         ``,
         `## Decisions Made This Run`,
         `(check ${projectId} - Decisions.md for any decisions logged)`,
@@ -293,7 +293,7 @@ export async function runPhase(
     if (shellResult) {
       if (shellResult.ok) {
         if (!tickTask(phaseNode.path, nextTask)) {
-          console.warn('[gzos] Shell task succeeded but checkbox not found — skipping');
+          console.warn('[onyx] Shell task succeeded but checkbox not found — skipping');
         }
         tasksCompleted++;
         consecutiveFailures = 0;
@@ -321,7 +321,7 @@ export async function runPhase(
     const effectiveModel = modelForTier(tier, config.modelTiers);
     const timeoutMs = tier === 'heavy' ? 900_000 : tier === 'light' ? 300_000 : 600_000;
     if (effectiveModel !== config.llm?.model) {
-      console.log(`[gzos:complexity] P${phaseNum} task classified as "${tier}" → ${effectiveModel}`);
+      console.log(`[onyx:complexity] P${phaseNum} task classified as "${tier}" → ${effectiveModel}`);
     }
 
     // Lean prompt — point agent at vault files, it reads them natively
@@ -408,7 +408,7 @@ export async function runPhase(
       // Without ticking, selectNextTask would return the same task → infinite loop.
       // Treat as a blocking failure so the operator can inspect.
       const detail = 'Agent succeeded but task checkbox could not be ticked — possible format mismatch';
-      console.warn(`[gzos] ${detail}`);
+      console.warn(`[onyx] ${detail}`);
       appendToLog(phaseNode.path, { runId, event: 'task_blocked', detail });
       writeHumanRequirement(phaseNode.path, `${detail}\n\nTask: ${nextTask}`);
       releaseLock(phaseNode.path, runId, 'phase-blocked');
@@ -432,16 +432,16 @@ export async function runPhase(
     releaseLock(phaseNode.path, runId, 'phase-completed');
 
     // Auto-tag the repo at the point of phase completion
-    // Tag: gzos/P{n}-done — lets you roll back to "right after P3 completed"
+    // Tag: onyx/P{n}-done — lets you roll back to "right after P3 completed"
     try {
-      const tagName = `gzos/P${phaseNum}-done`;
-      const tagMsg  = `gzos: P${phaseNum} — ${phaseLabel} completed`;
+      const tagName = `onyx/P${phaseNum}-done`;
+      const tagMsg  = `onyx: P${phaseNum} — ${phaseLabel} completed`;
       execSync(`git tag -a "${tagName}" -m "${tagMsg}"`, {
         cwd: ctx.repoPath,
         stdio: 'ignore',
         timeout: 10_000,
       });
-      console.log(`[gzos] Tagged repo: ${tagName}`);
+      console.log(`[onyx] Tagged repo: ${tagName}`);
     } catch {
       // Non-fatal — repo may not be a git repo, or tag already exists
     }
@@ -459,7 +459,7 @@ export async function runPhase(
 
   } catch (err) {
     // Guarantee lock release on any unexpected error in the task loop
-    console.error('[gzos] Unexpected error in task loop — releasing lock:', (err as Error).message);
+    console.error('[onyx] Unexpected error in task loop — releasing lock:', (err as Error).message);
     appendToLog(phaseNode.path, { runId, event: 'task_failed', detail: `Unexpected error: ${(err as Error).message}` });
     releaseLock(phaseNode.path, runId, 'phase-blocked');
     return { status: 'error', tasksCompleted, blockers: [(err as Error).message], logNotePath, repoPath: ctx.repoPath };
@@ -549,7 +549,7 @@ function buildPrompt(opts: {
     ctx.knowledgePath ? `2. Read the knowledge file for prior learnings and gotchas.` : '',
     `3. Complete ONLY the task above.`,
     `4. Work in: ${ctx.repoPath}`,
-    `5. Commit: git commit -m "gzos: P${phaseNum} — ${summariseTask(nextTask)}"`,
+    `5. Commit: git commit -m "onyx: P${phaseNum} — ${summariseTask(nextTask)}"`,
     `6. If blocked: output BLOCKED: <reason>`,
     ctx.decisionsPath ? `7. If you make an architectural decision, append to: ${ctx.decisionsPath}\n   Format: | D{next_id} | P${phaseNum} | arch/pattern/library | <decision> | <choice> | <rationale> | Yes/No |` : '',
     acceptanceCriteria ? `\nVerify before committing — Acceptance Criteria:\n${acceptanceCriteria}` : '',

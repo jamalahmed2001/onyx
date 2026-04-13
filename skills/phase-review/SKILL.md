@@ -70,13 +70,13 @@ Verdict: [LGTM/REVIEW NEEDED/NEEDS WORK]
 
 ### Step 4 — Send via WhatsApp
 
-Use the notify configuration from `groundzero.config.json`:
+Use the notify configuration from `onyx.config.json`:
 
 ```bash
 curl -s "<whatsapp_api_url>?phone=<number>&text=<url-encoded-message>&apikey=<key>"
 ```
 
-Or the gzos notify helper is invoked automatically from `src/skills/phaseReview.ts` when the phase completes.
+Or the onyx notify helper is invoked automatically from `src/skills/phaseReview.ts` when the phase completes.
 
 ### Step 5 — Write review to log note
 
@@ -98,7 +98,7 @@ This skill runs automatically in `src/controller/loop.ts` after a phase complete
 
 ## Configuration
 
-In `groundzero.config.json`:
+In `onyx.config.json`:
 ```json
 {
   "notify": {

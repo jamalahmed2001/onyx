@@ -113,7 +113,7 @@ project: "${projectName}"
 type: overview
 status: planning
 tags:
-  - gz-project
+  - onyx-project
 created: ${today}
 ---
 # ${projectName}
@@ -163,7 +163,7 @@ status: backlog
 locked_by: ""
 locked_at: ""
 tags:
-  - gz-phase
+  - onyx-phase
   - phase-backlog
 created: ${today}
 ---

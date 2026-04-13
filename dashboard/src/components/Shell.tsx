@@ -75,7 +75,7 @@ function QuickCapture({ onClose }: { onClose: () => void }) {
     if (!text.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch('/api/gz/inbox', {
+      const res = await fetch('/api/onyx/inbox', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: text.trim() }),
@@ -167,7 +167,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
   const [saved, setSaved]   = useState(false);
 
   useEffect(() => {
-    fetch('/api/gz/settings').then(r => r.json()).then(d => setData(d)).catch(() => setData(null));
+    fetch('/api/onyx/settings').then(r => r.json()).then(d => setData(d)).catch(() => setData(null));
   }, []);
 
   const save = async () => {
@@ -185,7 +185,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
     body.modelTiers = data.modelTiers;
     body.prompts = data.prompts;
     try {
-      const res = await fetch('/api/gz/settings', {
+      const res = await fetch('/api/onyx/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -414,9 +414,9 @@ export default function Shell() {
     setLoading(true);
     try {
       const [pr, ru, tr] = await Promise.all([
-        fetch('/api/gz/projects').then(r => r.json()),
-        fetch('/api/gz/runs').then(r => r.json()),
-        fetch('/api/gz/vault-tree').then(r => r.json()),
+        fetch('/api/onyx/projects').then(r => r.json()),
+        fetch('/api/onyx/runs').then(r => r.json()),
+        fetch('/api/onyx/vault-tree').then(r => r.json()),
       ]);
       setData({ projects: pr.projects ?? [], runs: ru.runs ?? [], tree: tr.tree ?? [], lastFetch: Date.now() });
     } catch { /* ignore */ }
@@ -471,7 +471,7 @@ export default function Shell() {
     setCliLog(l => [entry, ...l.slice(0, 9)]);
     setCliOpen(true);
     try {
-      const res = await fetch('/api/gz/cli', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cmd, args }) });
+      const res = await fetch('/api/onyx/cli', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cmd, args }) });
       const d = await res.json() as CLIOut;
       setCliLog(l => l.map(x => x.id === entry.id ? { ...entry, ...d } : x));
     } catch {
@@ -491,7 +491,7 @@ export default function Shell() {
     setSearchLoading(true);
     searchTimer.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/gz/search?q=${encodeURIComponent(searchQ)}`);
+        const res = await fetch(`/api/onyx/search?q=${encodeURIComponent(searchQ)}`);
         const d = await res.json() as { hits: Array<{ path: string; label: string; folder: string; fileType: string; context: string; matchIn: string; score: number }> };
         setSearchHits(d.hits ?? []);
         setSearchSel(0);
@@ -523,7 +523,7 @@ export default function Shell() {
     const repoPath = proj?.repoPath;
 
     try {
-      const res = await fetch('/api/gz/chat', {
+      const res = await fetch('/api/onyx/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: newMessages, projectId: chatProject, repoPath }),
@@ -541,10 +541,10 @@ export default function Shell() {
   }, [chatInput, chatSending, chatMessages, chatProject, data]);
 
   return (
-    <div className="gzos-shell" style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
+    <div className="onyx-shell" style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
 
       {/* Sidebar — liquid glass (becomes bottom tab bar on mobile) */}
-      <aside className="gzos-sidebar" style={{
+      <aside className="onyx-sidebar" style={{
         width: 192, flexShrink: 0,
         background: 'rgba(10,14,22,0.82)',
         backdropFilter: 'blur(24px) saturate(160%)',
@@ -552,16 +552,16 @@ export default function Shell() {
         borderRight: '1px solid var(--glass-b)',
         display: 'flex', flexDirection: 'column',
       }}>
-        <div className="gzos-sidebar-header" style={{ height: 50, display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', borderBottom: '1px solid var(--glass-b)', flexShrink: 0 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-str)', letterSpacing: '0.12em', fontFamily: 'monospace' }}>GZOS</span>
+        <div className="onyx-sidebar-header" style={{ height: 50, display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', borderBottom: '1px solid var(--glass-b)', flexShrink: 0 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-str)', letterSpacing: '0.12em', fontFamily: 'monospace' }}>ONYX</span>
           <span style={{ fontSize: 9, color: 'var(--text-faint)', fontFamily: 'monospace', letterSpacing: '0.05em' }}>dashboard</span>
         </div>
 
-        <nav className="gzos-sidebar-nav" style={{ flex: 1, padding: '8px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <nav className="onyx-sidebar-nav" style={{ flex: 1, padding: '8px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {NAV.map(({ id, label, Icon, shortcut }) => {
             const active = tab === id;
             return (
-              <button key={id} onClick={() => setTab(id)} className="gzos-nav-btn" style={{
+              <button key={id} onClick={() => setTab(id)} className="onyx-nav-btn" style={{
                 display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', borderRadius: 'var(--r-sm)',
                 border: active ? '1px solid rgba(77,156,248,0.22)' : '1px solid transparent',
                 cursor: 'pointer', width: '100%',
@@ -574,15 +574,15 @@ export default function Shell() {
                 onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-dim)'; } }}
               >
                 <Icon size={13} style={{ flexShrink: 0, opacity: active ? 1 : 0.7 }}/>
-                <span className="gzos-nav-label" style={{ flex: 1, textAlign: 'left' }}>{label}</span>
-                <span className="gzos-nav-shortcut" style={{ fontSize: 9, color: 'var(--text-faint)', fontFamily: 'monospace' }}>{shortcut}</span>
+                <span className="onyx-nav-label" style={{ flex: 1, textAlign: 'left' }}>{label}</span>
+                <span className="onyx-nav-shortcut" style={{ fontSize: 9, color: 'var(--text-faint)', fontFamily: 'monospace' }}>{shortcut}</span>
               </button>
             );
           })}
         </nav>
 
         {/* Bottom shortcuts */}
-        <div className="gzos-sidebar-actions" style={{ padding: '8px', borderTop: '1px solid var(--glass-b)' }}>
+        <div className="onyx-sidebar-actions" style={{ padding: '8px', borderTop: '1px solid var(--glass-b)' }}>
           {[
             { Icon: Inbox,    label: 'Inbox',         key: 'i',  action: () => setDrawerPath('00 - Dashboard/Inbox.md') },
             { Icon: Terminal, label: 'Capture',       key: 'c',  action: () => setCaptureOpen(o => !o) },
@@ -611,7 +611,7 @@ export default function Shell() {
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* Header — glass */}
-        <header className="gzos-header" style={{
+        <header className="onyx-header" style={{
           height: 50, display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px',
           borderBottom: '1px solid var(--glass-b)',
           background: 'rgba(10,14,22,0.7)',
@@ -678,7 +678,7 @@ export default function Shell() {
               <div style={{ height: 185, borderTop: '1px solid var(--glass-b)', background: 'rgba(5,8,14,0.92)', backdropFilter: 'blur(16px)', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', alignItems: 'center', padding: '4px 10px', borderBottom: '1px solid var(--glass-b)', gap: 8 }}>
                   <Terminal size={10} style={{ color: 'var(--accent)' }}/>
-                  <span style={{ fontSize: 10, color: 'var(--text-faint)', fontFamily: 'monospace', flex: 1 }}>gzos</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-faint)', fontFamily: 'monospace', flex: 1 }}>onyx</span>
                   {(['heal', 'doctor', 'logs', 'status'] as const).map(cmd => (
                     <button key={cmd} onClick={() => runCLI(cmd)} style={{ padding: '2px 7px', borderRadius: 'var(--r-sm)', border: '1px solid var(--glass-b)', background: 'transparent', cursor: 'pointer', fontSize: 9, color: 'var(--text-dim)', fontFamily: 'monospace' }}>
                       {cmd}
@@ -691,7 +691,7 @@ export default function Shell() {
                     ? <span style={{ color: 'var(--text-faint)' }}>No commands yet. Use buttons above or keyboard shortcuts.</span>
                     : cliLog.map((l, i) => (
                         <div key={i} style={{ marginBottom: 6 }}>
-                          <div style={{ color: 'var(--accent)', marginBottom: 1 }}>$ gzos {l.cmd}</div>
+                          <div style={{ color: 'var(--accent)', marginBottom: 1 }}>$ onyx {l.cmd}</div>
                           <pre style={{ color: l.exitCode === 0 ? 'var(--text-dim)' : 'var(--blocked)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
                             {l.output.slice(0, 800)}
                           </pre>
@@ -705,7 +705,7 @@ export default function Shell() {
 
           {/* Chat pane — persistent right panel */}
           {chatOpen && (
-            <div className="gzos-chat-pane" style={{
+            <div className="onyx-chat-pane" style={{
               width: 360, flexShrink: 0, display: 'flex', flexDirection: 'column',
               borderLeft: '1px solid var(--glass-b)',
               background: 'rgba(8,12,20,0.95)',
@@ -780,7 +780,7 @@ export default function Shell() {
         <>
           <div onClick={() => { setSearchOpen(false); setSearchQ(''); setSearchHits([]); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 200, animation: 'fade-in 0.1s ease' }}/>
           <div
-            className="gzos-search-modal"
+            className="onyx-search-modal"
             style={{
               position: 'fixed', top: '14%', left: '50%', transform: 'translateX(-50%)',
               width: 560, background: 'rgba(10,14,22,0.98)',

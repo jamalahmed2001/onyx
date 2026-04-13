@@ -9,7 +9,7 @@ version: 2.0
 
 # AGENTS — Operating Rules
 
-These rules apply to every agent that interacts with this GroundZeroOS vault. Read this file first on every session. No exceptions.
+These rules apply to every agent that interacts with this ONYX vault. Read this file first on every session. No exceptions.
 
 ---
 
@@ -19,7 +19,7 @@ Before doing anything else on a new session:
 
 1. Read this file (AGENTS.md) in full.
 2. Open [[Dashboard|Dashboard.md]] — note which projects exist and which are active.
-3. Run `gzos status` — see exact phase states across all projects.
+3. Run `onyx status` — see exact phase states across all projects.
 4. Read the Repo Context for the project you are about to work on — it contains the repo path, stack, key areas, and constraints.
 
 Only after completing all four steps should you take any action.
@@ -117,7 +117,7 @@ The Repo Context note (`<Project> - Repo Context.md`) is a living document. Agen
 - `## Architecture Notes` — if you learn something architecturally significant that future agents should know
 
 **Never change:**
-- `repo_path` — this is set by `gzos init` and is authoritative
+- `repo_path` — this is set by `onyx init` and is authoritative
 - `## Agent Constraints` — these are set by the human and are hard rules
 
 **Format for updates:**
@@ -131,10 +131,10 @@ Append to the relevant section with a timestamp comment so humans can see what w
 
 ## 5. Self-Healing
 
-Run `gzos heal` at startup if the vault looks off, and any time you encounter unexpected state:
+Run `onyx heal` at startup if the vault looks off, and any time you encounter unexpected state:
 
 ```bash
-gzos heal
+onyx heal
 ```
 
 The healer handles:

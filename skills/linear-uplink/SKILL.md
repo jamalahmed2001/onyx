@@ -25,7 +25,7 @@ The original Linear project description / master spec issue is never modified.
 Only phase-level issues (epics or child issues created by import) are updated.
 
 ## Config
-Requires `linear` block in `groundzero.config.json`:
+Requires `linear` block in `onyx.config.json`:
 ```json
 {
   "linear": {

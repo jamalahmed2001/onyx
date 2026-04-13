@@ -19,7 +19,7 @@ replan_count: 0
 
 ## Overview
 
-Demonstration phase. Pre-atomised and tagged `phase-ready`. Run `gzos run` to execute it.
+Demonstration phase. Pre-atomised and tagged `phase-ready`. Run `onyx run` to execute it.
 
 The agent will create a file called `hello.txt` in the repo directory configured in the Overview note.
 
@@ -31,12 +31,12 @@ None. No credentials, no env vars, no approvals needed.
 
 ## Tasks
 
-- [x] Create a file called `hello.txt` containing exactly the text `GroundZeroOS is running.` (no newline)
+- [x] Create a file called `hello.txt` containing exactly the text `ONYX is running.` (no newline)
 
 ## Acceptance Criteria
 
 - [x] `hello.txt` exists in the repo directory
-- [x] `hello.txt` contains `GroundZeroOS is running.`
+- [x] `hello.txt` contains `ONYX is running.`
 
 ## Blockers
 

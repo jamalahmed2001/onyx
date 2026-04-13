@@ -37,7 +37,7 @@ function buildIssueDescription(phase: PhaseNode): string {
   if (summary) parts.push(`\n## Summary\n\n${summary}`);
   if (taskLines) parts.push(`\n## Tasks\n\n${taskLines}`);
   if (ac) parts.push(`\n## Acceptance Criteria\n\n${ac}`);
-  parts.push(`\n---\n*Synced from GroundZeroOS vault*`);
+  parts.push(`\n---\n*Synced from ONYX vault*`);
 
   return parts.join('\n');
 }
@@ -126,7 +126,7 @@ export async function uplinkPhasesToLinear(
       phaseList,
       '',
       '---',
-      '*Synced from GroundZeroOS vault*',
+      '*Synced from ONYX vault*',
     ].join('\n');
 
     try {
@@ -163,7 +163,7 @@ export async function uplinkPhasesToLinear(
 
       await updateIssue(apiKey, parentIssueId, {
         title: bundle.projectId,
-        description: `**Progress:** ${completedPhases}/${totalPhases} phases complete\n\n## Phases\n\n${phaseList}\n\n---\n*Synced from GroundZeroOS vault*`,
+        description: `**Progress:** ${completedPhases}/${totalPhases} phases complete\n\n## Phases\n\n${phaseList}\n\n---\n*Synced from ONYX vault*`,
         teamId,
       });
       console.log(`  ✓ Parent issue updated: ${parentIssueId}`);

@@ -89,14 +89,14 @@ function loadDotEnv(cwd: string): void {
   }
 }
 
-// Load config from groundzero.config.json (and .env for secrets).
-// GROUNDZERO_VAULT_ROOT env always overrides vault_root in file.
+// Load config from onyx.config.json (and .env for secrets).
+// ONYX_VAULT_ROOT env always overrides vault_root in file.
 // Throws with a clear human-readable message if required fields are missing.
 export function loadConfig(configPath?: string): ControllerConfig {
   // Load .env first so env vars are available for the rest of this function
   loadDotEnv(process.cwd());
 
-  const resolvedPath = configPath ?? path.resolve(process.cwd(), 'groundzero.config.json');
+  const resolvedPath = configPath ?? path.resolve(process.cwd(), 'onyx.config.json');
 
   let raw: RawConfig = {};
   const content = readRawFile(resolvedPath);
@@ -105,7 +105,7 @@ export function loadConfig(configPath?: string): ControllerConfig {
       raw = JSON.parse(content) as RawConfig;
     } catch (err) {
       throw new Error(
-        `\n[gzos] groundzero.config.json is not valid JSON.\n\n` +
+        `\n[onyx] onyx.config.json is not valid JSON.\n\n` +
         `  File: ${resolvedPath}\n` +
         `  Error: ${err instanceof Error ? err.message : String(err)}\n\n` +
         `  Fix: check for trailing commas, unquoted keys, or missing brackets.\n`
@@ -114,26 +114,26 @@ export function loadConfig(configPath?: string): ControllerConfig {
   }
 
   const vaultRoot =
-    process.env['GROUNDZERO_VAULT_ROOT'] ??
+    process.env['ONYX_VAULT_ROOT'] ??
     raw.vault_root ??
     raw.vaultRoot;
 
   if (!vaultRoot) {
     throw new Error(
-      '\n[gzos] vault_root is required.\n\n' +
-      '  Option A: Set it in groundzero.config.json\n' +
+      '\n[onyx] vault_root is required.\n\n' +
+      '  Option A: Set it in onyx.config.json\n' +
       '    { "vault_root": "/path/to/your/obsidian/vault" }\n\n' +
-      '  Option B: Set GROUNDZERO_VAULT_ROOT in your .env file\n' +
-      '    GROUNDZERO_VAULT_ROOT=/path/to/your/obsidian/vault\n\n' +
-      '  Run: gzos doctor  — to check all configuration\n'
+      '  Option B: Set ONYX_VAULT_ROOT in your .env file\n' +
+      '    ONYX_VAULT_ROOT=/path/to/your/obsidian/vault\n\n' +
+      '  Run: onyx doctor  — to check all configuration\n'
     );
   }
 
   if (!fs.existsSync(vaultRoot)) {
     throw new Error(
-      `\n[gzos] vault_root does not exist on disk: ${vaultRoot}\n\n` +
-      `  Create the directory or correct the path in groundzero.config.json\n` +
-      `  Run: gzos doctor  — to check all configuration\n`
+      `\n[onyx] vault_root does not exist on disk: ${vaultRoot}\n\n` +
+      `  Create the directory or correct the path in onyx.config.json\n` +
+      `  Run: onyx doctor  — to check all configuration\n`
     );
   }
 

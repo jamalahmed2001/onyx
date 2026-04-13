@@ -1,12 +1,12 @@
-# GroundZeroOS — Agent Setup Guide
+# ONYX — Agent Setup Guide
 
-This file tells Claude (or any AI agent) exactly how to set up GroundZeroOS on a new machine. Follow these steps in order. Do not skip steps.
+This file tells Claude (or any AI agent) exactly how to set up ONYX on a new machine. Follow these steps in order. Do not skip steps.
 
 ---
 
 ## What you are setting up
 
-GroundZeroOS (`gzos`) is a local CLI that runs AI coding agents against a repo, phase by phase, using an Obsidian vault as the source of truth. After setup, the operator runs `gzos run` and agents execute development phases autonomously.
+ONYX (`onyx`) is a local CLI that runs AI coding agents against a repo, phase by phase, using an Obsidian vault as the source of truth. After setup, the operator runs `onyx run` and agents execute development phases autonomously.
 
 ---
 
@@ -32,15 +32,15 @@ If Node is not installed, tell the operator: install Node 18+ from https://nodej
 ## Step 2 — Install dependencies and build
 
 ```bash
-cd /path/to/groundzeroOS-starter
+cd /path/to/onyx
 npm install
 ```
 
-`npm install` triggers `postinstall` which runs `tsc` automatically. The build output goes to `dist/`. After this, `gzos` is available as a local binary.
+`npm install` triggers `postinstall` which runs `tsc` automatically. The build output goes to `dist/`. After this, `onyx` is available as a local binary.
 
 Verify the build succeeded:
 ```bash
-node dist/cli/gzos.js --version 2>/dev/null || node dist/cli/gzos.js --help | head -5
+node dist/cli/onyx.js --version 2>/dev/null || node dist/cli/onyx.js --help | head -5
 ```
 
 If TypeScript errors appear, report them to the operator — do not proceed.
@@ -57,7 +57,7 @@ Open `.env` and set these two required values:
 
 | Variable | What to set |
 |---|---|
-| `GROUNDZERO_VAULT_ROOT` | Absolute path to the operator's Obsidian vault (e.g. `/Users/alice/Obsidian/MyVault`). If they do not have a vault yet, use the bundled starter vault: `$(pwd)/vault` |
+| `ONYX_VAULT_ROOT` | Absolute path to the operator's Obsidian vault (e.g. `/Users/alice/Obsidian/MyVault`). If they do not have a vault yet, use the bundled starter vault: `$(pwd)/vault` |
 | `OPENROUTER_API_KEY` | Their OpenRouter API key from https://openrouter.ai — ask the operator for this |
 
 **Agent driver keys are not required if the operator is already logged in:**
@@ -70,9 +70,9 @@ All other variables are optional. Do not fill in optional variables unless the o
 
 ---
 
-## Step 4 — Configure groundzero.config.json
+## Step 4 — Configure onyx.config.json
 
-Open `groundzero.config.json`. It ships with a blank `vault_root`. Set it to match `GROUNDZERO_VAULT_ROOT` from `.env`:
+Open `onyx.config.json`. It ships with a blank `vault_root`. Set it to match `ONYX_VAULT_ROOT` from `.env`:
 
 ```json
 {
@@ -84,7 +84,7 @@ Open `groundzero.config.json`. It ships with a blank `vault_root`. Set it to mat
 If the operator wants to use the bundled starter vault (no existing Obsidian vault), set:
 ```json
 {
-  "vault_root": "/absolute/path/to/groundzeroOS-starter/vault",
+  "vault_root": "/absolute/path/to/onyx/vault",
   ...
 }
 ```
@@ -93,22 +93,22 @@ The bundled vault at `./vault/` is a fully working starter with example project,
 
 ---
 
-## Step 5 — Make gzos available globally
+## Step 5 — Make onyx available globally
 
-Add `gzos` to the shell PATH so the operator can run it from any directory:
+Add `onyx` to the shell PATH so the operator can run it from any directory:
 
 ```bash
 # Option A: npm link (recommended)
 npm link
 
 # Option B: alias (add to ~/.bashrc or ~/.zshrc)
-echo 'alias gzos="node /absolute/path/to/groundzeroOS-starter/dist/cli/gzos.js"' >> ~/.bashrc
+echo 'alias onyx="node /absolute/path/to/onyx/dist/cli/onyx.js"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
 Verify:
 ```bash
-gzos --help
+onyx --help
 ```
 
 You should see the command list. If not, debug the PATH and retry.
@@ -118,14 +118,14 @@ You should see the command list. If not, debug the PATH and retry.
 ## Step 6 — Run doctor
 
 ```bash
-gzos doctor
+onyx doctor
 ```
 
 This checks every dependency and prints a green ✓ or a red ✗ with the exact fix command. Fix everything red before proceeding. Common issues:
 
 | Error | Fix |
 |---|---|
-| `vault_root not set` | Set it in `.env` and `groundzero.config.json` as per Step 4 |
+| `vault_root not set` | Set it in `.env` and `onyx.config.json` as per Step 4 |
 | `claude CLI not found` | `npm install -g @anthropic-ai/claude-code` |
 | `OPENROUTER_API_KEY missing` | Set it in `.env` |
 | `vault_root path does not exist` | Create the directory or correct the path |
@@ -137,10 +137,10 @@ This checks every dependency and prints a green ✓ or a red ✗ with the exact 
 If the operator wants to try it immediately with a new project:
 
 ```bash
-gzos init "My App"
+onyx init "My App"
 ```
 
-This will prompt for the repo path. Enter the absolute path to the codebase the operator wants to work on. GZOS will auto-detect the stack and create a full vault bundle.
+This will prompt for the repo path. Enter the absolute path to the codebase the operator wants to work on. ONYX will auto-detect the stack and create a full vault bundle.
 
 If using the bundled starter vault, there is already a "My First Project" example to explore in Obsidian.
 
@@ -150,11 +150,11 @@ If using the bundled starter vault, there is already a "My First Project" exampl
 
 Run a dry status check:
 ```bash
-gzos status
+onyx status
 ```
 
 Should print the project list and their phase states. If you see an error, check:
-1. Is `vault_root` correct in both `.env` and `groundzero.config.json`?
+1. Is `vault_root` correct in both `.env` and `onyx.config.json`?
 2. Does the vault directory exist and contain markdown files?
 3. Did the build in Step 2 complete without errors?
 
@@ -163,27 +163,27 @@ Should print the project list and their phase states. If you see an error, check
 ## Setup complete
 
 Tell the operator:
-- `gzos run` — starts the execution loop (picks up `phase-ready` phases, spawns agents)
-- `gzos status` — shows all projects and their current state
-- `gzos heal` — fixes vault drift, stale locks, broken links
-- `gzos doctor` — re-run any time something feels wrong
+- `onyx run` — starts the execution loop (picks up `phase-ready` phases, spawns agents)
+- `onyx status` — shows all projects and their current state
+- `onyx heal` — fixes vault drift, stale locks, broken links
+- `onyx doctor` — re-run any time something feels wrong
 
 For full documentation, open the vault in Obsidian and read:
-- `00 - Dashboard/What is GroundZeroOS.md`
+- `00 - Dashboard/What is ONYX.md`
 - `00 - Dashboard/Getting Started.md`
 
 ---
 
 ## Troubleshooting reference
 
-**`gzos run` exits immediately with no output**
+**`onyx run` exits immediately with no output**
 - No `phase-ready` phases found. Open Obsidian, find a phase note, and add `phase-ready` to its `tags` array in frontmatter.
 
-**`gzos run` errors on spawn**
+**`onyx run` errors on spawn**
 - The agent driver (`claude`) is not installed or not in PATH. Run `claude --version` to confirm.
 
 **Phase stuck as `phase-active` with no agent running**
-- Run `gzos heal`. The healer detects locks older than 5 minutes and clears them automatically.
+- Run `onyx heal`. The healer detects locks older than 5 minutes and clears them automatically.
 
 **`pnpm` errors on install**
 - This project uses `npm`, not `pnpm`. Use `npm install`.

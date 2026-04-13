@@ -3,10 +3,10 @@ dist/
 .env
 *.DS_Store
 ._*
-.groundzero-locks/
-.groundzero-checkpoints/
-.groundzero-cursor-sessions/
-.gzos-backups/
+.onyx-locks/
+.onyx-checkpoints/
+.onyx-cursor-sessions/
+.onyx-backups/
 *.jsonl
 
 # Dashboard build artifacts

@@ -1,4 +1,4 @@
-// gzos capture <text>
+// onyx capture <text>
 // Fire-and-forget thought capture — appends to Obsidian Inbox for triage.
 
 import { loadConfig } from '../config/load.js';
@@ -7,7 +7,7 @@ import fs from 'fs';
 
 export async function runCapture(text?: string): Promise<void> {
   if (!text) {
-    console.log('Usage: gzos capture "your thought or task"');
+    console.log('Usage: onyx capture "your thought or task"');
     console.log('       Saves to Obsidian Inbox for triage in next plan.');
     return;
   }

@@ -131,14 +131,83 @@ function applyNav(
 // ---------------------------------------------------------------------------
 // Discovery helpers
 // ---------------------------------------------------------------------------
+const GLOB_IGNORE = [
+  '**/.trash/**',
+  '**/.onyx-backups/**',
+  '**/.obsidian/**',
+  '**/node_modules/**',
+  '**/_onyx_consolidated/**',
+];
+
 function discoverBundles(vaultRoot: string, projectsGlob: string): string[] {
-  const base = projectsGlob.replace('/**', '').replace('/**/*', '');
-  return glob.sync(`${base}/**/*Overview*.md`, { cwd: vaultRoot, absolute: true });
+  // Handle brace-expansion globs like "{02 - Fanvue/**,03 - Ventures/**,...}"
+  const bases = projectsGlob
+    .replace(/^\{/, '').replace(/\}$/, '')
+    .split(',')
+    .map(b => b.trim().replace(/\/\*\*\/?(\*)?$/, ''));
+
+  const results: Set<string> = new Set();
+  for (const base of bases) {
+    const matches = glob.sync(`${base}/**/*Overview*.md`, {
+      cwd: vaultRoot,
+      absolute: true,
+      ignore: GLOB_IGNORE,
+    });
+    for (const m of matches) results.add(m);
+  }
+  return [...results];
 }
 
 function discoverDomainHub(projectsRoot: string): string | null {
   const hubs = glob.sync('*Hub.md', { cwd: projectsRoot, absolute: true });
   return hubs[0] ?? null;
+}
+
+/**
+ * Walk UP from a directory to vaultRoot, collecting the nearest *Hub.md at each level.
+ * Returns an array of hub paths, nearest first (e.g. Experiments Hub, Personal Hub, Ventures Hub).
+ */
+function discoverHubChain(startDir: string, vaultRoot: string): string[] {
+  const hubs: string[] = [];
+  let dir = startDir;
+  const normalizedRoot = path.resolve(vaultRoot);
+
+  while (path.resolve(dir) !== normalizedRoot && dir !== path.dirname(dir)) {
+    dir = path.dirname(dir);
+    const hubFiles = glob.sync('*Hub.md', { cwd: dir, absolute: true });
+    if (hubFiles.length > 0) hubs.push(hubFiles[0]!);
+  }
+
+  return hubs;
+}
+
+/**
+ * Discover ALL *Hub.md files across all project areas.
+ */
+function discoverAllHubs(vaultRoot: string, projectsGlob: string): string[] {
+  const bases = projectsGlob
+    .replace(/^\{/, '').replace(/\}$/, '')
+    .split(',')
+    .map(b => b.trim().replace(/\/\*\*\/?(\*)?$/, ''));
+
+  const allHubs: Set<string> = new Set();
+  for (const base of bases) {
+    const hubs = glob.sync(`${base}/**/*Hub.md`, {
+      cwd: vaultRoot,
+      absolute: true,
+      ignore: GLOB_IGNORE,
+    });
+    for (const h of hubs) allHubs.add(h);
+    // Also check root of each base
+    const rootHubs = glob.sync(`*Hub.md`, {
+      cwd: path.join(vaultRoot, base),
+      absolute: true,
+      ignore: GLOB_IGNORE,
+    });
+    for (const h of rootHubs) allHubs.add(h);
+  }
+
+  return [...allHubs];
 }
 
 function discoverPhases(bundleDir: string): string[] {
@@ -475,9 +544,6 @@ export async function maintainVaultGraph(config: ControllerConfig): Promise<Grap
   const result: GraphMaintainResult = { repairs: [], wrongLinksRemoved: 0, hubsSplit: [] };
   const { vaultRoot, projectsGlob } = config;
 
-  const projectsBase = projectsGlob.replace('/**', '').replace('/**/*', '');
-  const projectsRoot = path.join(vaultRoot, projectsBase);
-  const domainHubPath = discoverDomainHub(projectsRoot);
   const overviewPaths = discoverBundles(vaultRoot, projectsGlob);
   const today = new Date().toISOString().slice(0, 10);
 
@@ -497,16 +563,27 @@ export async function maintainVaultGraph(config: ControllerConfig): Promise<Grap
     const docPaths   = discoverDocs(bundleDir, projectName);
 
     // ------------------------------------------------------------------
-    // Overview — Option B: link ONLY to sub-hubs (petal flower)
+    // Overview — link UP to nearest hub + DOWN to sub-hubs
     // ------------------------------------------------------------------
-    applyNav(overviewPath,
-      [
-        { target: `${projectName} - Knowledge`,       display: 'Knowledge'  },
-        { target: `${projectName} - Kanban`,          display: 'Kanban'     },
-        { target: `${projectName} - Agent Log Hub`,   display: 'Agent Logs' },
-      ],
-      result, 'Overview → Knowledge + Kanban + Agent Log Hub'
+    const hubChain = discoverHubChain(bundleDir, vaultRoot);
+    const overviewLinks: NavLink[] = [];
+
+    // "Up" link to nearest parent hub (folder structure backlink)
+    if (hubChain.length > 0) {
+      const nearestHub = hubChain[0]!;
+      overviewLinks.push({
+        target: path.basename(nearestHub, '.md'),
+        display: path.basename(nearestHub, '.md').replace(' Hub', ''),
+      });
+    }
+
+    overviewLinks.push(
+      { target: `${projectName} - Knowledge`,       display: 'Knowledge'  },
+      { target: `${projectName} - Kanban`,          display: 'Kanban'     },
+      { target: `${projectName} - Agent Log Hub`,   display: 'Agent Logs' },
     );
+
+    applyNav(overviewPath, overviewLinks, result, 'Overview → Parent Hub + Knowledge + Kanban + Agent Log Hub');
 
     const repoContextPath = path.join(bundleDir, `${projectName} - Repo Context.md`);
 
@@ -616,25 +693,59 @@ created: ${today}
     }
 
     // ------------------------------------------------------------------
-    // Phases — bridge: Phase Group (or Kanban) + their Log
+    // Build phase↔log index by phase_number (robust against frontmatter drift)
+    // ------------------------------------------------------------------
+    const phaseByNumber = new Map<number, { path: string; name: string }>();
+    for (const p of phasePaths) {
+      const node = readPhaseNode(p);
+      const n = typeof node.frontmatter['phase_number'] === 'number'
+        ? node.frontmatter['phase_number']
+        : parseInt(path.basename(p).match(/\d+/)?.[0] ?? '0', 10);
+      if (n <= 0) continue;
+      const nameFromFm = String(node.frontmatter['phase_name'] ?? '').trim();
+      const nameFromFile = path.basename(p, '.md').replace(/^P\d+\s*-\s*/, '').trim();
+      const name = nameFromFm || nameFromFile;
+      phaseByNumber.set(n, { path: p, name });
+    }
+
+    const logByNumber = new Map<number, { path: string; name: string }>();
+    for (const l of logPaths) {
+      const node = readPhaseNode(l);
+      const n = typeof node.frontmatter['phase_number'] === 'number'
+        ? node.frontmatter['phase_number']
+        : parseInt(path.basename(l).match(/\d+/)?.[0] ?? '0', 10);
+      if (n <= 0) continue;
+      const nameFromFm = String(node.frontmatter['phase_name'] ?? '').trim().replace(/^Phase\s*\d+\s*-\s*/, '');
+      const nameFromFile = path.basename(l, '.md').replace(/^L\d+\s*-\s*/, '').trim().replace(/^Phase\s*\d+\s*-\s*/, '');
+      const name = nameFromFm || nameFromFile;
+      // Prefer first log found for each number (disambiguates duplicates)
+      if (!logByNumber.has(n)) logByNumber.set(n, { path: l, name });
+    }
+
+    // ------------------------------------------------------------------
+    // Phases — bridge: Phase Group (or Kanban) + their Log (paired by phase_number)
     // ------------------------------------------------------------------
     for (const phasePath of phasePaths) {
       const phaseNode = readPhaseNode(phasePath);
       const phaseNum = typeof phaseNode.frontmatter['phase_number'] === 'number'
         ? phaseNode.frontmatter['phase_number']
         : parseInt(path.basename(phasePath).match(/\d+/)?.[0] ?? '1', 10);
-      const phaseName = String(phaseNode.frontmatter['phase_name'] ?? path.basename(phasePath, '.md'));
+      const phaseName = phaseByNumber.get(phaseNum)?.name ?? path.basename(phasePath, '.md');
 
       // Link to Phase Group if groups exist, otherwise Kanban
       const groupPath = usePhaseGroups ? phaseGroupMap.get(phaseGroupNum(phaseNum)) : undefined;
       const parentTarget = groupPath ? path.basename(groupPath, '.md') : `${projectName} - Kanban`;
       const parentDisplay = groupPath ? path.basename(groupPath, '.md') : 'Kanban';
 
-      const logBase = `L${phaseNum} - ${phaseName}.md`;
-      const logPath = path.join(bundleDir, 'Logs', logBase);
-
-      // Auto-create log note if missing
-      if (!fs.existsSync(logPath)) {
+      // Find log by phase_number (robust against filename/frontmatter mismatch)
+      let logPath: string;
+      const existingLog = logByNumber.get(phaseNum);
+      if (existingLog) {
+        logPath = existingLog.path;
+      } else {
+        // Auto-create log note if missing
+        const logBase = `L${phaseNum} - ${phaseName}.md`;
+        logPath = path.join(bundleDir, 'Logs', logBase);
         const logParent = `${projectName} - Agent Log Hub`;
         writeFile(logPath, `---
 tags: [project-log]
@@ -654,6 +765,7 @@ created: ${today}
 
 `);
         result.repairs.push({ file: logPath, action: `auto-created log note for P${phaseNum}` });
+        logByNumber.set(phaseNum, { path: logPath, name: phaseName });
       }
 
       applyNav(phasePath,
@@ -666,27 +778,28 @@ created: ${today}
     }
 
     // ------------------------------------------------------------------
-    // Logs — stamen: Phase + Log Group (or Agent Log Hub)
+    // Logs — stamen: Phase + Agent Log Hub (paired by phase_number)
     // ------------------------------------------------------------------
     for (const logPath of logPaths) {
       const logNode = readPhaseNode(logPath);
       const phaseNum = typeof logNode.frontmatter['phase_number'] === 'number'
         ? logNode.frontmatter['phase_number']
         : parseInt(path.basename(logPath).match(/\d+/)?.[0] ?? '1', 10);
-      const phaseName = String(logNode.frontmatter['phase_name'] ?? '');
 
-      const phaseBase = `P${phaseNum} - ${phaseName}`;
-
+      const pairedPhase = phaseByNumber.get(phaseNum);
       const logParent = `${projectName} - Agent Log Hub`;
       const logParentDisplay = 'Agent Log Hub';
 
-      applyNav(logPath,
-        [
-          { target: phaseBase, display: `P${phaseNum} — ${phaseName}` },
-          { target: logParent, display: logParentDisplay },
-        ],
-        result, `Log L${phaseNum} → Phase + ${logParentDisplay}`
-      );
+      const navLinks: NavLink[] = [];
+      if (pairedPhase) {
+        navLinks.push({
+          target: path.basename(pairedPhase.path, '.md'),
+          display: `P${phaseNum} — ${pairedPhase.name}`,
+        });
+      }
+      navLinks.push({ target: logParent, display: logParentDisplay });
+
+      applyNav(logPath, navLinks, result, `Log L${phaseNum} → Phase + ${logParentDisplay}`);
     }
 
     // ------------------------------------------------------------------
@@ -705,41 +818,103 @@ created: ${today}
   }
 
   // ------------------------------------------------------------------
-  // Domain Hub — back to Dashboard; lists all project Overviews in body
+  // Hierarchy-aware Hub linking
+  //
+  // For each hub in the vault:
+  //   Nav "up" → parent hub (or Dashboard if top-level)
+  //   Body     → child hubs + child projects (Overviews directly under it)
   // ------------------------------------------------------------------
-  if (domainHubPath && fs.existsSync(domainHubPath)) {
-    applyNav(domainHubPath, [{ target: 'Dashboard', display: 'Dashboard' }], result, 'Domain Hub → Dashboard');
-    let hubRaw = readRawFile(domainHubPath) ?? '';
-    // Build a set of wikilink targets already present in the body (avoid duplicates)
+  const allHubs = discoverAllHubs(vaultRoot, projectsGlob);
+
+  for (const hubPath of allHubs) {
+    if (!fs.existsSync(hubPath)) continue;
+    const hubDir = path.dirname(hubPath);
+
+    // Find parent hub (walk up from this hub's directory)
+    const parentChain = discoverHubChain(hubDir, vaultRoot);
+    // parentChain[0] would be this hub itself if it's in hubDir's parent — skip to find the actual parent
+    const parentHub = parentChain.find(h => path.dirname(h) !== hubDir);
+
+    // Nav: link up to parent hub or Dashboard
+    const navTarget = parentHub
+      ? { target: path.basename(parentHub, '.md'), display: path.basename(parentHub, '.md').replace(' Hub', '') }
+      : { target: 'Dashboard', display: 'Dashboard' };
+    applyNav(hubPath, [navTarget], result, `Hub → ${navTarget.display}`);
+
+    // Body: ensure child hubs and child project Overviews are listed
+    let hubRaw = readRawFile(hubPath) ?? '';
     const existingLinks = new Set([...hubRaw.matchAll(/\[\[([^\]|]+)/g)].map(m => m[1]!.trim()));
     let changed = false;
-    for (const overviewPath of [...new Set(overviewPaths)]) {
-      const node = readPhaseNode(overviewPath);
-      const pName = String(node.frontmatter['project'] ?? path.basename(path.dirname(overviewPath)));
-      const overviewBase = path.basename(overviewPath, '.md');
-      if (!existingLinks.has(overviewBase)) {
-        hubRaw = hubRaw.trimEnd() + `\n- [[${overviewBase}|${pName}]]\n`;
-        existingLinks.add(overviewBase);
-        changed = true;
+
+    // Child hubs: *Hub.md in immediate subdirectories (one level down only)
+    const childDirs = fs.readdirSync(hubDir, { withFileTypes: true })
+      .filter(d => d.isDirectory() && !d.name.startsWith('.'));
+    for (const childDir of childDirs) {
+      const childHubs = glob.sync('*Hub.md', { cwd: path.join(hubDir, childDir.name), absolute: true });
+      for (const ch of childHubs) {
+        const chBase = path.basename(ch, '.md');
+        if (!existingLinks.has(chBase)) {
+          hubRaw = hubRaw.trimEnd() + `\n- [[${chBase}|${chBase.replace(' Hub', '')}]]\n`;
+          existingLinks.add(chBase);
+          changed = true;
+        }
       }
     }
+
+    // Child projects: Overview files in immediate subdirectories
+    for (const childDir of childDirs) {
+      const childOverviews = glob.sync('*Overview*.md', { cwd: path.join(hubDir, childDir.name), absolute: true });
+      for (const co of childOverviews) {
+        const coBase = path.basename(co, '.md');
+        // Only add if this project's nearest hub IS this hub (prevents double-listing)
+        const projectHubChain = discoverHubChain(path.dirname(co), vaultRoot);
+        if (projectHubChain.length > 0 && path.resolve(projectHubChain[0]!) === path.resolve(hubPath)) {
+          if (!existingLinks.has(coBase)) {
+            const node = readPhaseNode(co);
+            const pName = String(node.frontmatter['project'] ?? path.basename(path.dirname(co)));
+            hubRaw = hubRaw.trimEnd() + `\n- [[${coBase}|${pName}]]\n`;
+            existingLinks.add(coBase);
+            changed = true;
+          }
+        }
+      }
+    }
+
     if (changed) {
-      writeFile(domainHubPath, hubRaw);
-      result.repairs.push({ file: domainHubPath, action: 'project overviews listed in Domain Hub' });
+      writeFile(hubPath, hubRaw);
+      result.repairs.push({ file: hubPath, action: 'child hubs/projects listed' });
     }
   }
 
   // ------------------------------------------------------------------
-  // Dashboard — root; ensure domain hubs are listed
+  // Dashboard — root; ensure top-level domain hubs are listed
   // ------------------------------------------------------------------
   const dashboardPath = path.join(vaultRoot, '00 - Dashboard', 'Dashboard.md');
-  if (fs.existsSync(dashboardPath) && domainHubPath) {
+  if (fs.existsSync(dashboardPath)) {
     const raw = readRawFile(dashboardPath);
     if (raw !== null) {
-      const domainBase = path.basename(domainHubPath, '.md');
-      if (!raw.includes(`[[${domainBase}`)) {
-        writeFile(dashboardPath, raw.trimEnd() + `\n- [[${domainBase}|${domainBase}]]\n`);
-        result.repairs.push({ file: dashboardPath, action: `domain hub linked in Dashboard` });
+      let dashRaw = raw;
+      const existingDashLinks = new Set([...dashRaw.matchAll(/\[\[([^\]|]+)/g)].map(m => m[1]!.trim()));
+      let changed = false;
+
+      // Find top-level hubs (those whose parent hub chain leads directly to vault root)
+      for (const hubPath of allHubs) {
+        const parentChain = discoverHubChain(path.dirname(hubPath), vaultRoot);
+        const parentHub = parentChain.find(h => path.dirname(h) !== path.dirname(hubPath));
+        // If no parent hub exists, this is a top-level hub → link from Dashboard
+        if (!parentHub) {
+          const hubBase = path.basename(hubPath, '.md');
+          if (!existingDashLinks.has(hubBase)) {
+            dashRaw = dashRaw.trimEnd() + `\n- [[${hubBase}|${hubBase.replace(' Hub', '')}]]\n`;
+            existingDashLinks.add(hubBase);
+            changed = true;
+          }
+        }
+      }
+
+      if (changed) {
+        writeFile(dashboardPath, dashRaw);
+        result.repairs.push({ file: dashboardPath, action: 'top-level domain hubs linked in Dashboard' });
       }
     }
   }

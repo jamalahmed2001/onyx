@@ -4,7 +4,7 @@ import path from 'path';
 const IGNORE = new Set([
   'node_modules', '.git', 'dist', 'build', '.next', 'coverage',
   '.cache', '__pycache__', '.tox', 'venv', '.venv', 'vendor',
-  'tmp', 'temp', '.turbo', '.gzos-backups',
+  'tmp', 'temp', '.turbo', '.onyx-backups',
 ]);
 
 // Source-like directory names to prioritize at depth 1

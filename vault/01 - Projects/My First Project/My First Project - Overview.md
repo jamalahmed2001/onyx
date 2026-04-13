@@ -2,9 +2,9 @@
 project: My First Project
 type: overview
 status: active
-repo_path: /tmp/gzos-test
+repo_path: /tmp/onyx-test
 tags:
-  - gz-project
+  - onyx-project
   - example
 created: 2026-01-01T00:00:00.000Z
 ---
@@ -18,7 +18,7 @@ created: 2026-01-01T00:00:00.000Z
 
 ## What This Project Is
 
-The example project that ships with GroundZeroOS.
+The example project that ships with ONYX.
 Demonstrates the correct bundle layout and a ready-to-execute phase.
 
 **Use it to:**
@@ -26,10 +26,10 @@ Demonstrates the correct bundle layout and a ready-to-execute phase.
 2. Understand the bundle structure before creating your own project
 3. See the Obsidian graph pattern in action
 
-Once done, run `gzos init "My Real Project"` and start fresh.
+Once done, run `onyx init "My Real Project"` and start fresh.
 
 > **Before running:** set `repo_path` above to the absolute path of your repo (or any directory you want the agent to work in).
 
 ## Goal
 
-Demonstrate a complete GroundZeroOS execution cycle — from `phase-ready` to `phase-completed` with a full log trace.
+Demonstrate a complete ONYX execution cycle — from `phase-ready` to `phase-completed` with a full log trace.

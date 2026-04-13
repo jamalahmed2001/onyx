@@ -6,15 +6,15 @@ Standard notification contract. Every controller action fires a notification.
 ## Channels
 - **stdout** — always, every event, formatted as:
   ```
-  [GroundZeroOS] event_type · Project · Phase · detail (#runId)
+  [ONYX] event_type · Project · Phase · detail (#runId)
   ```
 - **OpenClaw Gateway (WhatsApp)** — if `notify.openclaw` is configured (recommended)
 - **WhatsApp (CallMeBot)** — if `notify.whatsapp` is configured (legacy/simple)
 
 ## OpenClaw setup (recommended)
-Requires the `openclaw` CLI installed + logged in on the machine running GZOS.
+Requires the `openclaw` CLI installed + logged in on the machine running ONYX.
 
-Add to `groundzero.config.json`:
+Add to `onyx.config.json`:
 ```json
 {
   "notify": {
@@ -71,10 +71,10 @@ Environment variable alternative (keep out of git):
 
 ## WhatsApp message format
 ```
-🎉 GroundZeroOS
+🎉 ONYX
 My Project · P1 — Example Phase
 phase_completed — all 3 tasks done
-Run: #gz-1234567-abc
+Run: #onyx-1234567-abc
 ```
 
 ## Non-blocking

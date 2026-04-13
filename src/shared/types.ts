@@ -1,4 +1,4 @@
-// Shared type definitions for GroundZeroOS.
+// Shared type definitions for ONYX.
 // Both CLI and dashboard import from here — this is the single source of truth.
 
 // ---------------------------------------------------------------------------
