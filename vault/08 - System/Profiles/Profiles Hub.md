@@ -20,20 +20,25 @@ status: active
 
 ## Available Profiles
 
-Six profiles. Each one is a genuinely distinct mechanical contract — different required fields, different bundle structure, different acceptance gate.
+Nine profiles. Each one is a genuinely distinct mechanical contract — different required fields, different bundle structure, different acceptance gate.
 
 | Profile | Use for | Key required fields | Acceptance gate |
 |---|---|---|---|
+| [[08 - System/Profiles/general.md\|general]] | Catch-all — unsure which profile, mixed domains, lightweight tasks | none | all tasks checked + output documented |
 | [[08 - System/Profiles/engineering.md\|engineering]] | Software projects with a git repo | `repo_path`, `test_command` | test command exits 0 |
 | [[08 - System/Profiles/content.md\|content]] | Podcast, video, newsletter, social pipelines | `voice_profile`, `pipeline_stage` | safety filter + voice check |
 | [[08 - System/Profiles/research.md\|research]] | Investigation, analysis, synthesis | `research_question`, `source_constraints`, `output_format` | source count + confidence level |
 | [[08 - System/Profiles/operations.md\|operations]] | System ops, monitoring, incident response, e-commerce, events | `monitored_systems`, `runbook_path` | runbook_followed + outcome documented |
 | [[08 - System/Profiles/trading.md\|trading]] | Algorithmic trading, strategy dev, exchange integration | `exchange`, `strategy_type`, `risk_limits`, `backtest_command` | backtest passes + risk model compliance |
 | [[08 - System/Profiles/experimenter.md\|experimenter]] | Systematic experimentation — prompt engineering, agent config, ML, A/B testing | `hypothesis`, `success_metric`, `baseline_value` | result recorded + Cognition Store updated |
+| [[08 - System/Profiles/accounting.md\|accounting]] | Bookkeeping, financial reporting, audit preparation, financial analysis | `reporting_period`, `accounting_standards`, `entity_type` | balance check + human sign-off mandatory |
+| [[08 - System/Profiles/legal.md\|legal]] | Legal research, contract drafting, compliance, litigation support | `jurisdiction`, `matter_type` | citations verified + human professional review required |
 
 ---
 
-## Why only six profiles?
+## When to use each profile
+
+**Start here if unsure:** `general` — no required fields, flexible acceptance. You can migrate to a more specific profile once the project type is clear.
 
 A profile is a mechanical contract with ONYX — different required fields, a different bundle structure, a different acceptance gate. Most project types don't need a new profile; they need a better Overview and the right directives.
 
@@ -42,6 +47,8 @@ A profile is a mechanical contract with ONYX — different required fields, a di
 - **Marketing campaigns** → use `content`. Phases that do audience research use `research`.
 - **E-commerce operations, event management, creator management** → use `operations`.
 - **Building any of the above as software** → use `engineering`.
+- **Bookkeeping, financial reporting, audit** → use `accounting`.
+- **Legal research, contract drafting, compliance** → use `legal`.
 
 ---
 

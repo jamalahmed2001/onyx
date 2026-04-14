@@ -10,7 +10,7 @@ import path from 'path';
 import fs from 'fs';
 import readline from 'readline';
 
-const PROFILES = ['engineering', 'content', 'research', 'operations', 'trading', 'experimenter'] as const;
+const PROFILES = ['general', 'engineering', 'content', 'research', 'operations', 'trading', 'experimenter', 'accounting', 'legal'] as const;
 type ProfileName = typeof PROFILES[number];
 
 // Extract distinct section paths from a projects_glob pattern.
@@ -212,9 +212,10 @@ export async function runInit(projectNameArg?: string, profileArg?: string): Pro
     if (!profileName || !PROFILES.includes(profileName)) {
       console.log('\n  Select a profile:');
       PROFILES.forEach((p, i) => console.log(`    ${i + 1}. ${p}`));
-      const choice = (await prompt(rl, '  Profile [1 = engineering]: ')).trim();
+      console.log('  (Not sure? Choose 1 — general works for any project type)');
+      const choice = (await prompt(rl, '  Profile [1 = general]: ')).trim();
       const idx = parseInt(choice, 10) - 1;
-      profileName = (idx >= 0 && idx < PROFILES.length ? PROFILES[idx] : 'engineering') as ProfileName;
+      profileName = (idx >= 0 && idx < PROFILES.length ? PROFILES[idx] : 'general') as ProfileName;
     }
     console.log(`  Profile: ${profileName}`);
 
@@ -238,6 +239,7 @@ export async function runInit(projectNameArg?: string, profileArg?: string): Pro
 
     // Repo path — only required for engineering + trading + experimenter profiles
     const needsRepo = profileName === 'engineering' || profileName === 'trading' || profileName === 'experimenter';
+    const needsDirectivesFolder = ['content', 'research', 'experimenter', 'general', 'accounting', 'legal'].includes(profileName);
     let repoPath = '';
     let scan = { stack: '', keyAreas: '', architectureNotes: '', constraints: '' };
     if (needsRepo) {
@@ -279,8 +281,12 @@ export async function runInit(projectNameArg?: string, profileArg?: string): Pro
     fs.mkdirSync(phasesDir, { recursive: true });
     fs.mkdirSync(logsDir, { recursive: true });
     // Create Directives/ folder for profiles that use per-phase agent identity
-    if (profileName === 'content' || profileName === 'research' || profileName === 'experimenter') {
+    if (needsDirectivesFolder) {
       fs.mkdirSync(path.join(bundleDir, 'Directives'), { recursive: true });
+    }
+    // Create Drafts/ folder for legal profile
+    if (profileName === 'legal') {
+      fs.mkdirSync(path.join(bundleDir, 'Drafts'), { recursive: true });
     }
 
     // Overview — frontmatter varies by profile
@@ -568,6 +574,173 @@ created: ${today}
 
 _First trial will be written here by the experimenter-engineer directive._
 `,
+      'Project Context': `---
+project: "${projectName}"
+type: project-context
+created: ${today}
+---
+# Project Context — ${projectName}
+
+> Standing context for all phases. Populate this and agents will read it before starting any phase.
+
+## Background
+_Why does this project exist? What triggered it?_
+
+## Stakeholders
+_Who cares about the output? Who can unblock things?_
+
+## Prior work
+_What's been tried before? What already exists?_
+
+## Constraints
+_Hard limits: time, budget, access, technology._
+
+## Dependencies
+_What must exist or be true for this project to succeed?_
+`,
+      'Chart of Accounts': `---
+project: "${projectName}"
+type: chart-of-accounts
+created: ${today}
+---
+# Chart of Accounts — ${projectName}
+
+> Accounting classification structure. Agent reads this before categorising any transaction.
+
+## Assets (1000–1999)
+
+| Code | Account Name | Type | Notes |
+|------|------|------|------|
+| 1000 | Cash – Main Account | Cash | |
+| 1010 | Accounts Receivable | Receivable | |
+| 1020 | Prepaid Expenses | Prepaid | |
+| 1100 | Equipment | Fixed Asset | |
+
+## Liabilities (2000–2999)
+
+| Code | Account Name | Type | Notes |
+|------|------|------|------|
+| 2000 | Accounts Payable | Payable | |
+| 2100 | Accrued Liabilities | Accrual | |
+
+## Equity (3000–3999)
+
+| Code | Account Name | Type | Notes |
+|------|------|------|------|
+| 3000 | Owner Equity | Equity | |
+| 3100 | Retained Earnings | Equity | |
+
+## Revenue (4000–4999)
+
+| Code | Account Name | Type | Notes |
+|------|------|------|------|
+| 4000 | Revenue | Revenue | Primary income |
+
+## Expenses (5000–9999)
+
+| Code | Account Name | Type | Notes |
+|------|------|------|------|
+| 5000 | Cost of Goods Sold | COGS | |
+| 6000 | Salaries & Wages | Expense | |
+| 6100 | Rent | Expense | |
+| 6200 | Professional Fees | Expense | |
+| 6300 | Software & Subscriptions | Expense | |
+`,
+      'Ledger': `---
+project: "${projectName}"
+type: ledger
+created: ${today}
+---
+# Ledger — ${projectName}
+
+> Transaction register. Append-only. Agent adds entries below; never modifies existing ones.
+> Corrections are separate reversing entries with a note.
+
+## Format
+
+| Date | Ref | Debit Account | Credit Account | Amount | Narration | Source |
+|------|-----|---------------|----------------|--------|-----------|--------|
+
+## Entries
+
+_Agent will populate this as reconciliation phases run._
+`,
+      'Financial Notes': `---
+project: "${projectName}"
+type: financial-notes
+created: ${today}
+---
+# Financial Notes — ${projectName}
+
+> Disclosure notes, policy elections, and material items for the reporting period.
+> Agent updates this; qualified accountant reviews before finalising.
+
+## Basis of preparation
+_Accounting standards, period, and any departures from standard treatment._
+
+## Significant accounting policies
+_Depreciation method, revenue recognition, inventory valuation (if applicable)._
+
+## Material judgements and estimates
+_Items where professional judgement was applied — explain the estimate and the range._
+
+## Items requiring human review
+_Anything the agent flagged as needing accountant sign-off._
+`,
+      'Matter Context': `---
+project: "${projectName}"
+type: matter-context
+created: ${today}
+---
+# Matter Context — ${projectName}
+
+> The facts. Populated by the human and refined at P1. Agent reads this before any legal work.
+
+## Parties
+
+| Party | Role | Entity type | Jurisdiction |
+|-------|------|-------------|-------------|
+| | | | |
+
+## Background facts
+_Chronological narrative of relevant events._
+
+## Timeline
+
+| Date | Event | Source |
+|------|-------|--------|
+
+## Key documents
+
+| Document | Date | Parties | Relevance |
+|----------|------|---------|-----------|
+
+## Open questions of fact
+_Things that are unknown or disputed._
+`,
+      'Research Notes': `---
+project: "${projectName}"
+type: research-notes
+created: ${today}
+---
+# Research Notes — ${projectName}
+
+> Raw legal research output. Organised by issue. Distinct from Knowledge.md (which contains synthesised conclusions).
+
+## Issues
+
+_Agent populates each issue as it is researched. Format:_
+
+### Issue: [Legal question]
+
+**Applicable law:** [Statute/common law area]
+
+**Key cases and statutes:**
+| Citation | Jurisdiction | Date | Holding | Relevance |
+|---|---|---|---|---|
+
+**Gaps:** _What couldn't be found._
+`,
       'Cognition Store': `---
 project: "${projectName}"
 type: cognition-store
@@ -627,6 +800,23 @@ _None yet — accumulates as trials run._
 
     // Profile-appropriate P1 bootstrap phase
     const p1Tasks: Record<ProfileName, string> = {
+      general: `- [ ] Read the Overview and confirm the goal is clearly stated
+- [ ] Populate Project Context: background, stakeholders, constraints, dependencies
+- [ ] List the 3 most important things that need to happen for this project to succeed
+- [ ] Write stub P2 phase: first substantive work task
+- [ ] Append bootstrap summary to Knowledge.md`,
+      accounting: `- [ ] Read the Overview and confirm reporting_period, accounting_standards, and entity_type are set
+- [ ] Populate Chart of Accounts with the entity's account structure
+- [ ] Confirm access to the transaction source (bank feeds, CSV exports, accounting software)
+- [ ] Set up the Ledger structure and record any opening balances
+- [ ] Populate Financial Notes with basis of preparation and key accounting policies
+- [ ] Write stub P2 phase: first reconciliation task
+- [ ] Append bootstrap summary to Knowledge.md`,
+      legal: `- [ ] Read the Overview and confirm jurisdiction, matter_type, and scope are set
+- [ ] Populate Matter Context: parties, timeline, key documents, open questions of fact
+- [ ] Identify the 3-5 key legal issues to be researched
+- [ ] Write stub P2 phase: first legal research task (map the legal landscape)
+- [ ] Append bootstrap summary to Knowledge.md`,
       engineering: `- [ ] Verify repo structure, confirm stack, and ensure the project builds
 - [ ] Configure development environment and tooling (linter, formatter, test runner)
 - [ ] Write a smoke test to validate the setup end-to-end
@@ -666,6 +856,19 @@ _None yet — accumulates as trials run._
     };
 
     const p1Acceptance: Record<ProfileName, string> = {
+      general: `- [ ] Project Context populated with background, stakeholders, and constraints
+- [ ] Goal clearly stated in Overview
+- [ ] P2 phase exists with state: backlog
+- [ ] Knowledge.md has at least one entry`,
+      accounting: `- [ ] Chart of Accounts populated and covers all expected transaction types
+- [ ] Ledger set up with opening balances (if applicable)
+- [ ] Financial Notes populated with basis of preparation
+- [ ] P2 phase exists with state: backlog
+- [ ] Knowledge.md has at least one entry`,
+      legal: `- [ ] Matter Context populated with parties, timeline, and key documents
+- [ ] Key legal issues identified (at least 3)
+- [ ] P2 phase exists (legal research) with state: backlog
+- [ ] Knowledge.md has at least one entry`,
       engineering: `- [ ] Repo builds without errors
 - [ ] Test suite runs (may have failures — that's OK at this stage)
 - [ ] Repo Context populated
@@ -760,6 +963,18 @@ created: ${today}
     const extraDocsSummary = createdDocs.length > 0 ? `\n    ${createdDocs.join('\n    ')}` : '';
 
     const nextSteps: Record<ProfileName, string> = {
+      general: `    1. Fill in Goal and Success Criteria in Overview
+    2. Fill in Project Context: background, stakeholders, constraints
+    3. Set P1 tag to phase-ready, then run: onyx run --project "${projectName}"
+    4. Add directives per phase as the project type becomes clear`,
+      accounting: `    1. Fill in reporting_period, accounting_standards, entity_type in Overview frontmatter
+    2. Populate Chart of Accounts before running P1
+    3. Set P1 tag to phase-ready, then run: onyx run --project "${projectName}"
+    4. Recommended directive per phase: accountant`,
+      legal: `    1. Fill in jurisdiction and matter_type in Overview frontmatter
+    2. Populate Matter Context with the facts before running P1
+    3. Set P1 tag to phase-ready, then run: onyx run --project "${projectName}"
+    4. Recommended directives: legal-researcher (research phases), legal-drafter (drafting phases)`,
       engineering: `    1. Fill in Architecture Notes and Agent Constraints in Overview
     2. Review P1 — Bootstrap tasks and acceptance criteria
     3. Set P1 tag to phase-ready when ready to execute

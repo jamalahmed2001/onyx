@@ -79,6 +79,49 @@ For maintaining structured knowledge across a project:
 
 ---
 
+## General Purpose
+
+For any project where no specialist role is needed, or as a default fallback:
+
+- [[08 - System/Agent Directives/general.md|general]] — flexible catch-all agent; reads the phase carefully and does exactly what it asks. Used when `directive:` is not set, or on mixed-domain phases.
+
+---
+
+## Professional Role Directives
+
+Specialist agents that simulate professional roles. Each has domain-specific rules, output formats, and safety constraints appropriate to the profession.
+
+### Finance & Legal
+
+- [[08 - System/Agent Directives/accountant.md|accountant]] — bookkeeping, reconciliation, financial reporting under GAAP/IFRS. Every entry sourced; balance check mandatory; human sign-off required. Use with `accounting` profile.
+- [[08 - System/Agent Directives/legal-researcher.md|legal-researcher]] — legal research with primary source citations; evidence hierarchy; jurisdiction-specific. No legal advice. Use with `legal` profile.
+- [[08 - System/Agent Directives/legal-drafter.md|legal-drafter]] — contract and policy drafting; precision clause writing; review + annotation mode. All drafts marked for professional review. Use with `legal` profile.
+- [[08 - System/Agent Directives/investment-analyst.md|investment-analyst]] — company research, financial modelling, investment memos; thesis-driven; bear case mandatory; regulatory disclaimer required.
+- [[08 - System/Agent Directives/compliance-officer.md|compliance-officer]] — regulatory obligation mapping, gap analysis, control frameworks (SOC 2, ISO 27001, GDPR); jurisdiction-specific; accepted risk requires human sign-off.
+
+### Strategy & Product
+
+- [[08 - System/Agent Directives/consultant.md|consultant]] — strategy frameworks (MECE, pyramid principle, hypothesis-driven); situation-complication-resolution structure; so-what test on every finding.
+- [[08 - System/Agent Directives/product-manager.md|product-manager]] — PRDs, roadmaps, user stories, acceptance criteria, metrics frameworks; problem before solution; no UI design decisions.
+- [[08 - System/Agent Directives/marketing-strategist.md|marketing-strategist]] — campaign strategy, messaging frameworks, copy; audience before message; business objective required for every deliverable.
+
+### Data & Security
+
+- [[08 - System/Agent Directives/data-analyst.md|data-analyst]] — EDA, metrics reporting, cohort analysis, statistical analysis; observation vs interpretation separated; sources and queries documented.
+- [[08 - System/Agent Directives/security-analyst.md|security-analyst]] — threat modelling (STRIDE), OWASP Top 10 code review, vulnerability assessment; authorised contexts only; no weaponised exploit code.
+
+### People & Learning
+
+- [[08 - System/Agent Directives/hr-manager.md|hr-manager]] — job descriptions, interview scorecards, onboarding plans, HR policies; jurisdiction compliance mandatory; hiring decisions remain human.
+- [[08 - System/Agent Directives/curriculum-designer.md|curriculum-designer]] — backward design, Bloom's taxonomy aligned objectives, lesson plans, assessments; outcomes before content; practice activities required.
+
+### Research & Media
+
+- [[08 - System/Agent Directives/clinical-researcher.md|clinical-researcher]] — biomedical literature synthesis; evidence hierarchy (RCT > cohort > expert opinion); Vancouver citations; no medical advice under any circumstances.
+- [[08 - System/Agent Directives/journalist.md|journalist]] — story research, article writing, fact-checking; multiple-source corroboration; right-of-reply noted; no fabrication.
+
+---
+
 ## Writing a project directive
 
 Project directives live in `My Project/Directives/`. They override system directives of the same name. Useful for: project-specific voice, domain rules, safety constraints, output formats.
