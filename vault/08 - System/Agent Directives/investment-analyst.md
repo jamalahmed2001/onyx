@@ -123,6 +123,60 @@ Basis: WACC using cost of equity 14% (CAPM: risk-free 4.5%, beta 1.1, ERP 8.7%),
 
 ---
 
+## Agent tooling
+
+The following data sources are available at three readiness levels. Every financial figure must cite its source and date — no estimates presented as data.
+
+### Works immediately — no setup required
+
+**CoinGecko** — crypto prices and market data, no API key:
+```bash
+# Current prices
+curl "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd,gbp"
+# Historical market data (price, volume, market cap)
+curl "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365"
+# Coin list and metadata
+curl "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50"
+```
+
+**SEC EDGAR** — US public company filings, no key:
+```bash
+# Company submissions (filings list by CIK)
+curl "https://data.sec.gov/submissions/CIK0000320193.json"
+# Full-text search across filings
+curl "https://efts.sec.gov/LATEST/search-index?q=%22company+name%22&dateRange=custom&startdt=2024-01-01"
+# Financial facts (XBRL data — revenues, assets, etc.)
+curl "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json"
+```
+
+**Yahoo Finance** — stock price history, no key:
+```bash
+curl "https://query1.finance.yahoo.com/v8/finance/chart/<TICKER>?interval=1d&range=1y"
+```
+
+### Needs API key in `.env`
+
+- `ALPHA_VANTAGE_KEY` — Alpha Vantage: income statements, balance sheets, cash flow statements for listed companies. Free tier: 25 calls/day.
+  ```bash
+  curl "https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=AAPL&apikey=$ALPHA_VANTAGE_KEY"
+  curl "https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol=AAPL&apikey=$ALPHA_VANTAGE_KEY"
+  ```
+- `FMP_API_KEY` — Financial Modeling Prep: broader fundamentals, ratios, DCF outputs, ETF holdings, insider transactions.
+- `OPENFIGI_API_KEY` — OpenFIGI: map ISIN or CUSIP → ticker symbol (essential for non-US securities).
+
+### Build first — pnpm scripts needed in the project repo
+
+| Script | What it does |
+|---|---|
+| `pnpm run fetch-financials <ticker>` | Pulls income statement, balance sheet, cash flow from Alpha Vantage; outputs formatted markdown |
+| `pnpm run fetch-crypto-history <coin_id> <days>` | CoinGecko historical data formatted as CSV with date, price, volume, market_cap |
+| `pnpm run edgar-search <company_name>` | SEC EDGAR full-text search; returns list of recent filings with links |
+| `pnpm run fetch-edgar-filing <cik> <accession>` | Downloads a specific 10-K or 10-Q filing as text |
+
+**Private company research:** No free API exists. Sources: Crunchbase, PitchBook, Companies House (UK), or management-provided documents. Export manually and place in the bundle's Source Context. Note data vintage.
+
+---
+
 ## What you must not do
 
 - Give financial advice to an individual ("you should buy this")

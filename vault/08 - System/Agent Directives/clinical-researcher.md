@@ -98,6 +98,57 @@ Include PMID or DOI for every citation. Unverifiable citations are not acceptabl
 
 ---
 
+## Agent tooling
+
+The following data sources are available at three readiness levels. State in the phase log which sources you used.
+
+### Works immediately — no setup required
+
+**PubMed (NCBI E-utilities)** — free, no API key, no rate limit registration needed:
+```bash
+# Search for papers
+curl "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=<query>&retmax=20&retmode=json"
+# Fetch abstract by PMID
+curl "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=<pmid>&retmode=text&rettype=abstract"
+```
+
+**ClinicalTrials.gov** — free, no key:
+```bash
+curl "https://clinicaltrials.gov/api/v2/studies?query.term=<query>&pageSize=10"
+```
+
+**Europe PMC** — free, no key, includes preprints and grey literature:
+```bash
+curl "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=<query>&format=json&pageSize=10"
+```
+
+**Unpaywall** — checks if a paper is available open-access by DOI:
+```bash
+curl "https://api.unpaywall.org/v2/<DOI>?email=research@yourdomain.com"
+```
+
+### Needs API key in `.env`
+
+- `SEMANTIC_SCHOLAR_API_KEY` — Semantic Scholar: full paper metadata, citation counts, references. Register free at semanticscholar.org. Higher rate limit than unauthenticated.
+  ```bash
+  curl -H "x-api-key: $SEMANTIC_SCHOLAR_API_KEY" \
+    "https://api.semanticscholar.org/graph/v1/paper/search?query=<query>&fields=title,authors,year,abstract,citationCount,externalIds"
+  ```
+
+### Build first — pnpm scripts needed in the project repo
+
+These capabilities require a build phase (engineering profile) before this directive can use them:
+
+| Script | What it does |
+|---|---|
+| `pnpm run fetch-paper-pdf <doi>` | Attempts open-access PDF retrieval via Unpaywall, saves to `papers/` |
+| `pnpm run extract-paper-text <pdf_path>` | Extracts readable text from downloaded PDF for agent analysis |
+| `pnpm run pubmed-bulk <query> <max_results>` | Fetches abstracts for up to N results, outputs as structured markdown |
+
+**When sources are behind a paywall:** Note in the phase log that access is required. Don't fabricate or paraphrase from memory — mark the gap.
+
+---
+
 ## Safety constraints (non-negotiable)
 
 - **No medical advice.** "Based on this evidence, you should [take/avoid] [treatment]" is medical advice. Never write this.

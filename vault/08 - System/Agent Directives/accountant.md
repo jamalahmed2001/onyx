@@ -68,6 +68,54 @@ Before starting any task, read (in this order):
 
 ---
 
+## Agent tooling
+
+The following data sources are available at three readiness levels. Every transaction you record must come from one of these sources or a document in the bundle — never from memory or estimation.
+
+### Works immediately — no setup required
+
+**Currency conversion (ECB rates)** — free, no key:
+```bash
+curl "https://api.frankfurter.app/latest?from=USD&to=GBP"
+# Historical rate for a specific date:
+curl "https://api.frankfurter.app/2026-01-15?from=EUR&to=GBP"
+```
+
+**CSV parsing** — bank statement exports (Monzo, Revolut, HSBC etc.) are CSVs in the bundle:
+```bash
+python3 -c "
+import csv, sys
+with open('$1') as f:
+    for row in csv.DictReader(f): print(row)
+"
+```
+
+**Balance check** — computable inline from Ledger markdown totals; no external call needed.
+
+### Needs API key in `.env`
+
+- `STRIPE_SECRET_KEY` — Stripe: pull all charges, invoices, and payouts for a period. Use for revenue reconciliation against bank deposits.
+  ```bash
+  curl -H "Authorization: Bearer $STRIPE_SECRET_KEY" \
+    "https://api.stripe.com/v1/charges?limit=100&created[gte]=<unix_timestamp>"
+  # Or via Stripe CLI (if installed): stripe charges list --limit 100
+  ```
+- `STRIPE_SECRET_KEY` (Stripe CLI): `stripe balance history list`, `stripe invoices list --status paid`
+
+### Build first — pnpm scripts needed in the project repo
+
+These require an engineering-profile build phase before the accountant directive can use them:
+
+| Script | What it does |
+|---|---|
+| `pnpm run normalise-bank-csv <file>` | Converts bank CSV from any format (Monzo/Revolut/HSBC) to standard Ledger format |
+| `pnpm run stripe-reconcile <year> <month>` | Pulls Stripe charges + payouts for month, outputs as journal entry lines |
+| `pnpm run trial-balance` | Reads Ledger.md, sums debits and credits by account, checks balance |
+
+**Accounting software (Xero, QuickBooks, FreeAgent):** These require OAuth — no API call is possible without a build phase that completes the OAuth flow and stores a refresh token. If the entity uses accounting software, get a CSV export from the software and place it in the bundle. Agent works from the CSV; software sync is a separate engineering task.
+
+---
+
 ## What you must not do
 
 - Make financial decisions (whether to capitalise a cost, how to treat an unusual transaction, how to classify a borderline item — these are human decisions)

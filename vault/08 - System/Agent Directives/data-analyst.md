@@ -126,6 +126,65 @@ print(f"Shape: {df.shape}, Date range: {df['created_at'].min()} to {df['created_
 
 ---
 
+## Agent tooling
+
+The following data sources are available at three readiness levels. State in every analysis report exactly which source was used, the date range, and the row count.
+
+### Works immediately — no setup required
+
+**CSV files in the bundle** — any CSV placed in the project bundle folder:
+```bash
+python3 -c "
+import pandas as pd
+df = pd.read_csv('<file>')
+print(f'Shape: {df.shape}')
+print(df.describe())
+print(df.dtypes)
+"
+```
+
+**SQLite databases** — if a `.db` file is in the bundle:
+```bash
+sqlite3 <db_file> "SELECT * FROM events LIMIT 10;"
+sqlite3 <db_file> ".schema"
+```
+
+**Reddit public data** (audience research, no key):
+```bash
+curl -H "User-Agent: ONYX-research/1.0" \
+  "https://www.reddit.com/r/<subreddit>/top.json?limit=25&t=month"
+```
+
+### Needs API key in `.env`
+
+- `POSTHOG_API_KEY` + `POSTHOG_PROJECT_ID` — PostHog product analytics. Query saved insights, funnel breakdowns, event counts. Note: PostHog is also available as an MCP in interactive Claude sessions, but ONYX agents (running via `claude --print`) require API scripts.
+  ```bash
+  curl -H "Authorization: Bearer $POSTHOG_API_KEY" \
+    "https://app.posthog.com/api/projects/$POSTHOG_PROJECT_ID/insights/?insight=TRENDS"
+  ```
+- `AMPLITUDE_API_KEY` + `AMPLITUDE_SECRET_KEY` — Amplitude event segmentation and funnel data:
+  ```bash
+  curl -u "$AMPLITUDE_API_KEY:$AMPLITUDE_SECRET_KEY" \
+    "https://amplitude.com/api/2/events/segmentation?e=%7B%22event_type%22%3A%22<event>%22%7D&start=<YYYYMMDD>&end=<YYYYMMDD>"
+  ```
+- `DATABASE_URL` — direct PostgreSQL queries:
+  ```bash
+  psql $DATABASE_URL -c "<query>" --csv
+  ```
+
+### Build first — pnpm scripts needed in the project repo
+
+| Script | What it does |
+|---|---|
+| `pnpm run fetch-posthog-events <event> <from> <to>` | Fetches raw event stream from PostHog, saves to CSV in `data/` |
+| `pnpm run fetch-amplitude-funnel <funnel_id>` | Fetches funnel conversion rates from Amplitude |
+| `pnpm run db-snapshot <table_name>` | Exports a table to CSV for offline analysis |
+| `pnpm run chart <csv_file> <x_col> <y_col>` | Generates a chart image from a CSV file |
+
+**When data is unavailable:** If the data source hasn't been built yet, write a `## Data gaps` section in the analysis noting what data would answer the question, and what build work is needed to get it.
+
+---
+
 ## What you must not do
 
 - Present a sample as if it represents the full population without noting the sample size

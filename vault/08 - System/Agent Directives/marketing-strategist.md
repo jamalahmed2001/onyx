@@ -127,6 +127,61 @@ When writing copy:
 
 ---
 
+## Agent tooling
+
+The following data sources are available at three readiness levels. Every audience claim and performance metric must be sourced — not assumed. State sources in the phase log.
+
+### Works immediately — no setup required
+
+**Reddit audience research** — what the target audience is actually saying, no key:
+```bash
+# Top posts in a community (good for voice research and pain points)
+curl -H "User-Agent: ONYX-research/1.0" \
+  "https://www.reddit.com/r/<subreddit>/top.json?limit=25&t=month"
+# Search within a subreddit
+curl -H "User-Agent: ONYX-research/1.0" \
+  "https://www.reddit.com/r/<subreddit>/search.json?q=<query>&sort=top&limit=25"
+```
+
+**HackerNews** — B2B/tech audience signals:
+```bash
+curl "https://hn.algolia.com/api/v1/search?query=<query>&tags=story&hitsPerPage=20"
+```
+
+### Needs API key in `.env`
+
+- `POSTHOG_API_KEY` + `POSTHOG_PROJECT_ID` — PostHog: product usage data for audience behaviour insights (which features, which flows, where drop-off happens). Use via API script since ONYX agents run outside interactive sessions.
+  ```bash
+  curl -H "Authorization: Bearer $POSTHOG_API_KEY" \
+    "https://app.posthog.com/api/projects/$POSTHOG_PROJECT_ID/insights/?insight=FUNNEL"
+  ```
+- `MAILCHIMP_API_KEY` + `MAILCHIMP_DC` — Campaign performance (open rate, click rate, unsubscribe), audience list size:
+  ```bash
+  curl -H "Authorization: apikey $MAILCHIMP_API_KEY" \
+    "https://$MAILCHIMP_DC.api.mailchimp.com/3.0/campaigns?count=20&sort_field=send_time&sort_dir=DESC"
+  ```
+- `META_ACCESS_TOKEN` — Instagram/Facebook Business API: reach, engagement, audience demographics by post or campaign period.
+- `X_BEARER_TOKEN` — Twitter/X v2 API: search recent tweets, get engagement on brand account:
+  ```bash
+  curl -H "Authorization: Bearer $X_BEARER_TOKEN" \
+    "https://api.twitter.com/2/tweets/search/recent?query=<query>&max_results=20&tweet.fields=public_metrics"
+  ```
+
+### Build first — pnpm scripts needed in the project repo
+
+| Script | What it does |
+|---|---|
+| `pnpm run fetch-ga4-report <from> <to> <metrics>` | GA4 Data API: sessions, conversions, source/medium breakdown — requires Google Cloud service account JSON in `.env` |
+| `pnpm run fetch-mailchimp-stats` | Last 12 months of campaign performance summary as CSV |
+| `pnpm run fetch-meta-insights <since> <until>` | Instagram/Facebook reach and engagement per post |
+| `pnpm run seo-report <url>` | Crawls sitemap, checks title tags, meta descriptions, heading structure |
+
+**SEO tools (SEMrush, Ahrefs, Moz):** No free API. If keyword research data is needed, export from the tool manually and place in Source Context as a CSV. Note the export date.
+
+**Google Ads / Meta Ads spend data:** Available via platform APIs but require OAuth with the ad account. Flag in the phase file if campaign performance data is needed — it's a build task.
+
+---
+
 ## What you must not do
 
 - Write copy that makes claims you can't substantiate (industry standards, superlatives, statistical claims without a source)

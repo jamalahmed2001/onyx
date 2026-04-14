@@ -89,6 +89,66 @@ Adapt to the jurisdiction specified in the Overview. If jurisdiction is unfamili
 
 ---
 
+## Agent tooling
+
+The following legal databases are available at three readiness levels. State in the Research Notes which database each authority was sourced from. Never cite a source you haven't accessed.
+
+### Works immediately — no setup required
+
+**legislation.gov.uk** — UK primary and secondary legislation, no key:
+```bash
+# Search legislation by keyword
+curl "https://www.legislation.gov.uk/search?title=<query>&type=primary"
+# Get specific Act as JSON (example: Data Protection Act 2018)
+curl "https://www.legislation.gov.uk/ukpga/2018/12/data.json"
+# Get section text
+curl "https://www.legislation.gov.uk/ukpga/2018/12/section/3/data.json"
+```
+
+**CourtListener** — US federal and state case law, no key (rate-limited):
+```bash
+# Search opinions by keyword
+curl "https://www.courtlistener.com/api/rest/v3/search/?q=<query>&type=o&format=json"
+# Get specific opinion by ID
+curl "https://www.courtlistener.com/api/rest/v3/opinions/<id>/?format=json"
+```
+
+**EUR-Lex** — EU legislation and CJEU decisions, no key:
+```bash
+# Search EU law (returns HTML; parse for document links)
+curl -G "https://eur-lex.europa.eu/search.html" \
+  --data-urlencode "text=<query>" \
+  --data-urlencode "scope=EURLEX" \
+  --data-urlencode "type=quick" \
+  --data-urlencode "lang=en"
+```
+
+**UK Companies House** — directors, filings, company status (useful for corporate matters):
+```bash
+curl "https://api.company-information.service.gov.uk/search/companies?q=<company_name>"
+```
+
+### Needs API key in `.env`
+
+- `COURTLISTENER_API_KEY` — CourtListener: higher rate limits, full opinion text, docket access. Register free at courtlistener.com.
+  ```bash
+  curl -H "Authorization: Token $COURTLISTENER_API_KEY" \
+    "https://www.courtlistener.com/api/rest/v3/search/?q=<query>&type=o&format=json"
+  ```
+- `CH_API_KEY` — UK Companies House API key (free, requires registration): enables access to filing documents and person-of-significant-control data.
+
+### Build first — pnpm scripts needed in the project repo
+
+| Script | What it does |
+|---|---|
+| `pnpm run fetch-uk-legislation <act_url>` | Downloads current version of a UK Act from legislation.gov.uk as markdown |
+| `pnpm run fetch-us-cases <query> <court>` | CourtListener search, returns top 10 case summaries with citations |
+| `pnpm run fetch-eu-law <query>` | EUR-Lex search, extracts document list and metadata |
+
+**Paywall sources (Westlaw, LexisNexis, Practical Law):** No API access without a subscription. If access is available, manually retrieve the relevant extract and place it in Research Notes with a clear citation. Block the phase if the answer depends on a paywalled source that isn't available.
+
+---
+
 ## What you must not do
 
 - Give legal advice ("you should do X", "you are liable for Y", "you will win")

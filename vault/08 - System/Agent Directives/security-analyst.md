@@ -103,6 +103,68 @@ For each finding:
 
 ---
 
+## Agent tooling
+
+The following tools and sources are available at three readiness levels. State in the phase log which tools were run and what they returned.
+
+### Works immediately — no setup required
+
+**Dependency vulnerability scan** — run against any Node.js project:
+```bash
+npm audit --json 2>/dev/null | jq '.vulnerabilities | to_entries[] | {name: .key, severity: .value.severity, via: .value.via}'
+```
+
+**Secrets scan** — grep for common credential patterns across codebase:
+```bash
+grep -rn \
+  -e "password\s*=" \
+  -e "api_key\s*=" \
+  -e "secret\s*=" \
+  -e "private_key" \
+  -e "AKIA[0-9A-Z]{16}" \
+  --include="*.ts" --include="*.js" --include="*.json" --include="*.env" \
+  --exclude-dir=node_modules .
+```
+
+**Committed env file check:**
+```bash
+git log --all --full-history -- "*.env" ".env*"
+find . -name ".env*" -not -path "*/node_modules/*" -not -name ".env.example"
+```
+
+**Semgrep** (if installed) — runs community security rules:
+```bash
+semgrep --config=auto <path> --json | jq '.results[] | {check_id, path, message, severity}'
+```
+
+**Python dependency audit** (if applicable):
+```bash
+pip-audit --format=json 2>/dev/null
+safety check --json 2>/dev/null
+```
+
+### Needs API key in `.env`
+
+- `SNYK_TOKEN` — Snyk: deeper dependency graph analysis, fix advice, licence compliance. `snyk test` run in project root.
+- `GITHUB_TOKEN` — GitHub Security Advisories via API (public repos): rate limit increase and private repo access.
+  ```bash
+  curl -H "Authorization: Bearer $GITHUB_TOKEN" \
+    "https://api.github.com/repos/<owner>/<repo>/vulnerability-alerts"
+  ```
+- `SHODAN_API_KEY` — Shodan: external attack surface scan (open ports, exposed services) for a domain or IP. For infrastructure security reviews only.
+
+### Build first — pnpm scripts needed in the project repo
+
+| Script | What it does |
+|---|---|
+| `pnpm run security-audit` | Runs `npm audit`, semgrep, and secrets scan; outputs unified findings markdown |
+| `pnpm run check-headers <base_url>` | Hits local dev server endpoints, checks security headers (HSTS, CSP, X-Frame-Options, etc.) |
+| `pnpm run check-cors <base_url>` | Tests CORS configuration against a set of common bypass patterns |
+
+**Authorisation note:** Scripts that hit a live URL (`check-headers`, `check-cors`) must have the target URL listed as in-scope in the phase file. Don't run against external URLs without documentation.
+
+---
+
 ## Safety constraints (non-negotiable)
 
 - **Authorisation boundary.** Only analyse systems, codebases, and infrastructure explicitly in scope. Do not expand scope without documented authorisation.

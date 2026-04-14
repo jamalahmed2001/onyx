@@ -129,6 +129,66 @@ Multiple source rule: significant claims should be corroborated by at least two 
 
 ---
 
+## Agent tooling
+
+The following data sources are available at three readiness levels. Every factual claim must trace to one of these sources or a document in the bundle — never to memory. State sources used in the Agent Log.
+
+### Works immediately — no setup required
+
+**GDELT Project** — global news event database, no key:
+```bash
+# Search recent news coverage on a topic
+curl "https://api.gdeltproject.org/api/v2/doc/doc?query=<query>&mode=artlist&format=json&maxrecords=20"
+# Search for a specific entity/person
+curl "https://api.gdeltproject.org/api/v2/doc/doc?query=<query>+sourcecountry:UK&mode=artlist&format=json"
+```
+
+**Guardian API** — full articles, 500 free requests/day with test key:
+```bash
+curl "https://content.guardianapis.com/search?q=<query>&api-key=test&show-fields=bodyText&page-size=10"
+```
+
+**UK Companies House** — company directors, filings, incorporation date, registered address:
+```bash
+curl "https://api.company-information.service.gov.uk/search/companies?q=<company_name>"
+curl "https://api.company-information.service.gov.uk/company/<company_number>/officers"
+```
+
+**OpenCorporates** — company data across 140 jurisdictions:
+```bash
+curl "https://api.opencorporates.com/v0.4/companies/search?q=<company>&jurisdiction_code=gb"
+```
+
+**SEC EDGAR** — US company disclosures, insider transactions, beneficial ownership:
+```bash
+curl "https://efts.sec.gov/LATEST/search-index?q=%22<company>%22&dateRange=custom&startdt=2024-01-01"
+```
+
+### Needs API key in `.env`
+
+- `GUARDIAN_API_KEY` — Guardian full API: 5,000 requests/day, full article body text, tags, contributor data. Register free at open-platform.theguardian.com.
+  ```bash
+  curl "https://content.guardianapis.com/search?q=<query>&api-key=$GUARDIAN_API_KEY&show-fields=bodyText"
+  ```
+- `NEWS_API_KEY` — NewsAPI.org: news from 150,000 sources worldwide. 100 requests/day on free tier.
+  ```bash
+  curl "https://newsapi.org/v2/everything?q=<query>&from=<date>&sortBy=relevancy&apiKey=$NEWS_API_KEY"
+  ```
+- `CH_API_KEY` — UK Companies House full API: PSC (persons with significant control), charge registers, full filing documents.
+
+### Build first — pnpm scripts needed in the project repo
+
+| Script | What it does |
+|---|---|
+| `pnpm run fetch-gdelt-events <query> <from> <to>` | GDELT event search for a date range, formatted as markdown table |
+| `pnpm run fetch-companies-house <company_name>` | Companies House search + officer list + recent filings summary |
+| `pnpm run fetch-news <query> <from> <to>` | NewsAPI search, deduplicated, formatted as source list |
+| `pnpm run extract-pdf-text <pdf_path>` | Extracts text from a PDF document (leaked filings, public reports) for agent analysis |
+
+**Paywalled sources (FT, Bloomberg, Reuters subscription content):** Cannot be accessed programmatically. If a paywalled article is the primary source for a claim, note it as "seen by [publication name]" and flag in the right-of-reply section that the source should be obtained before publication.
+
+---
+
 ## What you must not do
 
 - State unverified claims as fact
