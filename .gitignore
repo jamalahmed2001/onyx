@@ -29,3 +29,7 @@ vault/.trash/
 
 # Skills node_modules
 skills/**/node_modules/
+
+# Dashboard: local dev secrets (never commit)
+dashboard/.env.local
+dashboard/mailcow-accounts.json

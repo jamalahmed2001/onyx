@@ -213,7 +213,8 @@ function discoverAllHubs(vaultRoot: string, projectsGlob: string): string[] {
 function discoverPhases(bundleDir: string): string[] {
   const phasesDir = path.join(bundleDir, 'Phases');
   if (!fs.existsSync(phasesDir)) return [];
-  return glob.sync('P*.md', { cwd: phasesDir, absolute: true }).sort((a, b) => {
+  // Match any letter-prefix phase files (P1, R1, C1, etc.) not just P-prefix
+  return glob.sync('[A-Z][0-9]*.md', { cwd: phasesDir, absolute: true }).sort((a, b) => {
     const na = parseInt(path.basename(a).match(/\d+/)?.[0] ?? '0', 10);
     const nb = parseInt(path.basename(b).match(/\d+/)?.[0] ?? '0', 10);
     return na - nb;
@@ -250,8 +251,13 @@ function discoverDocs(bundleDir: string, projectName: string): string[] {
 
   const docs: string[] = [];
 
-  // Docs/ and docs/ subdirectories
-  for (const dir of [path.join(bundleDir, 'Docs'), path.join(bundleDir, 'docs')]) {
+  // Docs/, docs/, Directives/, and Episodes/ subdirectories
+  for (const dir of [
+    path.join(bundleDir, 'Docs'),
+    path.join(bundleDir, 'docs'),
+    path.join(bundleDir, 'Directives'),
+    path.join(bundleDir, 'Episodes'),
+  ]) {
     if (fs.existsSync(dir)) {
       docs.push(...glob.sync('*.md', { cwd: dir, absolute: true }).filter(p => !isDailyNote(p)));
     }
@@ -703,7 +709,7 @@ created: ${today}
         : parseInt(path.basename(p).match(/\d+/)?.[0] ?? '0', 10);
       if (n <= 0) continue;
       const nameFromFm = String(node.frontmatter['phase_name'] ?? '').trim();
-      const nameFromFile = path.basename(p, '.md').replace(/^P\d+\s*-\s*/, '').trim();
+      const nameFromFile = path.basename(p, '.md').replace(/^[A-Z]\d+\s*-\s*/, '').trim();
       const name = nameFromFm || nameFromFile;
       phaseByNumber.set(n, { path: p, name });
     }
@@ -737,6 +743,12 @@ created: ${today}
       const parentTarget = groupPath ? path.basename(groupPath, '.md') : `${projectName} - Kanban`;
       const parentDisplay = groupPath ? path.basename(groupPath, '.md') : 'Kanban';
 
+      // Infer phase ID prefix from phase_id frontmatter or filename (e.g. R for R1, P for P1)
+      const phaseIdFromFm = String(phaseNode.frontmatter['phase_id'] ?? '').trim();
+      const phasePrefix = phaseIdFromFm
+        ? phaseIdFromFm.replace(/\d.*$/, '')   // strip trailing number: "R2" → "R"
+        : (path.basename(phasePath).match(/^([A-Z])\d/)?.[1] ?? 'P'); // fallback from filename
+
       // Find log by phase_number (robust against filename/frontmatter mismatch)
       let logPath: string;
       const existingLog = logByNumber.get(phaseNum);
@@ -756,7 +768,7 @@ created: ${today}
 ---
 ## 🔗 Navigation
 
-- [[${path.basename(phasePath, '.md')}|P${phaseNum} — ${phaseName}]]
+- [[${path.basename(phasePath, '.md')}|${phasePrefix}${phaseNum} — ${phaseName}]]
 - [[${logParent}|Agent Log Hub]]
 
 # L${phaseNum} — ${phaseName}
@@ -764,7 +776,7 @@ created: ${today}
 ## Entries
 
 `);
-        result.repairs.push({ file: logPath, action: `auto-created log note for P${phaseNum}` });
+        result.repairs.push({ file: logPath, action: `auto-created log note for ${phasePrefix}${phaseNum}` });
         logByNumber.set(phaseNum, { path: logPath, name: phaseName });
       }
 
@@ -773,7 +785,7 @@ created: ${today}
           { target: parentTarget, display: parentDisplay },
           { target: path.basename(logPath, '.md'), display: `L${phaseNum} — Execution Log` },
         ],
-        result, `Phase P${phaseNum} → ${parentDisplay} + Log`
+        result, `Phase ${phasePrefix}${phaseNum} → ${parentDisplay} + Log`
       );
     }
 
@@ -792,9 +804,10 @@ created: ${today}
 
       const navLinks: NavLink[] = [];
       if (pairedPhase) {
+        const pairedPrefix = (path.basename(pairedPhase.path).match(/^([A-Z])\d/)?.[1] ?? 'P');
         navLinks.push({
           target: path.basename(pairedPhase.path, '.md'),
-          display: `P${phaseNum} — ${pairedPhase.name}`,
+          display: `${pairedPrefix}${phaseNum} — ${pairedPhase.name}`,
         });
       }
       navLinks.push({ target: logParent, display: logParentDisplay });

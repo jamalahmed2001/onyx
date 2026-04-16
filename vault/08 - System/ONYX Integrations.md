@@ -167,3 +167,39 @@ updated: 2026-04-14
 **Pattern 3 — Two-lifecycle approach:** Engineering profile first (build the fetch scripts), then the operational directive uses them. The fetch script is a pnpm command with a stable interface (`pnpm run fetch-<thing> <args>`). The agent doesn't need to know the implementation — just the interface.
 
 **What to build for a new project:** Check which Tier 3 scripts the relevant directives need. Create a new engineering phase with task: `implement pnpm run fetch-<thing>` before the first operational phase that uses the data.
+
+---
+
+## Operational notes
+
+### When Tier 2/3 setup is missing
+If a directive declares a tool that needs an API key or a build-first script, and the key or script is absent at invocation time, current behaviour is inconsistent:
+
+- **Tool exists but key missing:** agent will attempt the call and get a 401 at runtime, often silently catching it and continuing with degraded output.
+- **Tool file absent entirely:** agent sees no tool doc and works without it.
+
+**Desired behaviour:** `onyx doctor` should surface both conditions before a run starts. Until that's implemented, check `onyx check <project>` output and `.env` before kicking off Tier 2/3 work.
+
+### Rate limits (Tier 1 free APIs)
+Several Tier 1 integrations have aggressive rate limits. When an agent fans out across many sources:
+
+| API | Rate limit | Mitigation in directive |
+|---|---|---|
+| PubMed E-utilities | 3 req/sec (10 with key) | Add `sleep 0.4` between calls; batch with `&id=1,2,3` |
+| SEC EDGAR | 10 req/sec | User-Agent header required (some endpoints 403 without it) |
+| CrossRef | 50 req/sec | No special handling needed |
+| PyPI / npm registry | Generous | No special handling |
+
+Directives that fan out aggressively should mention the backoff pattern explicitly rather than leaving the agent to discover it the hard way.
+
+### MCP availability
+PostHog, Sentry, and a few others are available as MCPs in interactive Claude sessions. ONYX agents run via `claude --print` (non-interactive), which does **not** load MCPs. When a directive needs one of these, it should prefer the REST API + API key path rather than assuming MCP is available.
+
+---
+
+## Roadmap
+
+- **`onyx doctor` gating for Tier 2/3 integrations.** Extend it to list the tools each project declares, check each tool's tier, and flag missing API keys or build-first scripts before `onyx run`.
+- **Tool inventory audit.** Cross-reference this doc against `08 - System/Tools/*.md`. Any tool listed here without a corresponding tool file should be marked 📋 *planned* or the tool file should be created.
+- **Rate-limit helper.** A small shared `sleep-between-calls` tool that directives using rate-limited APIs (PubMed, SEC EDGAR) can reference instead of inventing their own backoff pattern.
+- **MCP fallback routing.** If a future runtime mode loads MCPs (e.g. an interactive ONYX run), directives should declare "prefer MCP, fall back to REST." Today this distinction isn't expressed.

@@ -728,7 +728,7 @@ export default function Shell() {
               ) : (
                 <>
                   {tab === 'today'  && <TodayView  projects={data?.projects ?? []} onOpenFile={setDrawerPath} onRunCLI={runCLI} onOpenEmail={openEmail}/>}
-                  {tab === 'email'  && <EmailView key={emailBox} initialBox={emailBox}/>}
+                  {tab === 'email'  && <EmailView />}
                   {tab === 'kanban' && <KanbanView projects={data?.projects ?? []} onOpenFile={setDrawerPath} onRefresh={fetchData} onOpenProject={setDetailProject} onOpenProjectDiff={p => { setDetailProject(p); setDetailTab('diff'); }} onRunCLI={runCLI}/>}
                   {tab === 'vault'  && <VaultView  tree={data?.tree ?? []}         onOpenFile={setDrawerPath}/>}
                   {tab === 'runs'   && <RunsView   runs={data?.runs ?? []}          onOpenFile={setDrawerPath}/>}

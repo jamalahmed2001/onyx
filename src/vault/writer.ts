@@ -118,9 +118,12 @@ export function tickTask(absolutePath: string, taskLine: string): boolean {
   if (normalizedTarget) {
     for (let i = 0; i < fileLines.length; i++) {
       const line = fileLines[i]!;
-      if (!/^\s*[-*]\s*\[\s\]/.test(line)) continue;
-      const lineText = line.replace(/^\s*[-*]\s*\[\s\]\s*/, '').trim();
+      // Accept both unticked [ ] and already-ticked [x] (agent may tick it itself)
+      if (!/^\s*[-*]\s*\[\s*[x ]?\s*\]/.test(line)) continue;
+      const lineText = line.replace(/^\s*[-*]\s*\[\s*[x ]?\s*\]\s*/, '').trim();
       if (lineText === normalizedTarget) {
+        // Already ticked by the agent — no write needed, just report success
+        if (/^\s*[-*]\s*\[\s*x\s*\]/.test(line)) return true;
         fileLines[i] = line.replace(/\[\s\]/, '[x]');
         fs.writeFileSync(absolutePath, fileLines.join('\n'), 'utf-8');
         return true;
@@ -136,11 +139,14 @@ export function tickTask(absolutePath: string, taskLine: string): boolean {
 
   for (let i = 0; i < fileLines.length; i++) {
     const line = fileLines[i]!;
-    if (!/^\s*[-*]\s*\[\s\]/.test(line)) continue;
-    // The current line is a bare "- [ ]" — check its next non-empty line
-    if (line.replace(/^\s*[-*]\s*\[\s\]\s*/, '').trim()) continue; // has inline text, not bare
+    // Accept both unticked [ ] and already-ticked [x] for bare tasks
+    if (!/^\s*[-*]\s*\[\s*[x ]?\s*\]/.test(line)) continue;
+    const alreadyTicked = /^\s*[-*]\s*\[\s*x\s*\]/.test(line);
+    // The current line is a bare checkbox — check its next non-empty line
+    if (line.replace(/^\s*[-*]\s*\[\s*[x ]?\s*\]\s*/, '').trim()) continue; // has inline text, not bare
     if (!anchor) {
       // No anchor available — tick the first bare unchecked box
+      if (alreadyTicked) return true;
       fileLines[i] = line.replace(/\[\s\]/, '[x]');
       fs.writeFileSync(absolutePath, fileLines.join('\n'), 'utf-8');
       return true;
@@ -148,6 +154,7 @@ export function tickTask(absolutePath: string, taskLine: string): boolean {
     // Check next line matches anchor
     const nextLine = fileLines[i + 1]?.trim() ?? '';
     if (nextLine === anchor || nextLine.startsWith(anchor.slice(0, Math.min(anchor.length, 60)))) {
+      if (alreadyTicked) return true;
       fileLines[i] = line.replace(/\[\s\]/, '[x]');
       fs.writeFileSync(absolutePath, fileLines.join('\n'), 'utf-8');
       return true;

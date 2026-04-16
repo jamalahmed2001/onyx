@@ -52,19 +52,19 @@ Every project has a profile set in `Overview.md` frontmatter. The profile tells 
 - What bundle documents to create at init
 - What context to inject into the agent
 
-Nine profiles:
+Seven profiles ship today. Two more (`accounting`, `legal`) are specified below but **do not yet have profile files** — they're planned, not live. See the "Changes Needed" section at the end of this doc.
 
-| Profile | Domain | Key required fields | Acceptance gate |
-|---|---|---|---|
-| `general` | Catch-all — start here if unsure | none | all tasks checked + output documented |
-| `engineering` | Software with a git repo | `repo_path`, `test_command` | test command exits 0 |
-| `content` | Podcast, newsletter, video pipeline | `voice_profile`, `pipeline_stage` | safety filter + voice check |
-| `research` | Investigation, analysis, synthesis | `research_question`, `source_constraints`, `output_format` | source count + confidence gaps declared |
-| `operations` | System ops, incidents, monitoring | `monitored_systems`, `runbook_path` | runbook followed + outcome documented |
-| `trading` | Algorithmic strategies, exchange bots | `exchange`, `strategy_type`, `risk_limits`, `backtest_command` | backtest passes + risk compliance |
-| `experimenter` | Systematic experimentation, A/B testing | `hypothesis`, `success_metric`, `baseline_value` | result recorded + Cognition Store updated |
-| `accounting` | Bookkeeping, reconciliation, reporting | `ledger_path`, `reporting_period` | trial balance verified + human sign-off |
-| `legal` | Contracts, research, compliance | `jurisdiction`, `matter_type` | citations verified + professional review required |
+| Profile | Status | Domain | Key required fields | Acceptance gate |
+|---|---|---|---|---|
+| `general` | ✅ live | Anything | none | all tasks checked off |
+| `engineering` | ✅ live | Software with a git repo | `repo_path`, `test_command` | test command exits 0 |
+| `content` | ✅ live | Podcast, newsletter, video pipeline | `voice_profile`, `pipeline_stage` | safety filter + voice check |
+| `research` | ✅ live | Investigation, analysis, synthesis | `research_question`, `source_constraints`, `output_format` | source count + confidence |
+| `operations` | ✅ live | System ops, incidents, maintenance | `monitored_systems`, `runbook_path` | runbook followed + outcome documented |
+| `trading` | ✅ live | Algorithmic strategies, exchange bots | `exchange`, `strategy_type`, `risk_limits`, `backtest_command` | backtest passes + risk compliance |
+| `experimenter` | ✅ live | Systematic experimentation, A/B testing | `hypothesis`, `success_metric`, `baseline_value` | result recorded + Cognition Store updated |
+| `accounting` | 📋 planned | Financial records, reporting | `reporting_period`, `accounting_standards`, `entity_type` | trial balance checks + human sign-off |
+| `legal` | 📋 planned | Legal research, compliance | `jurisdiction`, `matter_type` | citations verified + human review |
 
 → Full specs: [[08 - System/Profiles/Profiles Hub.md|Profiles Hub]]
 
@@ -78,14 +78,12 @@ Two kinds:
 
 Set a directive on a phase by adding `directive: name` to the phase frontmatter. ONYX resolves it at runtime: project-local first, then system fallback.
 
-For **experimenter** projects: set `cycle_type: learn|design|experiment|analyze` and ONYX auto-wires the correct directive (no need to set `directive:` manually).
+For **experimenter** projects: set `cycle_type: learn|design|experiment|analyze` and ONYX auto-wires the correct directive (no need to set `directive:` manually):
+- `learn` / `design` → `experimenter-researcher`
+- `experiment` → `experimenter-engineer`
+- `analyze` → `experimenter-analyzer`
 
-**Workflow directives** are available system-wide — `accountant`, `investment-analyst`, `legal-researcher`, `data-analyst`, `security-analyst`, `clinical-researcher`, `journalist`, `marketing-strategist`, `general`, `knowledge-keeper`, `observer` + experimenter set. These encode non-trivial automatable processes: specific tool invocations, data protocols, structured output formats that a general agent wouldn't naturally produce. For each data-dependent directive, exact API calls are documented (Tier 1 free, Tier 2 keyed, Tier 3 build-first). No hallucinated data sources.
-
-Add your own: `onyx new directive <name>` — scaffolds a stub with the right structure.
-
-→ Directive index: [[08 - System/Agent Directives/Agent Directives Hub.md|Agent Directives Hub]]  
-→ Integration catalogue: [[08 - System/ONYX Integrations.md|ONYX Integrations]]
+→ Full reference: [[08 - System/Agent Directives/Agent Directives Hub.md|Agent Directives Hub]]
 
 ### Context injection order
 
@@ -119,6 +117,26 @@ backlog → planning → ready → active → completed
 
 To trigger a phase: set `state: ready` + tag `phase-ready` in frontmatter.
 To unblock: fix the issue → `onyx reset "Project Name"`.
+
+### Model tiers — routing complexity to the right model
+
+Every phase can declare a `complexity` field. ONYX uses this to pick the right model:
+
+| Complexity | Model | Use for |
+|---|---|---|
+| `light` | Haiku | Simple edits, formatting, renaming, small refactors |
+| `standard` | Sonnet *(default)* | Most work — feature development, research, writing |
+| `heavy` | Opus | Architecture decisions, complex debugging, legal/financial analysis |
+
+```yaml
+# Phase frontmatter — route this architecture phase to Opus
+complexity: heavy
+
+# Route a simple formatting pass to Haiku
+complexity: light
+```
+
+Models are configured in `onyx.config.json` under `model_tiers`. Change the model mapped to each tier without touching any phase files.
 
 ### Scheduling
 
@@ -227,10 +245,7 @@ onyx status
 # What is each project doing? (plain English)
 onyx explain
 
-# Run the single highest-priority ready phase (safest way to start)
-onyx next
-
-# Run one phase of one project
+# Run one phase of one project (safest to start)
 onyx run --project "ManiPlus" --once
 
 # Run all ready phases across all projects
@@ -240,8 +255,7 @@ onyx run
 onyx run --project "ManiPlus" --phase 2
 ```
 
-`onyx next` picks the highest-priority ready phase and runs it once — the safest single-step entry point.  
-`--once` does one loop iteration then stops. Use either while you're getting comfortable.
+`--once` does one iteration: find one ready phase, run it, stop. Use this while you're getting comfortable.
 
 ---
 
@@ -256,16 +270,16 @@ onyx status
 
 # Execution log for a specific project
 onyx logs "ManiPlus"
-onyx logs "ManiPlus" --recent    # most recent entries
+onyx logs "ManiPlus" --recent    # last 5 entries
 
 # Web dashboard (localhost:7070)
 onyx dashboard
 ```
 
-`onyx explain` is your primary debugging tool. It reads the vault directly (no LLM) and shows:
+`onyx explain` is your primary window into what's happening. It shows:
 - Active phase + which directive is running + acceptance criteria
-- Queued phases + their priorities + auto-wired directives
-- Blocked phases + the human requirement that needs resolving
+- Queued phases + their priorities
+- Blocked phases + how to unblock
 - Knowledge.md summary and Cognition Store state (for experimenter projects)
 
 ---
@@ -428,42 +442,41 @@ onyx init "Project" --profile content # create bundle
 
 # Visibility
 onyx explain                          # all projects, plain English
-onyx explain "Project"                # one project, detailed (no LLM — pure vault read)
+onyx explain "Project"                # one project, detailed
 onyx status                           # all projects, phase states
 onyx logs "Project"                   # execution log
-onyx logs "Project" --recent          # most recent entries
-onyx logs --audit                     # full audit trail
+onyx logs "Project" --recent          # last 5 entries
 
 # Execution
-onyx next                             # run single highest-priority ready phase
-onyx run                              # all ready phases, autonomous loop
+onyx run                              # all ready phases
 onyx run --project "Project"          # one project
-onyx run --once                       # single iteration then exit
-onyx run --phase 2                    # specific phase number
-onyx run --dry-run                    # preview without executing
+onyx run --once                       # single iteration
+onyx run --phase 2                    # specific phase
+onyx next "Project"                   # pick the next ready phase (priority-ordered)
 
 # Planning
 onyx plan "Project"                   # decompose + atomise
-onyx plan "Project" --extend          # add new phases to existing project
-onyx decompose "Project"              # Overview → phase stubs only
+onyx plan "Project" --extend          # append more phases to existing plan
+onyx decompose "Project"              # Overview → phase stubs
 onyx atomise "Project" 1              # one phase → tasks
+onyx daily-plan [date]                # time-blocked plan for the day
 
-# Phase state
-onyx ready "Project"                  # pick next backlog phase → set ready
-onyx ready "Project" 3                # set specific phase to ready
-onyx reset "Project"                  # unblock → ready (after fixing the blocker)
-onyx block "Project" "reason"         # manually block an active phase
-onyx set-state <path> ready           # force state change (for scripts)
+# State management
+onyx ready "Project" [phase]          # mark phase(s) ready (backlog → ready bypass)
+onyx block "Project" "<reason>"       # mark current phase blocked with a reason
+onyx reset "Project"                  # unblock → ready
+onyx heal                             # fix stale locks, drift
+onyx set-state <path> ready           # force state change
+onyx check "Project"                  # validate bundle shape + frontmatter
 
-# Maintenance
-onyx heal                             # fix stale locks, drift, graph links
-onyx check "Project"                  # validate vault state (fields, deps, directives)
+# Introspection
+onyx phase "Project" <name>           # print a phase file with resolved context
+onyx directive <name>                 # print a directive (system or project-local)
+onyx profile <name>                   # print a profile
+
+# Vault
 onyx consolidate "Project"            # manually trigger Knowledge consolidation
 onyx refresh-context "Project"        # re-scan repo, update Repo Context
-
-# Capture & daily work
-onyx capture "note text"              # append to Inbox.md
-onyx daily-plan                       # generate today's time-blocked plan
 
 # Integrations
 onyx dashboard                        # web dashboard on :7070
@@ -535,8 +548,16 @@ ONYX gets smarter in three layers:
 
 ## Reference
 
-- [[08 - System/Profiles/Profiles Hub.md|Profiles Hub]] — all 9 profiles with full specs
-- [[08 - System/Agent Directives/Agent Directives Hub.md|Agent Directives Hub]] — all system directives (15 professional roles + system roles)
-- [[08 - System/ONYX Integrations.md|ONYX Integrations]] — integration catalogue: APIs, tiers, env vars
-- [[08 - System/Agent Directives/ONYX Architecture Directive.md|ONYX Architecture Directive]] — full system internals
+- [[08 - System/Profiles/Profiles Hub.md|Profiles Hub]] — profile specs (7 live, 2 planned)
+- [[08 - System/Agent Directives/Agent Directives Hub.md|Agent Directives Hub]] — all system directives
+- [[08 - System/Agent Directives/ONYX Architecture Directive.md|ONYX Architecture Directive]] — full system internals (see §25 for audit vs code)
 - [[08 - System/Agent Directives/Observer Directive.md|Observer Directive]] — how to read system state
+- [[08 - System/ONYX - Zero-Code Architecture Vision.md|Zero-Code Architecture Vision]] — future direction: rebuild ONYX as directives + tools only
+
+---
+
+## Roadmap
+
+- **Write `accounting.md` and `legal.md` profiles.** Both are referenced in this doc but don't exist yet in `08 - System/Profiles/`. `accounting` is higher priority given `05 - Finance/` is active.
+- **Pick a policy on terminal phases.** Today `completed → planning` is a valid transition (phases can be re-opened). If you want audit-trail immutability, remove that transition from `src/fsm/states.ts`.
+- **See [[08 - System/ONYX Master Directive.md|ONYX Master Directive]]** for the directive-driven alternative to extending the TypeScript runtime.

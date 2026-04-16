@@ -1,917 +1,1403 @@
 ---
-tags: [system, architecture, directive, onyx]
-created: 2026-04-13
-updated: 2026-04-16
+title: ONYX Architecture Directive
+tags: [system, directive, architecture, onyx]
 type: directive
-version: "4.0"
+version: 4.0
+updated: 2026-04-16
+graph_domain: system
+up: Agent Directives Hub
+---
+## 🔗 Navigation
+
+**UP:** [[08 - System/Agent Directives/Agent Directives Hub.md|Agent Directives Hub]]
+**Related:** [[08 - System/ONYX - Zero-Code Architecture Vision.md|Zero-Code Architecture Vision]] — future direction
+
+# ONYX Architecture Directive
+
+> **Audience:** Any developer or AI agent working on or with the ONYX system.
+>
+> This document describes ONYX as it exists today: the runtime loop, the FSM, routing, the self-healer, and the CLI. §22 lists forward-looking work.
+
 ---
 
-# ONYX Architecture Directive v4.0
+## Table of Contents
 
-> **For agents working on ONYX itself.** Load this before reading any ONYX source file. It describes exactly what exists, how it works, and why — based on the current codebase.
+1. [System Philosophy](#1-system-philosophy)
+2. [Three-Layer Architecture](#2-three-layer-architecture)
+3. [Vault as State Mirror](#3-vault-as-state-mirror)
+4. [State Machines (FSM)](#4-state-machines-fsm)
+5. [Deterministic Routing Table](#5-deterministic-routing-table)
+6. [Entry Points](#6-entry-points)
+7. [Self-Healer](#7-self-healer)
+8. [Error Taxonomy & Retry Policy](#8-error-taxonomy--retry-policy)
+9. [Context Orchestration (QMD)](#9-context-orchestration-qmd)
+10. [Vault I/O Layer](#10-vault-io-layer)
+11. [Telemetry & Exec Log](#11-telemetry--exec-log)
+12. [Notification Chain](#12-notification-chain)
+13. [Linear Integration](#13-linear-integration)
+14. [Utility Layer](#14-utility-layer)
+15. [Constants & Configuration](#15-constants--configuration)
+16. [Public API Reference](#16-public-api-reference)
+17. [Developer Guide](#17-developer-guide)
+18. [Profiles & Directives System](#18-profiles--directives-system)
+19. [Knowledge Compounding & Experimenter Loop](#19-knowledge-compounding--experimenter-loop)
+20. [Phase Scheduling & Control](#20-phase-scheduling--control)
+21. [CLI Reference](#21-cli-reference)
+22. [Roadmap](#22-roadmap)
 
 ---
 
 ## 1. System Philosophy
 
-ONYX is a **vault-native agent orchestration layer**. It has three components:
+ONYX is a **deterministic, FSM-driven autonomous agent runtime** for managing software projects.
 
-1. **TypeScript CLI** (`src/`) — the controller, healer, executor, atomiser, consolidator. The nervous system.
-2. **Vault convention** — file names, folder layout, frontmatter fields. The contract.
-3. **Obsidian vault** — the only state store. Markdown files are ground truth.
+**Start here for roles/permissions:** [[08 - System/Agent Directives/Agent Roles & Contracts Directive.md|Agent Roles & Contracts Directive]].
 
-**Invariants that never change:**
+Its core principles:
 
-- The vault is the only state. No external database. No sidecar state. If it's not in a vault file, it didn't happen.
-- Phase is the unit of execution. Every project decomposes into phases. The phase lifecycle (FSM) is universal.
-- Agents are disposable. ONYX spawns them, they work, they exit. The vault persists. Swap the agent driver without changing anything else.
-- Knowledge compounds. Every completed phase feeds into Knowledge.md. Every subsequent agent reads it.
-- Healing is proactive. The healer runs before every execution loop. Drift doesn't accumulate.
-
-**What does NOT exist in ONYX (removed or never built):**
-
-- `Orchestrator.json` — removed. Config is `onyx.config.json`. State is vault frontmatter.
-- `ManifestV2` — removed. Phase state lives in frontmatter tags and `state:` field.
-- QMD (Query Metadata Document) — removed. Agents receive file paths via `--add-dir`, read natively.
-- `pipeline_atoms` / pipeline recipes — removed. The controller loop is a direct FSM, not a recipe pipeline.
-- `pipelineRunner.ts`, `controllerKernel.ts`, `intentClassifier.ts`, `stateTools.ts` — none of these exist. Old architecture.
-- Circuit breaker — removed. Retry logic is per-phase (3-strike). No global circuit breaker.
-- `ExecLog.md` — removed. Execution is logged to per-phase log notes (`Logs/L{n} - ...md`).
-- AGENT_WRITABLE boundary markers — used only in the managed block system for atomised plans. Not a general boundary.
+| Principle | Implementation |
+|-----------|----------------|
+| **Vault as source of truth** | All state lives in Obsidian markdown files. No database. |
+| **Deterministic routing** | Given (project_state, atoms, phases) → always the same mode. No LLM routing. |
+| **Self-healing** | Detect and repair drift on every run, before touching anything else. |
+| **Single writer** | All vault writes go through `writeBundle()`. Never `fs.writeFileSync` directly. |
+| **Error taxonomy** | Every failure is RECOVERABLE, BLOCKING, or INTEGRITY — never "unknown". |
+| **Atomic steps** | Each pipeline step is independently testable, has a `shouldRun()` guard, and is optionally retriable. |
+| **Observability** | Every dispatch logged to ExecLog.md. Every step telemetry'd to JSONL. Every error classified. |
 
 ---
 
-## 2. Source Structure
+## 2. Three-Layer Architecture
+
+```mermaid
+graph TB
+    subgraph Intelligence["🧠 Intelligence Layer"]
+        CC[Claude / Cursor Agent]
+        LLM[LLM Planning & Execution]
+    end
+
+    subgraph Runtime["⚙️ Runtime Layer (src/onyx/)"]
+        direction TB
+        K[controllerKernel.ts<br/>Autonomous Loop]
+        C[controller.ts<br/>Single Dispatch]
+        IC[intentClassifier.ts<br/>Weighted Signal Scoring]
+        PR[pipelineRunner.ts<br/>Step Execution Engine]
+        SH[selfHealer.ts<br/>Drift Repair]
+        ST[stateTools.ts<br/>Routing Table]
+        STEPS[steps/*.ts<br/>Atomic Pipeline Steps]
+        CO[contextOrchestrator.ts<br/>QMD Context Builder]
+        AB[agentBridge.ts<br/>Agent Spawner]
+    end
+
+    subgraph State["📁 State Layer (Vault)"]
+        direction TB
+        VS[vaultSkill.ts<br/>Sole IO Gateway]
+        OJ[Orchestrator.json<br/>Project Manifest]
+        PH[Phase Notes *.md<br/>Task Checklists + Plans]
+        KN[Knowledge.md<br/>Consolidated Context]
+        EL[ExecLog.md<br/>Append-only Event Log]
+    end
+
+    CC -->|invoke| C
+    K -->|batch dispatch| C
+    C -->|classify| IC
+    C -->|run| PR
+    C -->|repair first| SH
+    PR -->|execute| STEPS
+    STEPS -->|build context| CO
+    CO -->|spawn| AB
+    AB -->|call| CC
+    STEPS -->|read/write| VS
+    SH -->|read/write| VS
+    VS -->|file I/O| OJ
+    VS -->|file I/O| PH
+    VS -->|file I/O| KN
+    VS -->|file I/O| EL
+    K -->|evaluate| ST
+```
+
+**Rule:** Intelligence layer (Claude/Cursor) only touches vault files via the agent bridge or direct writes inside `<!-- AGENT_WRITABLE_* -->` markers. The runtime layer owns all structural state transitions.
+
+---
+
+## 3. Vault as State Mirror
+
+Every piece of project state lives as a human-readable markdown file. The Orchestrator.json is the message bus — it declares intent, and the runtime makes it real.
+
+### Bundle Structure
 
 ```
-src/
-├── cli/            # CLI entry points — one file per command
-│   ├── onyx.ts     # Main CLI router (commander.js)
-│   ├── run.ts      # onyx run
-│   ├── plan.ts     # onyx plan (decompose + atomise)
-│   ├── init.ts     # onyx init
-│   ├── status.ts   # onyx status
-│   ├── explain.ts  # onyx explain
-│   ├── heal.ts     # onyx heal
-│   ├── doctor.ts   # onyx doctor
-│   └── ...         # one file per remaining command
-│
-├── controller/
-│   ├── loop.ts     # Main orchestration loop (runController)
-│   └── router.ts   # Pure FSM router (state → operation, no IO)
-│
-├── executor/
-│   └── runPhase.ts # Phase execution: lock → preflight → shell fast-path → agent → retry → acceptance
-│
-├── planner/
-│   ├── atomiser.ts      # Phase stub → task plan (LLM or agent-write)
-│   ├── phasePlanner.ts  # Overview → phase stubs (decompose)
-│   ├── replan.ts        # Blocked phase → revised plan
-│   └── consolidator.ts  # Phase log → Knowledge.md extraction
-│
-├── healer/
-│   ├── index.ts         # Healer orchestration (runAllHeals)
-│   ├── staleLocks.ts    # Clear locks older than stale_lock_threshold_ms
-│   ├── drift.ts         # Normalise frontmatter drift, fix tag inconsistencies
-│   ├── migrateLogs.ts   # Migrate legacy log formats
-│   ├── repairProjectId.ts # Repair missing project_id in frontmatter
-│   └── recoverOrphanedLocks.ts # Recover phases locked by dead PIDs
-│
-├── vault/
-│   ├── reader.ts        # Read phase nodes, bundles, raw files
-│   ├── writer.ts        # Write vault files atomically (setPhaseTag, appendToLog, writeFile)
-│   ├── discover.ts      # Scan vault for phases, filter by state + dependencies
-│   ├── graphMaintainer.ts   # Maintain vault graph metadata
-│   ├── nodeConsolidator.ts  # Consolidate vault nodes
-│   ├── managedBlocks.ts     # AGENT_WRITABLE managed block I/O
-│   ├── knowledgeIndex.ts    # Semantic knowledge retrieval
-│   ├── repoScanner.ts       # Scan repo files for context
-│   └── ...
-│
-├── agents/
-│   ├── claudeCodeSpawn.ts   # Spawn claude CLI subprocess
-│   ├── cursorSpawn.ts       # Spawn Cursor agent
-│   ├── spawnAgent.ts        # Agent driver abstraction
-│   └── types.ts             # Agent type definitions
-│
-├── llm/
-│   ├── client.ts            # LLM API client (OpenRouter)
-│   ├── planningRouter.ts    # Route planning calls to right model/agent
-│   └── ...
-│
-├── shared/
-│   ├── types.ts             # ControllerConfig, PhaseNode, AgentDriver
-│   ├── schemas.ts           # Frontmatter validation schemas
-│   └── vault-parse.ts       # stateFromFrontmatter, tag parsing
-│
-├── config/
-│   └── load.ts              # loadConfig() — reads onyx.config.json + .env
-│
-├── lock/
-│   ├── acquire.ts           # Acquire phase lock (atomic)
-│   └── release.ts           # Release phase lock
-│
-├── fsm/
-│   └── states.ts            # Phase state machine definitions
-│
-├── linear/                  # Linear integration
-├── notify/                  # Notification dispatch
-├── skills/                  # phaseReview, etc.
-├── audit/                   # Audit trail
-└── utils/                   # complexityClassifier, log, etc.
+03 - Ventures/
+└── {Namespace}/{ProjectName}/
+    ├── Orchestrator.json           ← Project manifest / message bus
+    ├── {ProjectName} - Overview.md ← One-paragraph summary + top-level goals
+    ├── {ProjectName} - Kanban.md   ← (optional) Kanban view
+    ├── {ProjectName} - Knowledge.md← Consolidated context, decisions, Q&A
+    ├── Phase 01 - {Name}.md        ← Phase note (plan + tasks + log)
+    ├── Phase 02 - {Name}.md
+    ├── ExecLog.md                  ← Append-only dispatch log
+    └── Docs/                       ← Supporting documentation
+```
+
+### Orchestrator.json Schema (ManifestV2)
+
+```jsonc
+{
+  "project_id": "OpenClaw/Almani",        // Unique project identifier
+  "repo_path": "/home/jamal/dev/almani",  // Absolute path to code repo
+  "bundle_path": "10 - OpenClaw/Ventures/Almani", // Vault-relative
+  "status": "active",                     // ProjectState FSM value
+  "active_phase": 2,                      // Which phase is currently executing
+  "health": "healthy",                    // 'healthy' | 'degraded' | 'unknown'
+  "default_branch": "main",
+  "phases": {                             // Phase number → vault-relative path
+    "1": "10 - OpenClaw/Ventures/Almani/Phase 01 - Setup.md",
+    "2": "10 - OpenClaw/Ventures/Almani/Phase 02 - Core API.md"
+  },
+  "pipeline_atoms": [                     // Discrete work atoms (from Linear/atomiser)
+    { "atom": "import-linear", "status": "complete" },
+    { "atom": "plan", "status": "complete" },
+    { "atom": "execute", "status": "active" }
+  ],
+  "linear_project_id": "PROJ-123",        // Linear project ID
+  "linear_epic_id": "LIN-456",            // Root Linear epic
+  "test_command": "pnpm test",
+  "lint_command": "pnpm lint"
+}
+```
+
+### Phase Note Structure
+
+```markdown
+---
+status: active
+phase_status_tag: active
+phase_name: Core API
+linear_issue_id: LIN-789
+---
+
+# Phase 02 — Core API
+
+## 📂 Tasks
+- [x] **High-level goal 1** ← Auto-ticked on phase completion
+- [ ] **High-level goal 2**
+
+## 📋 Implementation Plan
+<!-- AGENT_WRITABLE_START:phase-plan -->
+- [ ] **Task 1:** Set up Express router structure
+  - Files: `src/api/router.ts`, `src/api/middleware.ts`
+  - Symbols: `createRouter`, `authMiddleware`
+  - Steps: Create file → define routes → add middleware
+  - Validation: `GET /health` returns 200
+
+- [ ] **Task 2:** Implement auth middleware
+  ...
+<!-- AGENT_WRITABLE_END:phase-plan -->
+
+## ✅ Acceptance Criteria
+- [ ] All endpoints return typed responses
+- [ ] Auth middleware covers all routes
+
+## 🚧 Blockers
+(none)
+
+## Agent Log
+- 2026-03-25T10:00:00Z — Phase transitioned: planned → ready (plan_created)
+- 2026-03-25T10:05:00Z — Phase transitioned: ready → active (execution_started)
 ```
 
 ---
 
-## 3. Controller Loop
+## 4. State Machines (FSM)
 
-**Entry point:** `src/controller/loop.ts` → `runController(config, options)`
+Three independent FSMs track state at different granularities.
 
-Called by `onyx run`. The full loop:
+### 4.1 Project State
 
-```
-1. runAllHeals(config)               → clear stale locks, fix drift, repair IDs
-2. maintainVaultGraph(config)        → update graph metadata
-3. consolidateVaultNodes(config)     → node consolidation
-4. detectDependencyCycles(allPhases) → warn on deadlocks, abort if cycles found
-5. discoverAllPhases(vaultRoot, glob)→ load all phase nodes
-6. For each phase:
-     routePhase(phase)               → returns { op, phaseNode, reason? }
-     Switch on op:
-       'atomise'         → atomisePhase() → setPhaseTag ready
-       'execute'         → runPhase()
-                           ↳ on complete: consolidatePhase() + runPhaseReview()
-                           ↳ on blocked:  consolidatePhase() + replanPhase()
-       'surface_blocker' → log blocker, notify human
-       'wait'            → skip (atomiser in flight)
-       'skip'            → skip (completed)
-7. If --once flag: exit after first actionable phase
-8. If no actionable phases remain: exit
-9. Repeat (up to maxIterations)
+```mermaid
+stateDiagram-v2
+    [*] --> draft : genesis()
+    draft --> active : start_project
+    active --> blocked : blocker_raised
+    active --> complete : all_phases_done
+    blocked --> active : blocker_cleared
+    complete --> archived : archive_requested
 ```
 
-**SIGINT / SIGTERM:** The loop catches signals. On interrupt, the current phase writes a checkpoint file (`.onyx-continue-P{n}.md`) so execution can resume cleanly with `onyx run`.
+| State | Meaning | Kernel Action |
+|-------|---------|---------------|
+| `draft` | Created, not yet active | `placement-only` (just record intent) |
+| `active` | Work in progress | `full-execute` (run the full pipeline) |
+| `blocked` | Manual intervention needed | `status` (surface blocker, don't advance) |
+| `complete` | All phases done | `uplink` (sync completion to Linear) |
+| `archived` | No further work | `null` (skip entirely) |
 
-**Hard limits:** `maxIterations` (default 20) prevents infinite loops. If the limit is hit, the loop exits with a warning.
+### 4.2 Phase State
 
----
+```mermaid
+stateDiagram-v2
+    [*] --> backlog : phase_created
+    backlog --> planning : atomisation_started
+    backlog --> ready : atomisation_skipped
+    planning --> ready : atomisation_complete
+    planning --> backlog : atomisation_failed
+    ready --> active : execution_started
+    ready --> planning : replan_requested
+    active --> completed : all_tasks_done
+    active --> blocked : blocker_raised
+    blocked --> active : blocker_cleared
+    blocked --> planning : replan_requested
+    completed --> planning : re_open_for_replan
+```
 
-## 4. Router
-
-**File:** `src/controller/router.ts`
-
-**Principle:** Pure function. No IO. No side effects. Takes a `PhaseNode`, returns an `Operation`. This is the only place phase state maps to action.
+Authoritative transition table — from `src/fsm/states.ts`:
 
 ```typescript
-function routePhase(phase: PhaseNode): RouteResult {
-  const state = stateFromFrontmatter(phase.frontmatter);
+export const PHASE_TRANSITIONS: Record<PhaseState, PhaseState[]> = {
+  backlog:   ['planning', 'ready'],
+  planning:  ['ready', 'backlog'],
+  ready:     ['active', 'planning'],
+  active:    ['completed', 'blocked'],
+  blocked:   ['active', 'planning'],
+  completed: ['planning'],                // Not terminal from a routing POV
+};
+```
+
+| State | Valid Next States | Routing Operation (from `routePhase`) | Healer Touches? |
+|-------|-------------------|---------------------------------------|-----------------|
+| `backlog`   | planning, ready       | `atomise`          | No |
+| `planning`  | ready, backlog        | `wait` (atomiser in flight) | No |
+| `ready`     | active, planning      | `execute`          | No |
+| `active`    | completed, blocked    | `execute` (stale-lock recovery path) | Yes — clears stale locks so next tick re-acquires cleanly |
+| `blocked`   | active, planning      | `surface_blocker`  | Yes — frontmatter drift only |
+| `completed` | planning              | `skip`             | No |
+
+> **Terminal state:** `completed` (per `isTerminal()` in `src/fsm/states.ts`). Routing treats it as skip-able, but the transition table still permits `completed → planning` so a phase can be re-opened for replanning without creating a new phase.
+
+### 4.3 Task State
+
+```mermaid
+stateDiagram-v2
+    [*] --> todo : task_discovered
+    todo --> in_progress : task_started
+    todo --> done : task_completed
+    in_progress --> blocked : blocker_raised
+    in_progress --> done : task_completed
+    blocked --> in_progress : blocker_cleared
+```
+
+### 4.4 Key FSM Functions
+
+Module: `src/fsm/states.ts`.
+
+```typescript
+// src/fsm/states.ts
+export const PHASE_TRANSITIONS: Record<PhaseState, PhaseState[]>
+export function canTransition(from: PhaseState, to: PhaseState): boolean
+export function isTerminal(state: PhaseState): boolean
+// Re-exported from src/shared/vault-parse.js:
+export { normalizeState as normalizeTag, stateToTag as toTag }
+```
+
+Frontmatter mutation lives in `src/vault/writer.ts`. Transition log appending happens inline inside the executor.
+
+---
+
+## 5. Deterministic Routing Table
+
+The dispatcher is `routePhase()` in `src/controller/router.ts`. Given a phase's frontmatter `status`, it returns exactly one of five operations — `atomise`, `wait`, `execute`, `surface_blocker`, or `skip`. Routing is per-phase; there is no project-level routing table.
+
+```mermaid
+flowchart TD
+  P[PhaseNode] --> S{frontmatter.status}
+  S -->|backlog|    ATM[op: atomise]
+  S -->|planning|   WAIT[op: wait<br/>reason: Atomiser in flight]
+  S -->|ready|      EX1[op: execute]
+  S -->|active|     EX2[op: execute<br/>stale-lock recovery]
+  S -->|blocked|    SB[op: surface_blocker]
+  S -->|completed|  SK[op: skip<br/>reason: Already completed]
+```
+
+### Routing Code (verbatim from `src/controller/router.ts`)
+
+```typescript
+export type Operation =
+  | { op: 'atomise';         phaseNode: PhaseNode }
+  | { op: 'execute';         phaseNode: PhaseNode }
+  | { op: 'surface_blocker'; phaseNode: PhaseNode }
+  | { op: 'wait';            phaseNode: PhaseNode; reason: string }
+  | { op: 'skip';            reason: string };
+
+export function routePhase(phaseNode: PhaseNode): Operation {
+  const state = stateFromFrontmatter(phaseNode.frontmatter);
   switch (state) {
-    case 'backlog':   return { op: 'atomise',         phaseNode: phase };
-    case 'planning':  return { op: 'wait',             phaseNode: phase, reason: 'Atomiser in flight' };
-    case 'ready':     return { op: 'execute',          phaseNode: phase };
-    case 'active':    return { op: 'execute',          phaseNode: phase }; // stale-lock recovery
-    case 'blocked':   return { op: 'surface_blocker',  phaseNode: phase };
-    case 'completed': return { op: 'skip',             reason: 'Already completed' };
+    case 'backlog':   return { op: 'atomise',         phaseNode };
+    case 'planning':  return { op: 'wait',            phaseNode, reason: 'Atomiser in flight' };
+    case 'ready':     return { op: 'execute',         phaseNode };
+    case 'active':    return { op: 'execute',         phaseNode };
+    case 'blocked':   return { op: 'surface_blocker', phaseNode };
+    case 'completed': return { op: 'skip',            reason: 'Already completed' };
   }
 }
 ```
 
-**Why `active` → `execute`:** If an agent died mid-phase and left the lock (state remains `active`), the healer clears the stale lock and the router resumes execution. The phase doesn't get stuck.
+### Controller Loop (from `src/controller/loop.ts`)
+
+The outer loop (`runLoop`) wraps routing:
+
+```
+1. notify controller_started
+2. runAllHeals → notify heal_complete
+3. maintainVaultGraph (fractal link integrity)
+4. discoverAllPhases → dependenciesMet filter → cycle detection
+5. If no ready phases: notify controller_idle, return
+6. For each actionable phase: routePhase → dispatch to atomiser/executor/consolidator/surface
+7. notify per-action event
+8. Repeat until no work OR maxIterations OR SIGINT/SIGTERM
+```
+
+Consolidation is **not** a separate routing op — it runs inline inside the executor path immediately after a phase transitions to `completed`. There is no `PROJECT_STATE_RECIPE` or `PHASE_STATE_OPS` map in the current codebase.
+
 
 ---
 
-## 5. Execution
+## 6. Entry Points
 
-**File:** `src/executor/runPhase.ts`
+ONYX is invoked exclusively through the CLI. Each command maps to a function call inside `src/`:
 
-Full execution sequence for a single phase:
+### 6.1 `onyx run` — the loop
 
-```
-1. resolveContextPaths()   — determine profile, directive, context docs for this phase
-2. backup phase file       — write .bak before touching anything
-3. acquireLock()           — write locked_by, locked_at, lock_pid, lock_ttl_ms to frontmatter
-4. preflight()             — validate required_fields from profile; fatal if any missing
-5. setPhaseTag('active')   — tag: phase-active
-6. buildPrompt()           — lean prompt: file paths only (not content injection)
-7. shell fast-path check   — if all tasks are whitelisted shell commands, run directly (no agent)
-8. spawnAgent()            — spawn claude CLI subprocess with --add-dir paths
-9. task loop:
-     selectTask()          — find next unchecked checkbox
-     dispatch to agent     → agent executes task → ticks checkbox → writes output
-     on BLOCKED:           → 3-strike retry → writeHumanRequirement + block if 3 strikes
-10. acceptanceMet()        — check ## Acceptance Criteria checkboxes
-11. On accepted:
-     setPhaseTag('completed')
-     git tag 'onyx/P{n}-done'  (if repo_path exists and git repo)
-     releaseLock()
-12. Return result for consolidation
-```
-
-### Context path resolution
+The primary autonomous entry point. Calls `runLoop()` in `src/controller/loop.ts`.
 
 ```typescript
-interface ContextPaths {
-  profileName:    string;        // e.g. 'engineering'
-  profilePath:    string;        // 08 - System/Profiles/engineering.md
-  requiredFields: string[];      // from profile frontmatter
-  directivePath:  string | null; // resolved directive file or null
-  overviewPath:   string;        // Project/Overview.md
-  knowledgePath:  string;        // Project/Knowledge.md
-  repoPath:       string | null; // from overview frontmatter repo_path
-  bundleDir:      string;        // Project bundle folder
-  addDirs:        string[];      // [bundleDir] + [repoPath if valid]
-  checkpointPath: string;        // .onyx-continue-P{n}.md
-  // ...and source context, log paths, etc.
+// src/controller/loop.ts
+export async function runLoop(config: ControllerConfig, opts: RunOptions = {}): Promise<IterationResult[]>
+
+export interface RunOptions {
+  projectFilter?: string;
+  phaseFilter?: number;
+  dryRun?: boolean;
+  once?: boolean;
 }
 ```
 
-### Directive resolution
+Each iteration:
 
-1. Read `directive:` from phase frontmatter
-2. Look for `{bundleDir}/Directives/{name}.md` — project-local override first
-3. Fall back to `{vaultRoot}/08 - System/Agent Directives/{name}.md`
-4. If not found: warn + skip (not fatal)
-
-**Experimenter auto-wiring:** If `directive:` is absent but `cycle_type:` is set on an experimenter-profile phase:
-
-```typescript
-const cycleMap = {
-  learn:      'experimenter-researcher',
-  design:     'experimenter-researcher',
-  experiment: 'experimenter-engineer',
-  analyze:    'experimenter-analyzer',
-};
+```mermaid
+flowchart LR
+  A[notify controller_started] --> B[runAllHeals]
+  B --> C[maintainVaultGraph]
+  C --> D[discoverAllPhases]
+  D --> E{any phase actionable?}
+  E -->|no| I[notify controller_idle → exit]
+  E -->|yes| F[routePhase → op]
+  F --> G[dispatch op to atomiser / executor / consolidator / surface]
+  G --> H[notify per-action event]
+  H --> E
 ```
 
-### The lean prompt pattern
+Halt conditions (from `runLoop`):
+- No actionable phases discovered
+- `opts.once` is true after one iteration
+- `config.max_iterations` reached
+- `SIGINT` / `SIGTERM` (graceful — finishes current action)
 
-`buildPrompt()` does NOT inject file content. It points the agent at file paths:
+### 6.2 `onyx next` — pick the next ready phase
 
-```
-Read these files before starting:
-- {directivePath}      (who you are)
-- {profilePath}        (domain rules + acceptance gate)
-- {overviewPath}       (project goals + constraints)
-- {knowledgePath}      (all prior learnings)
-- {contextDocPath}     (Repo Context / Source Context / Research Brief)
-- {phasePath}          (what to do right now)
+`src/cli/onyx.ts` → prints the highest-priority ready phase without executing. Useful for dashboards and scripts.
 
-Your working directories: {addDirs}
-Current task: {currentTask}
-```
+### 6.3 Plan commands
 
-The agent reads the actual vault files natively via `--add-dir`. No content duplication. Context stays tight.
-
-### 3-Strike retry
-
-```
-consecutiveFailures  0-2  → retry with revised prompt
-consecutiveFailures  3    → writeHumanRequirement("## Human Requirements\n...")
-                           → setPhaseTag('blocked')
-                           → releaseLock()
-                           → return { blocked: true }
-```
-
-Self-reported blockers: if agent output contains `BLOCKED: <reason>`, it counts as a failure.
-
-### Shell fast-path
-
-Safe whitelisted commands (ls, git status, npm test, echo, cat, etc.) can be executed directly without spawning an agent process. This keeps simple validation phases fast.
-
-### Complexity classifier
-
-`src/utils/complexityClassifier.ts` — reads task content and phase frontmatter to route to the right model tier:
-
-| `complexity:` frontmatter | Model tier | Default model |
+| CLI | Internal call | Purpose |
 |---|---|---|
-| `light` | light | claude-haiku-4-5 |
-| *(unset)* | standard | claude-sonnet-4-6 |
-| `heavy` | heavy | claude-opus-4-6 |
-| *(planning calls)* | planning | claude-opus-4-6 |
+| `onyx plan <project>` | `phasePlanner.planProject()` | Decompose `Overview.md` → phase stubs, then atomise each phase |
+| `onyx plan <project> <n>` | `atomiser.atomisePhase(n)` | Atomise a single phase |
+| `onyx plan <project> --extend` | `phasePlanner.extendProject()` | Append new phases to an existing plan |
+| `onyx decompose <project>` | `phasePlanner.decompose()` | Generate phase stubs only (no atomisation) |
+| `onyx atomise <project> [n]` | `atomiser.atomisePhase(n)` | Explicit atomise |
 
----
+### 6.4 State control commands
 
-## 6. Atomising
+| CLI | Purpose |
+|---|---|
+| `onyx ready <project> [phase]` | Flip `backlog` (or `planning`) → `ready` |
+| `onyx block <project> "<reason>"` | Flip active phase → `blocked` with reason recorded |
+| `onyx reset [project]` | Unblock → `ready` |
+| `onyx set-state <path> <state>` | Force state transition (dashboard/scripts) |
 
-**File:** `src/planner/atomiser.ts`
+### 6.5 Integrity commands
 
-Converts a phase stub (`state: backlog`) into a task plan with checkboxes.
-
-Two strategies, selected by `planningUsesAgent()`:
-
-**LLM direct** (default): Uses `chatCompletion()` → OpenRouter → returns task plan as text → written into phase file between managed block markers.
-
-**Agent-write**: Spawns a Claude Code agent instructed to read the phase, explore the repo, and write the plan directly using Edit/Write tools. Used when the phase requires deep repo understanding.
-
-**Managed block markers:**
-```
-<!-- AGENT_WRITABLE_START:phase-plan -->
-## Implementation Plan
-### [T1] Task name
-**Files:** `path/to/file.ts`
-**Steps:** ...
-**Validation:** ...
-**DoD:** ...
-- [ ] [T1.1] Sub-task
-- [ ] [T1.2] Sub-task
-<!-- AGENT_WRITABLE_END:phase-plan -->
-```
-
-Agents MUST write tasks inside this block. The managed block system (`src/vault/managedBlocks.ts`) handles reading and replacing content between these markers.
-
-**After atomising:** Phase tag transitions from `phase-backlog` → `phase-ready`.
-
-**GROUNDING RULES (enforced via system prompt):**
-- `Files:` lines must reference files that exist in the repo tree, or be marked `(new)`
-- Do not invent file paths
-- Validation steps must use commands that exist (check package.json scripts)
-
----
-
-## 7. Replanning
-
-**File:** `src/planner/replan.ts`
-
-Called when a phase blocks after 3 consecutive failures. The replanner:
-
-1. Reads the phase note (including `## Human Requirements` written by the executor)
-2. Reads Knowledge.md and the blocker context
-3. Calls the LLM with a revised plan prompt
-4. Writes a new implementation plan back to the phase file (replacing the old one)
-5. Sets phase tag back to `phase-ready` (or leaves as `blocked` if replanning itself fails)
-
-**Replan limit:** After 3 consecutive replan attempts, the phase stays blocked and surfaces to the human.
-
----
-
-## 8. Knowledge Consolidation
-
-**File:** `src/planner/consolidator.ts`
-
-Called after every phase execution (completed AND blocked). Extracts structured learnings from the phase log.
-
-**System prompt instructs the LLM to produce:**
-```json
-{
-  "learnings": ["reusable pattern or technique — 1-2 sentences, 2-5 items"],
-  "decisions": ["Chose X over Y because Z — 1-3 items or []"],
-  "gotchas":   ["X fails when Y, use Z instead — 1-3 items or []"]
-}
-```
-
-**Output written to Knowledge.md:** Appended under `## Learnings`, `## Decisions`, `## Gotchas` sections.
-
-**Cross-project principles:** A second LLM call deduplicates learnings against `08 - System/Cross-Project Knowledge.md`. Only genuinely new, project-agnostic principles get added. Each new entry includes: name, rule, why (failure mode it prevents), first_seen (project + context).
-
-**Both outcomes captured:** Blocked phase logs generate gotchas. Completed phase logs generate learnings + decisions. Neither is skipped.
-
----
-
-## 9. Healer
-
-**File:** `src/healer/index.ts` — orchestrates all 5 healers via `runAllHeals(config)`
-
-Called at the start of every `onyx run` and by `onyx heal`.
-
-### 5 repair types
-
-| Healer | File | What it fixes |
+| CLI | Internal call | Purpose |
 |---|---|---|
-| `staleLocks` | `healer/staleLocks.ts` | Phases locked longer than `stale_lock_threshold_ms` (default 5 min) → clear lock fields, reset to `phase-ready` |
-| `drift` | `healer/drift.ts` | Frontmatter drift: normalise `state` vs `tags` inconsistencies, fix tag format, remove duplicates |
-| `migrateLogs` | `healer/migrateLogs.ts` | Migrate legacy log formats to current `Logs/L{n} - ...md` structure |
-| `repairProjectId` | `healer/repairProjectId.ts` | Add missing `project_id` field to phase frontmatter based on folder path |
-| `recoverOrphanedLocks` | `healer/recoverOrphanedLocks.ts` | Find phases locked by PIDs that no longer exist → clear lock, reset to ready |
+| `onyx doctor` | pre-flight checks | Validates config, vault, API keys, `claude` CLI availability |
+| `onyx heal` | `runAllHeals()` | Clears stale locks + runs graph maintenance |
+| `onyx check <project>` | bundle validator | Read-only: validates bundle shape + frontmatter |
 
-### HealAction types
+### 6.6 Observability
 
-```typescript
-type HealAction =
-  | 'stale_lock_cleared'
-  | 'frontmatter_drift_fixed'
-  | 'tag_normalized'
-  | 'missing_section_detected'
-  | 'orphaned_lock_field_cleared'
-  | 'replan_count_reset'
-  | 'duplicate_nav_removed'
-  | 'project_id_repaired'
-```
+| CLI | Purpose |
+|---|---|
+| `onyx status [project]` | Phase states for all projects (or one) |
+| `onyx explain [project]` | Plain-English summary |
+| `onyx logs <project> [--audit]` | Execution log (add `--audit` for full trail) |
 
-Each healer returns a list of `HealAction` objects. The full set is logged to stdout and returned to the controller.
+### 6.7 Knowledge + capture
+
+| CLI | Purpose |
+|---|---|
+| `onyx consolidate <project>` | Manually run the consolidator for a project |
+| `onyx monthly-consolidate` | Roll up monthly logs |
+| `onyx refresh-context <project>` | Re-scan the repo, update Repo Context |
+| `onyx capture "<text>"` | Append to `00 - Dashboard/Inbox.md` |
+| `onyx research <topic>` | Research-step dispatch |
+| `onyx daily-plan [date]` | Time-blocked daily plan |
+
+### 6.8 Linear integration
+
+| CLI | Purpose |
+|---|---|
+| `onyx import <linearProjectId>` | Import Linear project as vault bundle |
+| `onyx linear-uplink [project]` | Push vault phase state to Linear |
+
+### 6.9 Introspection
+
+| CLI | Purpose |
+|---|---|
+| `onyx phase <project> <name>` | Print a phase with its resolved context |
+| `onyx directive <name>` | Print a directive (bundle-local or system) |
+| `onyx profile <name>` | Print a profile |
+
+### 6.10 Dashboard
+
+| CLI | Purpose |
+|---|---|
+| `onyx dashboard [port]` | Next.js dashboard (default `:7070`) |
+
+### 6.11 Project bootstrap
+
+| CLI | Internal call | Purpose |
+|---|---|---|
+| `onyx init [name]` | bundle generator | Interactive project creation (prompts for profile) |
 
 ---
 
-## 10. Vault I/O
 
-**Files:** `src/vault/reader.ts`, `src/vault/writer.ts`
+## 7. Self-Healer
 
-### Reader
+Runs as the first action of every `runLoop` iteration, before phase discovery.
 
 ```typescript
-// Read a single phase node (frontmatter + body)
-readPhaseNode(absolutePath: string): PhaseNode
-
-// Read a raw file as string (null if not found)
-readRawFile(absolutePath: string): string | null
-
-// Read a full project bundle
-readBundle(bundleDir: string): VaultBundle
+// src/healer/index.ts
+export function runAllHeals(config: ControllerConfig): { applied: number; detected: number }
 ```
 
-### PhaseNode
+```mermaid
+flowchart LR
+    SH[runAllHeals] --> SL[clear stale locks<br/>age > stale_lock_threshold_ms]
+    SH --> GM[maintainVaultGraph<br/>fractal parent↔child wikilinks]
+```
+
+### Current repair types
+
+| Type | Detection | Repair |
+|------|-----------|--------|
+| `stale_lock` | Lock file mtime > `stale_lock_threshold_ms` (default 5 min) | Delete lock file |
+| `graph_drift` | Parent note missing a wikilink back from a child, or vice versa | Rewrite the link into the correct note |
+
+All vault repairs go through the vault writer (`src/vault/writer.ts`) — never direct `fs.writeFileSync`.
+
+Potential future repair types (see §22): `frontmatter_drift`, `orphaned_phase`, `stale_session`, `broken_wikilink`.
+
+---
+
+## 8. Error Taxonomy & Retry Policy
+
+### Three Failure Classes
+
+```mermaid
+graph TD
+    ERR[Error] --> CLASS{classifyError}
+    CLASS -->|corruption / schema mismatch / FSM_INVALID / vault structure| I[INTEGRITY\nHalt kernel immediately]
+    CLASS -->|timeout / ETIMEDOUT / 429 / rate-limit / ENOENT spawn| R[RECOVERABLE\nRetry with backoff]
+    CLASS -->|everything else| B[BLOCKING\nSkip project, increment circuit breaker]
+```
 
 ```typescript
-interface PhaseNode {
-  path:        string;                       // Absolute path
-  exists:      boolean;                      // false if file missing
-  frontmatter: Record<string, unknown>;      // Parsed YAML frontmatter
-  body:        string;                       // Content after frontmatter
-  raw:         string;                       // Full file text
+// src/onyx/errors.ts
+enum FailureClass {
+  RECOVERABLE = 'RECOVERABLE',  // Transient: will self-resolve
+  BLOCKING    = 'BLOCKING',     // Needs human triage
+  INTEGRITY   = 'INTEGRITY',    // Structural corruption — halt now
 }
 ```
 
-### Writer
+### Error Classes
 
 ```typescript
-// Set phase tag state (e.g. 'phase-ready', 'phase-active', 'phase-blocked', 'phase-completed')
-setPhaseTag(path: string, tagSuffix: string): void
-
-// Append timestamped entry to the phase's log note
-appendToLog(logNotePath: string, content: string): void
-
-// Write any file atomically
-writeFile(absolutePath: string, content: string): void
-
-// Derive the log note path for a phase
-deriveLogNotePath(phasePath: string, bundleDir: string): string
+class GZError extends Error {
+  failureClass: FailureClass;
+  component: string;
+  retryable: boolean;
+}
+class RecoverableError extends GZError { } // failureClass = RECOVERABLE
+class BlockingError    extends GZError { } // failureClass = BLOCKING
+class IntegrityError   extends GZError { } // failureClass = INTEGRITY
 ```
 
-**Rule:** All vault writes go through the writer module. Never call `fs.writeFileSync` on vault files directly from controller, healer, or executor code.
+### Retry Policies
+
+| Policy | Max Attempts | Backoff | Retries On |
+|--------|-------------|---------|------------|
+| `RECOVERABLE_POLICY` | 3 | `1000 × 2^n + rand(0-500ms)` | RECOVERABLE only |
+| `AGENT_POLICY` | 2 | `2000 × 2^n + rand(0-1000ms)` | RECOVERABLE only |
+| `NO_RETRY` | 1 | none | never |
+
+```typescript
+withRetry<T>(fn: () => Promise<T>, policy: RetryPolicy, onRetry?: (attempt, err) => void): RetryResult<T>
+```
+
+### FlowResult Error Codes
+
+| Code | Class | Meaning |
+|------|-------|---------|
+| `REFINER_FATAL` | INTEGRITY | Orchestrator.json corrupted — kernel halts |
+| `FSM_INVALID_TRANSITION` | INTEGRITY | Illegal phase state transition |
+| `PIPELINE_CRASH` | BLOCKING | Unhandled exception in pipeline |
+| `CHECKS_FAILED` | BLOCKING | Postcondition violations after execute |
+| `LINEAR_IMPORT_FAILED` | RECOVERABLE | Linear API error during import |
+| `LINEAR_UPLINK_FAILED` | RECOVERABLE | Linear API error during uplink |
+| `LINEAR_SYNC_FAILED` | RECOVERABLE | Linear sync API error |
+
+---
+
+## 9. Context Orchestration (QMD)
+
+Every agent invocation receives a structured context string (QMD format) that scopes exactly what the agent needs.
+
+```typescript
+// src/onyx/contextOrchestrator.ts
+buildQMDContext(
+  projectId: string,
+  phaseRel: string,
+  taskLine?: string,
+  intent?: string,
+  vaultRoot?: string
+): string
+```
+
+### QMD Block Types
+
+```yaml
+```query
+phase:
+  file: 10 - OpenClaw/Ventures/Almani/Phase 02 - Core API.md
+  excerpt: |
+    ## 📋 Implementation Plan (scoped)
+    - [ ] **Task 3:** Implement auth middleware
+      - Files: src/api/middleware.ts
+      - Symbols: authMiddleware, JWTPayload
+```
+
+```query
+knowledge:
+  file: 10 - OpenClaw/Ventures/Almani/Knowledge.md
+  excerpts: |
+    JWT tokens use HS256. Secret in ONYX_JWT_SECRET env.
+    Auth middleware must attach decoded payload to req.user.
+```
+
+```query
+exec_log:
+  recent_entries: |
+    2026-03-25T10:05:00Z | COMPLETE | executor | task=Task 2 done
+
+```query
+files:
+  task_files:
+    - path: src/api/router.ts
+      symbols: createRouter
+      excerpt: |
+        export function createRouter() {
+          const router = Router();
+```
+```
+
+### Context Assembly Priority
+
+```mermaid
+flowchart TD
+    BQ[buildQMDContext] --> PQ[buildPhaseQuery\nphase + excerpt]
+    BQ --> KQ[buildKnowledgeQuery\nkeyword-matched paras]
+    BQ --> EL[buildExecLogContext\nlast 5 log entries]
+    BQ --> AL[buildAgentLogContext\nlast 10 agent log lines]
+    BQ --> FQ[buildFilesQuery\ntask Files metadata → snippets]
+    PQ & KQ & EL & AL & FQ --> COMBINE[Combine + escapeTripleBackticks]
+    COMBINE --> OUT[QMD string\ncapped at 3200 chars for executor\n4000 chars for planner]
+```
+
+**Task scoping:** When `taskLine` is provided, the Implementation Plan excerpt is scoped to only the matching task block (not the full plan), keeping context tight.
+
+---
+
+## 10. Vault I/O Layer
+
+**Rule:** All reads and writes to the vault MUST go through `vaultSkill.ts`. No step or healer may call `fs.readFileSync` / `fs.writeFileSync` on vault files directly.
+
+```typescript
+// src/onyx/vaultSkill.ts — sole IO gateway
+
+// Read entire bundle (all files as BundleNode objects)
+readBundle(projectId: string, vaultRoot: string): VaultBundle
+
+// Write any bundle node atomically
+writeBundle(opts: {
+  projectId: string;
+  node: 'phase' | 'overview' | 'knowledge' | 'config' | 'execlog';
+  phaseFile?: string;       // Required when node='phase'
+  frontmatter?: Record<string, unknown>;
+  content: string;
+}, vaultRoot: string): void
+
+// Read Orchestrator.json config
+readOrchestratorConfig(projectId: string, vaultRoot: string): ProjectOrchestratorConfig
+
+// Resolve bundle directory path
+resolveBundlePath(projectId: string, vaultRoot: string): string
+```
+
+### BundleNode
+
+Every file in the vault is loaded as a `BundleNode`:
+
+```typescript
+interface BundleNode {
+  path: string;                          // Absolute path
+  exists: boolean;                       // false if file missing
+  frontmatter: Record<string, unknown>;  // Parsed YAML frontmatter
+  content: string;                       // Body after frontmatter strip
+  raw: string;                           // Full file including frontmatter
+}
+```
 
 ### VaultBundle
 
 ```typescript
 interface VaultBundle {
-  bundleDir:  string;
-  overview:   PhaseNode;
-  knowledge:  PhaseNode;
-  phases:     PhaseNode[];    // Sorted by phase_number
-  logNotes:   PhaseNode[];
-  docs:       PhaseNode[];    // Repo Context, Source Context, etc.
+  projectId: string;
+  bundleDir: string;
+  overview: BundleNode;
+  kanban: BundleNode;
+  knowledge: BundleNode;
+  docsHub?: BundleNode;
+  phases: BundleNode[];    // Sorted by filename (Phase 01, Phase 02, ...)
+  docs: BundleNode[];
 }
 ```
 
 ---
 
-## 11. Discovery & Dependency Management
+## 11. Telemetry & Exec Log
 
-**File:** `src/vault/discover.ts`
+### Exec Log (`ExecLog.md`)
 
-### Phase discovery
+Every dispatch is appended to the project's `ExecLog.md` as a markdown H3 block. Human-readable and parseable.
 
-```typescript
-// All phases in vault (any state)
-discoverAllPhases(vaultRoot, projectsGlob): PhaseNode[]
-
-// Only ready phases (respects dependencies)
-discoverReadyPhases(vaultRoot, projectsGlob): PhaseNode[]
-
-// Only active phases (stale-lock detection)
-discoverActivePhases(vaultRoot, projectsGlob): PhaseNode[]
+```markdown
+### 2026-03-25T10:05:00.000Z | COMPLETE | controller
+run_id: abc123 | mode: execute-phase | status: complete | actions: 7 | phases_executed: P2
 ```
 
-Phase notes are found by:
-1. `projectsGlob/Phases/*.md` pattern
-2. Validation: `isPhaseNote()` check — requires `onyx-phase` tag OR `phase_number` field OR lives in `/Phases/` directory
-3. Schema validation via `validatePhaseFrontmatter()` — hard-invalid notes are skipped with a warning
-
-### Dependency resolution
+**Log Levels:** `DISPATCH | COMPLETE | ERROR | BLOCKED | SYNC | GENESIS | DRY-RUN | FATAL | INFO`
 
 ```typescript
-function dependenciesMet(phase: PhaseNode, allProjectPhases: PhaseNode[]): boolean {
-  const deps = phase.frontmatter['depends_on'];
-  // Handles numeric 1, string "1", and "P1"/"P2" shorthand
-  // Returns false if any dependency is missing or not 'completed'
-}
+appendExecLog(projectId: string, entry: ExecLogEntry, vaultRoot?: string): void
+appendRunLog(projectId: string, runId: string, content: string, vaultRoot?: string): void
+queryExecLog(projectId: string, level?: LogLevel, vaultRoot?: string): string[]
 ```
 
-A phase with `depends_on: [P1, P2]` won't appear in the ready queue until both P1 and P2 are `completed`. Missing dependency = block (conservative).
+### Telemetry (JSONL)
 
-### Cycle detection
-
-```typescript
-detectDependencyCycles(phases: PhaseNode[]): Array<{ cycle: number[] }>
-```
-
-DFS-based cycle detection. Called at controller startup. A cycle (e.g. P1 → P2 → P1) produces a permanent deadlock — both phases wait forever. If cycles are found, the controller logs a clear error and stops.
-
-### Sort order (ready queue)
-
-```typescript
-// 1. priority (0–10, default 5) — higher runs first
-// 2. risk (high:0 → medium:1 → low:2) — high risk phases run first as tiebreaker
-// 3. phase_number ascending — natural progression
-```
-
----
-
-## 12. Configuration
-
-**Files:** `onyx.config.json`, `.env`, `src/config/load.ts`
-
-### onyx.config.json
+Machine-readable structured events written to `.onyx-telemetry/YYYY-MM-DD.jsonl`:
 
 ```json
-{
-  "vault_root":             "/absolute/path/to/obsidian/vault",
-  "projects_glob":          "01 - Projects/**",
-  "agent_driver":           "claude-code",
-  "stale_lock_threshold_ms": 300000,
-  "max_iterations":         20,
-  "model_tiers": {
-    "planning":  "anthropic/claude-opus-4-6",
-    "standard":  "anthropic/claude-sonnet-4-6",
-    "light":     "anthropic/claude-haiku-4-5-20251001",
-    "heavy":     "anthropic/claude-opus-4-6"
-  },
-  "llm": {
-    "model":    "anthropic/claude-sonnet-4-6",
-    "base_url": "https://openrouter.ai/api/v1"
-  },
-  "notify": {
-    "stdout": true
-  }
-}
+{"type":"step_start","timestamp":"2026-03-25T10:05:00.000Z","run_id":"abc123","project_id":"OpenClaw/Almani","component":"executorStep","phase_number":2}
+{"type":"step_end","timestamp":"2026-03-25T10:05:04.123Z","run_id":"abc123","project_id":"OpenClaw/Almani","component":"executorStep","duration_ms":4123,"metadata":{"task":"Task 3 done"}}
 ```
 
-### .env (secrets — never commit)
+**Event Types:** `step_start | step_end | step_error | step_retry | pipeline_start | pipeline_end | self_heal | circuit_break | dispatch`
 
-```bash
-ONYX_VAULT_ROOT=/absolute/path/to/vault    # Overrides config vault_root
-OPENROUTER_API_KEY=sk-or-...               # LLM API key
-LINEAR_API_KEY=lin_api_...                 # Linear integration (optional)
-WHATSAPP_RECIPIENT=+447700000000           # WhatsApp notifications (optional)
-WHATSAPP_API_KEY=...                       # WhatsApp API key (optional)
+```typescript
+emitStepStart(runId, projectId, component, phaseNumber?): () => void  // returns end fn
+emitStepError(runId, projectId, component, error, metadata?)
+emitSelfHeal(runId, projectId, description)
+emitCircuitBreak(projectId, failures, cooldownUntil)
+readTelemetryLog(date?: string): TelemetryEvent[]
 ```
-
-### Config loading precedence
-
-```
-ONYX_VAULT_ROOT env var  >  vault_root in onyx.config.json
-OPENROUTER_API_KEY env   >  llm.api_key in config
-.env file values         >  nothing (only sets if key not already in process.env)
-```
-
-### Deprecated keys (still supported, use new names)
-
-| Old | New |
-|---|---|
-| `vaultRoot` | `vault_root` |
-| `projectsGlob` | `projects_glob` |
-| `staleLockThresholdMs` | `stale_lock_threshold_ms` |
-| `maxIterations` | `max_iterations` |
-| `agentDriver` | `agent_driver` |
-| `modelTiers` | `model_tiers` |
 
 ---
 
-## 13. Profiles & Directives System
+## 12. Notification Chain
 
-### 13.1 Profiles
+```mermaid
+flowchart LR
+    NS[notifyStep] --> BNP[buildNotifyPayload\ninfer status from actions]
+    BNP --> DN[dispatchNotification]
+    DN --> STDOUT[Always: stdout log]
+    DN --> FILE[Always: onyx-notifications.jsonl\none entry per notification]
+    DN --> WA[Try: WhatsApp\nnon-blocking — failure → stderr only]
+```
 
-A **profile** is `08 - System/Profiles/{name}.md`. It defines the mechanical contract for a project type. Read at execution time to control:
+### NotifyPayload
 
-- `required_fields` — what Overview must contain (preflight fatal if missing)
-- Domain-specific acceptance rules
-- Phase field conventions
+```typescript
+interface NotifyPayload {
+  projectId: string;
+  phaseLabel: string;
+  status: 'complete' | 'blocked' | 'info';
+  summary: string;
+  blockers?: string;
+  completedTasks?: string;
+  runId?: string;
+  wizardReportPath?: string;
+}
+```
 
-**Profile resolution:** Read `profile:` from Overview frontmatter. Defaults to `engineering` if missing.
+**Status inference:** If `phasesExecuted.length > 0` → `complete`. If `blockers.length > 0` → `blocked`. Otherwise → `info`.
 
-**Nine profiles:**
+**Invariant (2026-03-26):** WhatsApp delivery failures are written to `stderr` only — never to `onyx-notifications.jsonl`. This prevents duplicate entries in the dashboard Activity feed. Previous behaviour (writing a second JSONL entry on failure) has been removed.
+
+---
+
+## 13. Linear Integration
+
+```mermaid
+graph LR
+    subgraph Import["Import Flow"]
+        direction TB
+        LI[Linear Issues] -->|linearImportStep| VP[Vault Phases\nPhase N .md files]
+        VP -->|atomiserStep| OS[Orchestrator.json\nphases map updated]
+    end
+
+    subgraph Uplink["Uplink Flow"]
+        direction TB
+        VP2[Vault Phase Notes] -->|linearUplinkStep| LI2[Linear Issues\nfindOrCreateIssue idempotent]
+        VP2 -->|linearUplinkStep| LT[Linear Tasks\none per checkbox task]
+    end
+
+    subgraph Sync["Sync Flow"]
+        direction TB
+        VP3[Vault Phase States] -->|linearSyncStep| LS[Linear Issue States\naligned to vault FSM state]
+    end
+```
+
+### Idempotency
+
+All Linear operations use `normalizeIssueTitleForDedupe()` to dedup by title before creating issues. Running `uplink` twice produces no duplicates.
+
+### Phase ↔ Linear Issue Mapping
+
+- Phase note frontmatter: `linear_issue_id: LIN-789`
+- Persisted via `withPhaseLinearIssueId()` + `writeBundle()`
+- All checkbox tasks under a phase become child issues of the phase issue
+
+---
+
+## 14. Utility Layer
+
+### `utils/phaseParser.ts` — Canonical Task Discovery
+
+The single implementation replacing three previous duplicates. All consumers import from here.
+
+```typescript
+findNextTask(phaseContent: string): string | null
+parseCheckboxTasks(content: string): CheckboxTask[]
+acceptanceCriteriaSatisfied(content: string): boolean
+isCheckboxLine(trimmed: string): boolean
+isUncheckedTask(trimmed: string): boolean
+isSectionHeading(line: string, titleFragment: string): boolean
+toggleCodeFence(line: string, inCode: boolean): boolean
+```
+
+**Task discovery priority (all functions):**
+1. `## 📋 Implementation Plan` → `### Implementation Tasks`
+2. `## 📂 Tasks` (only when no Implementation Plan exists)
+3. Fallback: any `- [ ]` outside excluded headings (Acceptance Criteria, Blockers, Agent Log)
+
+### `utils/sectionUtils.ts` — Section Manipulation
+
+```typescript
+findSectionRange(content, heading): { start: number; end: number } | null
+appendBulletToSection(content, heading, bullet): string
+ensureSection(content, heading): string
+replaceSection(content, heading, newBody): string
+upsertProseSection(content, heading, newBody): string
+```
+
+### `utils/workdirUtils.ts` — Working Directory Resolution
+
+```typescript
+// Resolve focused workdir from task Files: metadata
+resolveFocusedWorkdir(taskLine: string, repoPath: string): string
+
+// Find deepest common ancestor of a list of absolute paths
+commonAncestorDir(absPaths: string[]): string
+```
+
+**Heuristic:** Extract paths from `Files:` line in task metadata → resolve relative to repo → find common ancestor → return as focused workdir for agent.
+
+---
+
+## 15. Constants & Configuration
+
+```typescript
+// src/onyx/constants.ts
+
+// Timeouts
+LOCK_STALE_MS          = 15 * 60 * 1000      // 15 min — stale lock cleanup
+REFINER_LOCK_STALE_MS  = 20 * 60 * 1000      // 20 min — refiner-specific lock
+SESSION_STALE_MS       = 7 * 24 * 60 * 60 * 1000  // 7 days — cursor session
+CIRCUIT_COOLDOWN_MS    = 30 * 60 * 1000      // 30 min — circuit breaker cooldown
+CIRCUIT_MAX_FAILURES   = 3                    // trips circuit
+MAX_KERNEL_ITERATIONS  = 20                   // per runKernel() call
+
+// Section headings (used everywhere — single source of truth)
+SECTION = {
+  IMPLEMENTATION_PLAN: '📋 Implementation Plan',
+  IMPL_TASKS_SUB:      'Implementation Tasks',
+  TASKS:               '📂 Tasks',
+  ACCEPTANCE_CRITERIA: '✅ Acceptance Criteria',
+  BLOCKERS:            '🚧 Blockers',
+  AGENT_LOG:           'Agent Log',
+  OUTCOMES:            'Phase Outcomes (Definition of Done)',
+}
+
+// Agent-writable boundary markers
+AGENT_WRITABLE = {
+  START: '<!-- AGENT_WRITABLE_START:phase-plan -->',
+  END:   '<!-- AGENT_WRITABLE_END:phase-plan -->',
+}
+
+// Headings excluded from task discovery
+EXCLUDED_TASK_HEADINGS = [
+  SECTION.ACCEPTANCE_CRITERIA,
+  SECTION.BLOCKERS,
+  SECTION.AGENT_LOG,
+]
+```
+
+### Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `ONYX_VAULT_ROOT` | `/home/jamal/Obsidian/OnyxVault` | Vault root path |
+| `ONYX_EXEC_MODELS` | `composer-2,gpt-4.1-mini,sonnet-4` | Executor model list (comma-sep, tried in order) |
+| `ONYX_PLAN_MODELS` | `composer-2,gpt-4.1-mini` | Planner model list |
+| `ONYX_WHATSAPP_RECIPIENT` | — | Phone number for WhatsApp notifications (e.g. `+447700000000`). If unset, WhatsApp delivery is silently skipped. |
+| `DEBUG_ONYX` | `0` | Set to `1` for verbose stderr output |
+| `ONYX_JWT_SECRET` | — | JWT secret for auth middleware context |
+| `LINEAR_API_KEY` | — | Linear GraphQL API key |
+
+---
+
+## 16. Public API Reference
+
+```typescript
+// src/onyx/index.ts — grouped by concern
+
+// ── Entry Points ──────────────────────────────────────────────────────────
+export { handleMessage }       from './controller.js'       // single-project dispatch
+export { runKernel }           from './controllerKernel.js' // multi-project autonomous loop
+
+// ── Intent Classification ─────────────────────────────────────────────────
+export { classifyIntent, resolveMode, loadKnownProjectIds } from './intentClassifier.js'
+export type { ClassifiedIntent }                            from './intentClassifier.js'
+
+// ── Pipeline ──────────────────────────────────────────────────────────────
+export { runPipeline, createPipelineContext } from './pipelineRunner.js'
+export { MODE_RECIPES }                       from './pipelines.js'
+export type { PipelineStep, PipelineContext, StepResult, PipelineResult } from './pipelineRunner.js'
+export type { PipelineRecipeKey }             from './pipelines.js'
+
+// ── FSM ───────────────────────────────────────────────────────────────────
+export { normalizePhaseState, getPhaseStateFromFrontmatter,
+         canTransitionPhase, transitionPhase,
+         applyPhaseStateToRaw, appendTransitionLog }   from './fsm.js'
+export { PROJECT_STATE_RECIPE, PHASE_STATE_OPS,
+         evaluateRoutingTable }                         from './stateTools.js'
+export type { ProjectState, PhaseState, TaskState }    from './fsm.js'
+
+// ── Phase Operations ──────────────────────────────────────────────────────
+export { ensurePhaseActive, ensurePhaseReady,
+         transitionPhaseNode }                          from './phaseLifecycle.js'
+export { findNextTask, tickTask, appendBlocker,
+         appendAgentLog, completePhase }                from './phaseExecutor.js'
+export { planPhase }                                    from './phasePlanner.js'
+export { replanPhase }                                  from './replan.js'
+
+// ── Vault I/O ─────────────────────────────────────────────────────────────
+export { readBundle, writeBundle, readOrchestratorConfig,
+         resolveBundlePath, parseFrontmatter }          from './vaultSkill.js'
+export type { VaultBundle, BundleNode,
+              ProjectOrchestratorConfig }               from './vaultSkill.js'
+
+// ── Context ───────────────────────────────────────────────────────────────
+export { buildQMDContext, buildPhaseQuery,
+         buildKnowledgeQuery, buildFileSnippetQuery }   from './contextOrchestrator.js'
+export { executeAgentThroughBridge }                    from './agentBridge.js'
+
+// ── Self-Healing ──────────────────────────────────────────────────────────
+export { runSelfHealer }          from './selfHealer.js'
+export type { HealResult, HealAction } from './selfHealer.js'
+
+// ── Errors & Retry ────────────────────────────────────────────────────────
+export { FailureClass, classifyError, isRetryable, wrapError,
+         GZError, RecoverableError, BlockingError, IntegrityError } from './errors.js'
+export { withRetry, RECOVERABLE_POLICY, AGENT_POLICY, NO_RETRY }    from './retryPolicy.js'
+
+// ── Telemetry ─────────────────────────────────────────────────────────────
+export { emit, emitStepStart, emitStepError,
+         emitSelfHeal, emitCircuitBreak,
+         readTelemetryLog }        from './telemetry.js'
+export { appendExecLog, appendRunLog, queryExecLog } from './execLog.js'
+
+// ── Notifications ─────────────────────────────────────────────────────────
+export { buildNotifyPayload, inferNotifyStatus,
+         formatNotifyMessage }     from './notify.js'
+export { dispatchNotification }    from './notifyAgent.js'
+
+// ── Types ─────────────────────────────────────────────────────────────────
+export type { FlowResult, ControllerMode } from './controllerTypes.js'
+export type { RunContext, FlowName }       from './runContext.js'
+```
+
+---
+
+## 17. Developer Guide
+
+### Running the System
+
+```bash
+# Dry-run the kernel (shows what would dispatch, makes no changes)
+npx tsx src/onyx/controllerKernel.ts --dry-run
+
+# Run the kernel for a single project
+npx tsx src/onyx/controllerKernel.ts --project-id "OpenClaw/Almani"
+
+# Dispatch a single command
+npx tsx src/onyx/runController.ts --text "execute phase 2 for Almani" --project-id "OpenClaw/Almani"
+
+# Force-plan a phase
+npx tsx src/onyx/runController.ts --text "plan phase 2" --project-id "OpenClaw/Almani" --mode plan-phase
+
+# Check status
+npx tsx src/onyx/runController.ts --text "status" --project-id "OpenClaw/Almani" --mode status
+
+# Import from Linear
+npx tsx src/onyx/runController.ts --text "import linear" --project-id "OpenClaw/Almani" --linear-project-id "PROJ-123"
+```
+
+### Adding a New Pipeline Step
+
+1. Create `src/onyx/steps/myStep.ts`:
+
+```typescript
+import type { PipelineStep, StepResult } from '../pipelineRunner.js';
+import { RECOVERABLE_POLICY } from '../retryPolicy.js';
+
+export const myStep: PipelineStep = {
+  name: 'myStep',
+
+  shouldRun(ctx) {
+    // Guard: only run when needed
+    return ctx.state['someFlag'] === true;
+  },
+
+  async execute(ctx): Promise<StepResult> {
+    // Do work...
+    return {
+      ok: true,
+      actions: ['my-step:completed'],
+      messages: ['My step finished successfully'],
+    };
+  },
+
+  retryPolicy: RECOVERABLE_POLICY,  // or AGENT_POLICY or NO_RETRY
+  critical: false,                  // set true to abort pipeline on failure
+};
+```
+
+2. Add it to the relevant recipe in `pipelines.ts`:
+
+```typescript
+import { myStep } from './steps/myStep.js';
+
+export const MODE_RECIPES: Record<PipelineRecipeKey, PipelineStep[]> = {
+  'full-execute': [
+    refinerStep,
+    placementStep,
+    // ...
+    myStep,      // ← insert at the right point
+    executorStep,
+    notifyStep,
+  ],
+  // ...
+};
+```
+
+3. Export from `index.ts` if it's part of the public API.
+
+### Adding a New FSM State Transition
+
+1. Update the transition table in `fsm.ts`:
+```typescript
+const PHASE_TRANSITIONS: Record<PhaseState, PhaseState[]> = {
+  active: ['blocked', 'complete', 'my-new-state'],  // add here
+  // ...
+};
+```
+
+2. Handle the new state in `stateTools.ts` `PHASE_STATE_OPS`.
+3. Handle it in `selfHealer.ts` if the self-healer should detect/repair it.
+4. Handle it in `phaseLifecycle.ts` `ensurePhaseActive()` / `ensurePhaseReady()`.
+
+### Debugging a Run
+
+```bash
+# Enable verbose output
+DEBUG_ONYX=1 npx tsx src/onyx/controllerKernel.ts --project-id "OpenClaw/Almani"
+
+# Read the exec log for a project
+cat "~/Obsidian/OnyxVault/10 - OpenClaw/Ventures/Almani/ExecLog.md"
+
+# Read telemetry for today
+cat ".onyx-telemetry/$(date +%Y-%m-%d).jsonl" | jq .
+
+# Check notifications
+cat "onyx-notifications.jsonl" | tail -20 | jq .
+```
+
+### TypeScript Verification
+
+```bash
+# Must always compile clean
+npx tsc --noEmit
+
+# Run unit tests
+npx jest --testPathPattern="src/onyx"
+
+# Verify no subprocess spawning of contextOrchestrator
+grep -r "execFileSync.*contextOrchestrator" src/onyx/ # must be empty
+
+# Verify single writer contract
+grep -r "writeFileSync.*Orchestrator" src/onyx/       # must be empty
+
+# Verify single ControllerMode definition
+grep -rn "^export type ControllerMode" src/onyx/      # must be exactly 1
+```
+
+### Common Pitfalls
+
+| Pitfall | Correct Pattern |
+|---------|----------------|
+| Writing vault files directly | Always use `writeBundle()` |
+| Spawning contextOrchestrator as subprocess | Import and call `buildQMDContext()` directly |
+| Defining constants inline | Import from `constants.ts` |
+| Implementing `findNextTask` locally | Import from `utils/phaseParser.ts` |
+| Routing Linear modes per-project | Let `intentClassifier` handle all modes universally |
+| Catching all errors as the same class | Use `classifyError()` to get RECOVERABLE/BLOCKING/INTEGRITY |
+| Transitioning FSM state without going through `transitionPhase()` | Always gate through FSM |
+
+---
+
+## 18. Profiles & Directives System
+
+The profiles and directives system is the primary mechanism for making ONYX domain-aware and agent-identity-aware without code changes.
+
+### 21.1 Profiles
+
+A **profile** is a vault markdown file at `08 - System/Profiles/<name>.md` that defines the mechanical contract for a project type. The profile is read at phase execution time and controls:
+
+- `required_fields` — what the Overview must contain (preflight check fatal if missing)
+- `init_docs` — what context documents to create at `onyx init` time
+- Acceptance rules — domain-specific definition of "done"
+- Phase field conventions — what optional frontmatter fields phases in this project carry
+- Agent context ordering — what documents the agent reads and in what order
+
+**Profile resolution** (`src/executor/runPhase.ts` → `resolveContextPaths`):
+```typescript
+const profileName = String(ov.frontmatter['profile'] ?? 'engineering');
+const profileFilePath = path.join(vaultRoot, '08 - System', 'Profiles', `${profileName}.md`);
+// required_fields read from profile frontmatter
+// bundleDir always added to --add-dir (non-repo profiles can read bundle docs)
+```
+
+**Six profiles:**
 
 | Profile | required_fields | Acceptance gate |
 |---|---|---|
-| `general` | none | All tasks checked + output documented |
-| `engineering` | `repo_path`, `test_command` | test_command exits 0 |
+| `engineering` | `repo_path`, `test_command` | `test_command` exits 0 |
 | `content` | `voice_profile`, `pipeline_stage` | safety filter + voice check |
-| `research` | `research_question`, `source_constraints`, `output_format` | source count + confidence gaps declared |
-| `operations` | `monitored_systems`, `runbook_path` | runbook followed + outcome documented |
+| `research` | `research_question`, `source_constraints`, `output_format` | source count + confidence |
+| `operations` | `monitored_systems`, `runbook_path` | `runbook_followed: true` + outcome documented |
 | `trading` | `exchange`, `strategy_type`, `risk_limits`, `backtest_command` | backtest exits 0 + risk compliance |
 | `experimenter` | `hypothesis`, `success_metric`, `baseline_value` | result recorded + Cognition Store updated |
-| `accounting` | `ledger_path`, `reporting_period` | trial balance verified |
-| `legal` | `jurisdiction`, `matter_type` | evidence hierarchy followed + citations verified |
 
-### 13.2 Directives
+**Backward compatibility:** Missing `profile:` in Overview defaults to `engineering`. Behavior is identical to pre-profile ONYX.
 
-A **directive** is a markdown file prepended to the agent's context as the first item — before the profile, before the Overview. It defines who the agent is for the phase.
+### 21.2 Directives
 
-**Directive resolution order:**
+A **directive** is a vault markdown file prepended to the agent's context as the first item — before the profile, before the Overview. It gives the agent its identity for the phase: role, what to read, behavioral constraints, output format.
+
+**Directive resolution order** (`src/executor/runPhase.ts`):
 1. Read `directive:` from phase frontmatter
-2. Look for `{bundleDir}/Directives/{name}.md` — project-local first
-3. Fall back to `{vaultRoot}/08 - System/Agent Directives/{name}.md`
+2. Look for `bundleDir/Directives/<name>.md` (project-local, project-specific override)
+3. Fall back to `vaultRoot/08 - System/Agent Directives/<name>.md` (system-level)
 4. If not found: warn + skip (not fatal)
 
 **`cycle_type` auto-wiring** (experimenter profile only):
-
+If `directive:` is not set but `cycle_type:` is set and `profile: experimenter`:
 ```typescript
 const cycleMap = {
   learn: 'experimenter-researcher', design: 'experimenter-researcher',
   experiment: 'experimenter-engineer', analyze: 'experimenter-analyzer',
 };
+// resolves via same local-then-system lookup
 ```
 
-### 13.3 Context injection order
+### 21.3 Context injection order
 
+When `runPhase` spawns an agent, files are injected in this order:
 ```
-1. directivePath      (who the agent is — role, constraints, output format)
-2. profilePath        (domain rules + acceptance gate)
-3. overviewPath       (project goals + scope + required fields)
-4. knowledgePath      (all prior learnings — compounds across phases)
-5. contextDocPath     (Repo Context / Source Context / Research Brief / etc.)
-6. phasePath          (what to do right now — tasks, acceptance criteria)
+1. directivePath   (who the agent is)
+2. profilePath     (domain rules + acceptance gate)
+3. overviewPath    (project goals + required fields)
+4. knowledgePath   (all prior learnings — compounds across phases)
+5. profile-specific context doc (Repo Context / Source Context / Research Brief / etc.)
+6. phaseNotePath   (what to do right now)
 ```
 
-### 13.4 --add-dir access
+Implementation: `buildPrompt()` in `src/executor/runPhase.ts`, around line 580.
 
-The agent always gets `bundleDir` in `--add-dir`. For engineering profiles, `repoPath` is added too. This means:
+### 21.4 `--add-dir` multi-directory access
 
-- Content/research agents can read Source Context, Cognition Store, Directives, etc. without a git repo
-- Engineering agents can read both the bundle docs AND the codebase
-
-### 13.5 Preflight validation
-
-Before acquiring the lock, ONYX runs profile-driven preflight:
-
+For non-repo profiles (content, research, operations, experimenter), the agent needs to read bundle files even without a `repo_path`. The executor always includes `bundleDir` in `--add-dir`:
 ```typescript
-for (const field of requiredFields) {
+const addDirs: string[] = [bundleDir]; // always
+if (repoPathValid && repoPath !== bundleDir) addDirs.push(repoPath);
+```
+This means the agent can read Source Context, Directives, Cognition Store etc. even if there's no git repo.
+
+### 21.5 Preflight validation
+
+Before acquiring the phase lock, ONYX runs profile-driven preflight checks:
+```typescript
+for (const field of ctx.requiredFields) {
   const val = String(ovFrontmatter[field] ?? '').trim();
-  if (!val) fatal(`Missing required field "${field}" (profile: ${profileName})`);
+  if (!val) fatal(`Missing required field "${field}" (profile: ${ctx.profileName})`);
   if (field === 'repo_path' && !fs.existsSync(val)) fatal(`repo_path does not exist: ${val}`);
 }
 ```
-
-Missing a required field → phase does not run. Fix the Overview, then retry.
+For engineering: `repo_path` + `test_command` must be present. For content: `voice_profile` + `pipeline_stage`. For experimenter: `hypothesis` + `success_metric` + `baseline_value`. Missing any → phase does not run.
 
 ---
 
-## 14. Knowledge Compounding & Experimenter Loop
+## 19. Knowledge Compounding & Experimenter Loop
 
-### 14.1 Knowledge.md as compounding memory
+### 22.1 Knowledge.md as compounding memory
 
-Every agent reads `Knowledge.md` before starting its phase. Knowledge accumulates across phases — what P1 discovered, P5 builds on. This is the primary mechanism by which a project improves without human re-briefing.
+Every agent reads `Knowledge.md` before starting its phase. The knowledge document accumulates across phases — what P1 discovered, P5 builds on. This is the primary mechanism by which a project gets smarter over time without human re-briefing.
 
 **Pattern for maximum value:**
-- Every phase should include: `- [ ] Append learnings to Knowledge.md`
-- Use the `knowledge-keeper` directive on post-execution phases to maintain Knowledge.md as a structured wiki
-- The knowledge-keeper detects contradictions, cross-references topics, and maintains an index
+- Every phase should have a task: `- [ ] Append learnings to Knowledge.md`
+- Use the `knowledge-keeper` directive on a post-phase to maintain Knowledge.md as a structured wiki rather than a flat append-log
+- The knowledge-keeper detects contradictions, cross-references topics, and maintains an index — making Knowledge.md actually queryable by future agents
 
-### 14.2 The experimenter loop
+### 22.2 The experimenter loop (ASI-Evolve pattern)
 
-The `experimenter` profile implements a four-phase LEARN → DESIGN → EXPERIMENT → ANALYZE cycle.
+The `experimenter` profile implements a four-phase LEARN → DESIGN → EXPERIMENT → ANALYZE cycle inspired by ASI-Evolve's autonomous research loop.
 
-**Core insight:** Every trial must be recorded in full (hypothesis, config, raw result, analysis) so future agents never re-discover known territory. Negative results matter as much as positive ones.
+**Core insight:** every trial must be recorded in full (hypothesis, config, raw result, analysis) so future agents never re-discover what's already been found. Negative results are equally important as positive ones.
 
 **Two persistent artifacts:**
 
-**Cognition Store** (`Project - Cognition Store.md`) — LLM-maintained structured knowledge base. Sections: What works / What doesn't work / Open hypotheses / Heuristics. Maintained by the `experimenter-analyzer` directive. Read by the `experimenter-researcher` to avoid re-testing known territory.
+**Cognition Store** (`Project - Cognition Store.md`) — LLM-maintained structured knowledge base. Sections: What works / What doesn't work / Open hypotheses / Heuristics. The experimenter-analyzer directive maintains this. The experimenter-researcher reads it to avoid re-testing known territory.
 
 **Experiment Log** (`Project - Experiment Log.md`) — append-only full trial history. Each entry records: hypothesis, expected, actual, delta, configuration, raw output, anomalies, transferable lesson. Never edited — only appended.
 
 **Cycle:**
 ```
-P1: Bootstrap     → measure baseline, seed Cognition Store with open hypotheses
-P2: LEARN         → researcher reads Cognition Store + Experiment Log, ranks candidates
+P1: Bootstrap     → measure baseline, seed Cognition Store open hypotheses
+P2: LEARN         → researcher reads Cognition Store + Experiment Log, maps landscape, ranks candidates
 P3: DESIGN        → researcher picks best candidate, writes precise experiment spec
 P4: EXPERIMENT    → engineer executes spec exactly, records Trial T[n] to Experiment Log
-P5: ANALYZE       → analyzer explains delta, extracts lesson, updates Cognition Store
+P5: ANALYZE       → analyzer explains delta, extracts lesson, updates Cognition Store, proposes P6
 P6: LEARN (cycle 2) → researcher reads updated Cognition Store, selects next candidate
 ...
 ```
 
 **Cold-start elimination:** The Cognition Store means cycle 5's researcher starts with everything cycles 1–4 discovered. Learning compounds across cycles, not just within a cycle.
 
-### 14.3 Cross-project knowledge
+### 22.3 Cross-project knowledge
 
-`08 - System/Cross-Project Knowledge.md` captures findings that apply across all projects. The consolidator's dedup LLM call populates this automatically. Update it directly when you discover something general — architecture patterns, API behaviors, model capabilities, workflow improvements.
+[[08 - System/Cross-Project Knowledge.md|Cross-Project Knowledge]] captures findings that apply across all projects. Update it when you discover something general — architecture patterns, API behaviors, model capabilities, workflow improvements. This is the system-level Cognition Store.
 
 ---
 
-## 15. Phase Scheduling & Control
+## 20. Phase Scheduling & Control
 
-### 15.1 Phase selection
+### 23.1 Phase selection
 
-`discoverReadyPhases()` returns phases sorted by:
+`discoverReadyPhases()` (`src/vault/discover.ts`) finds all `phase-ready` phases and sorts them:
 
 ```typescript
-// 1. priority (0–10, default 5). Higher runs first.
-const pa = Number(a.frontmatter['priority'] ?? 5);
-// 2. risk (high first) as tiebreaker
-const riskOrder = { high: 0, medium: 1, low: 2 };
-// 3. phase_number ascending (natural order)
+.sort((a, b) => {
+  // 1. priority (0–10, default 5) — higher runs first
+  const pa = Number(a.frontmatter['priority'] ?? 5);
+  const pb = Number(b.frontmatter['priority'] ?? 5);
+  if (pa !== pb) return pb - pa;
+  // 2. risk (high first)
+  const riskOrder = { high: 0, medium: 1, low: 2 };
+  // 3. phase_number (ascending)
+});
 ```
 
-**Operator control knobs (no code changes required):**
+**Control knobs available from the vault (no code changes):**
 
-| Frontmatter field | Effect |
-|---|---|
-| `priority: 9` | Run before default-priority phases |
-| `priority: 1` | Only run when nothing more urgent is ready |
-| `risk: high` | Tiebreaker: runs before medium/low risk |
-| `depends_on: [P2, P3]` | Won't run until P2 and P3 are completed |
-| `complexity: heavy` | Routes to Opus model |
-| `complexity: light` | Routes to Haiku model |
+| Frontmatter field | Effect | Example |
+|---|---|---|
+| `priority: 9` | Runs this phase before priority-5 phases | Urgent fix |
+| `priority: 1` | Only runs when nothing more important is ready | Background cleanup |
+| `risk: high` | Tiebreaker: runs before medium/low risk phases | Default for critical work |
+| `depends_on: [2, 3]` | Won't run until P2 and P3 are completed | Dependency ordering |
+| `complexity: heavy` | Routes to Opus model | Architecture decisions |
+| `complexity: light` | Routes to Haiku model | Docs, config |
 
-### 15.2 Dependency resolution
+### 23.2 Dependency resolution
 
-`dependenciesMet()` handles: numeric `1`, string `"1"`, and `"P1"/"P2"` shorthand — all equivalent.
-
-A phase with `depends_on: [P1, P2]` won't appear in the ready queue until both P1 and P2 are `state: completed`. If a dependency phase is missing entirely, the dependent phase is blocked (conservative: better to block than to skip a missing dependency).
-
-### 15.3 Lock management
-
-Lock fields in phase frontmatter:
-
-```yaml
-locked_by:       "claude-code"
-locked_at:       "2026-04-16T10:05:00.000Z"
-lock_pid:        12345
-lock_hostname:   "macbook.local"
-lock_ttl_ms:     300000
+`dependenciesMet()` checks `depends_on` by scanning all phases in the same project:
+```typescript
+const deps = Array.isArray(fm['depends_on']) ? fm['depends_on'] : [fm['depends_on']];
+return deps.every(dep => {
+  const depNum = Number(dep);
+  const depPhase = projectPhases.find(p => phaseNumber(p) === depNum);
+  return !depPhase || stateFromFrontmatter(depPhase.frontmatter) === 'completed';
+});
 ```
+A phase with `depends_on: [1, 2]` won't appear in the ready queue until P1 and P2 are both `completed`.
 
-**Lock TTL:** 5 minutes default. If the agent process dies, the `staleLocks` healer detects the stale lock on the next `onyx run` and resets the phase to `phase-ready`.
+### 23.3 Lock management
 
-**Manual unlock:** `onyx reset "Project"` or `onyx heal`.
+Lock fields in phase frontmatter: `locked_by`, `locked_at`, `lock_pid`, `lock_hostname`, `lock_ttl_ms`.
 
-### 15.4 `onyx explain` — system transparency
+Lock TTL: 5 minutes default. If the agent process dies, the healer detects the stale lock and resets the phase to `phase-ready` on next run.
 
-`onyx explain [project]` is a pure vault read (no LLM) that produces plain English output:
+To manually unlock: `onyx reset "Project"` or `onyx heal`.
+
+### 23.4 `onyx explain` — system transparency
+
+`onyx explain [project]` is a pure vault read (no LLM) that produces plain English output about project state:
 - Profile + required fields
 - Active phase + directive currently injected + acceptance criteria
 - Queued phases with priority and auto-wired directive
 - Blocked phases with resolution hint
 - Knowledge.md summary + Cognition Store / Experiment Log state
 
-Run `onyx explain` before `onyx run` to confirm state is what you expect. This is the primary debugging tool.
+This is the primary debugging tool. Before running `onyx run`, run `onyx explain` to confirm state is what you expect.
 
 ---
 
-## 16. CLI Reference
+## 21. CLI Reference
 
-All commands as of v4.0 (2026-04-16):
+All 22 commands as of 2026-04-14:
+
+### Visibility
+```bash
+onyx explain [project]          # Plain English: profile, active phase, directive, queued, blocked
+onyx status [project]           # All projects + phase states (compact)
+onyx logs [project] [--recent]  # Execution log
+onyx doctor                     # Pre-flight: vault_root, agent driver, API keys, Claude CLI
+```
 
 ### Execution
 ```bash
-onyx run                             # autonomous loop — all phase-ready phases
-onyx run --project "My Project"      # scope to one project
-onyx run --once                      # single iteration then exit (safe for cron)
-onyx run --phase 2                   # run a specific phase number (implies --once)
-onyx run --dry-run                   # preview what would happen without running
-onyx next                            # find highest-priority ready phase and run it
-```
-
-### Observability
-```bash
-onyx status                          # all projects + phase states
-onyx status --json                   # machine-readable snapshot
-onyx explain                         # plain English: what every project is doing
-onyx explain "My Project"            # one project, detailed view
-onyx logs "My Project"               # execution log
-onyx logs "My Project" --recent      # most recent entries
-onyx logs --audit                    # full audit trail
-onyx doctor                          # pre-flight: config, vault, API keys, claude CLI
+onyx run [project] [--once] [--phase N]   # Execute ready phases
+onyx run --project "X" --once             # Single iteration, safest for first run
 ```
 
 ### Planning
 ```bash
-onyx init "My Project"               # create bundle (prompts for profile, repo path)
-onyx init "My Project" --profile engineering  # skip profile picker
-onyx plan "My Project"               # decompose Overview → phase stubs → atomise to tasks
-onyx plan "My Project" 2             # atomise one specific phase only
-onyx plan "My Project" --extend      # add new phases to an existing project
-onyx decompose "My Project"          # Overview → phase stubs only (no atomising)
-onyx atomise "My Project"            # atomise all backlog phase stubs to tasks
-onyx atomise "My Project" 1          # atomise a specific phase only
+onyx plan <project> [n]         # Decompose + atomise (both steps)
+onyx decompose <project>        # Overview → phase stubs (backlog)
+onyx atomise <project> [n]      # Phase stubs → tasks → phase-ready
 ```
 
-### Phase state management
+### Bundle management
 ```bash
-onyx ready "My Project"              # auto-pick next backlog phase → set ready
-onyx ready "My Project" 3            # set phase 3 specifically to ready
-onyx block "My Project" "reason"     # block active phase with a reason
-onyx reset "My Project"              # unblock → ready (after fixing the blocker)
-onyx set-state <path/to/phase.md> ready  # force state transition (for scripts)
+onyx init [name] [--profile <p>]         # Create new project bundle with profile picker
+onyx refresh-context [project]           # Re-scan repo, update Repo Context
+onyx consolidate [args]                  # Manually trigger Knowledge consolidation
+onyx monthly-consolidate [args]          # Monthly summary of daily plans
 ```
 
-### Vault objects
+### State management
 ```bash
-onyx new phase "My Project" "Name"   # create a new phase file
-onyx new directive <name>            # scaffold system directive stub
-onyx new directive <name> --project "My Project"  # project-local directive
-onyx new profile <name>              # scaffold new profile
-```
-
-### Maintenance & recovery
-```bash
-onyx heal                            # fix stale locks, frontmatter drift, graph links
-onyx check "My Project"              # validate vault state (fields, deps, directives)
-onyx consolidate "My Project"        # manually trigger Knowledge consolidation
-onyx refresh-context "My Project"    # re-scan repo, update Repo Context doc
-```
-
-### Capture & daily planning
-```bash
-onyx capture "note text"             # append to Inbox.md for later triage
-onyx daily-plan                      # generate today's time-blocked daily plan
+onyx reset [project]            # Unblock → phase-ready
+onyx heal                       # Fix stale locks, drift, broken links
+onyx set-state <path> <state>   # Force state change (scripts/dashboard)
 ```
 
 ### Integrations
 ```bash
-onyx dashboard                       # web dashboard on localhost:7070
-onyx import <linearProjectId>        # import Linear project as vault bundle
-onyx linear-uplink "My Project"      # sync vault phases to Linear issues
+onyx dashboard [port]           # Web dashboard (default :7070)
+onyx import <linearProjectId>   # Import Linear project as vault bundle
+onyx linear-uplink [project]    # Sync vault phases to Linear
+onyx capture [text]             # Quick capture to Obsidian Inbox
+onyx research <topic>           # Research step → vault
+onyx daily-plan [date]          # Time-blocked daily plan
 ```
 
 ---
 
-## 17. Adding to ONYX
+## 22. Roadmap
 
-### Adding a new CLI command
+Forward-looking work that would extend the current runtime. Each item is a concrete decision, not a commitment.
 
-1. Create `src/cli/my-command.ts` — export an async `run(args, config)` function
-2. Register in `src/cli/onyx.ts` with `program.command('my-command').action(...)`
-3. Build: `npm run build`
+### 22.1 Missing profile files
 
-### Adding a new healer
+`accounting.md` and `legal.md` are referenced in this directive and in the other System docs but no profile files exist in `08 - System/Profiles/`. Given the Finance domain is active, `accounting.md` should be written first; `legal.md` is lower priority.
 
-1. Create `src/healer/myHealer.ts` — export `runMyHealer(config): HealAction[]`
-2. Add to `src/healer/index.ts` `runAllHeals()` — call it and merge results
-3. Add the new action type to the `HealAction` union if needed
+### 22.2 Self-healer extensions
 
-### Adding a new profile
+Current healer clears stale locks and maintains graph links. Candidates for added repairs:
+- `frontmatter_drift` — detect when phase frontmatter `status` contradicts `phase_status_tag` and normalize
+- `orphaned_phase` — detect phases stuck in `active` with zero outstanding tasks and transition to `completed`
+- `broken_wikilink` — flag any `[[...]]` that no longer resolves
 
-```bash
-onyx new profile <name>
-```
+Each detector is a small function under `src/healer/`; the loop already invokes `runAllHeals` so no routing changes are needed.
 
-This scaffolds `08 - System/Profiles/<name>.md` with the required frontmatter structure. Fill in:
-- `required_fields` — what Overview must contain
-- Acceptance gate description
-- Domain-specific phase conventions
+### 22.3 Postcondition verification
 
-### Adding a new directive
+After each routed operation, verify the claimed state change actually happened (frontmatter updated, log appended, no partial writes). A `src/verifier/` module would sit between the operation and the next iteration. Useful if we start running multiple agents in parallel.
 
-```bash
-onyx new directive <name>                          # system-level
-onyx new directive <name> --project "My Project"   # project-local
-```
+### 22.4 Project-level routing
 
-Fill in: role definition, what to read first, behavioral constraints, output format.
+Today routing is purely per-phase. If project-level priorities or gating ever become important (e.g. "don't run project X until project Y's current phase is done"), that logic belongs in `src/controller/loop.ts` as a pre-filter before phase discovery — not in the per-phase router.
 
-### Debugging a run
+### 22.5 Intent classifier
 
-```bash
-# See what would happen without running
-onyx run --dry-run
+A natural-language front-door (`onyx "figure out what to do next and do it"`) would need an intent classifier that maps free text to a CLI command. Low priority — the existing structured CLI is sufficient for scripted use.
 
-# Check system health
-onyx doctor
+### 22.6 Toward the Zero-Code Architecture
 
-# Understand project state in plain English
-onyx explain "My Project"
+Most of the extensions above become unnecessary if we move toward the [[08 - System/ONYX - Zero-Code Architecture Vision.md|Zero-Code Architecture Vision]]. Under that model, the runtime loop is expressed as a master directive in markdown and executed by the agent itself. Verifier, classifier, and pipeline composition all collapse into prose rules.
 
-# See execution log
-onyx logs "My Project" --recent
+Before investing in §22.2–§22.5, check whether the Master Directive route would absorb the same value with less code.
 
-# Fix stale state
-onyx heal
-```
+### 22.7 Dashboard surface parity
+
+The Next.js dashboard (`onyx dashboard`) reads directly from the vault but doesn't yet surface every CLI operation. Adding: trigger-buttons for `heal`, `consolidate`, `refresh-context`, and a "mark ready / block" control would let the dashboard drive the runtime without a terminal.
 
 ---
 
-## 18. Invariants & Pitfalls
-
-| Invariant | Correct pattern |
-|---|---|
-| All vault reads → reader module | Use `readPhaseNode()`, `readBundle()`, `readRawFile()` |
-| All vault writes → writer module | Use `setPhaseTag()`, `appendToLog()`, `writeFile()` |
-| Phase state changes → through FSM | Use `setPhaseTag()` — never write `state:` directly to frontmatter |
-| Managed block content → `managedBlocks.ts` | Use `readManagedBlock()`, `writeManagedBlock()` |
-| Config → `loadConfig()` | Never read `onyx.config.json` directly |
-| Agent tasks are checkboxes | Agent ticks `- [ ]` → `- [x]`. Do not use other formats for task state. |
-| Vault is the only state | Do not cache phase state in memory across loop iterations |
-
-| Pitfall | Why it's wrong |
-|---|---|
-| Writing vault files with `fs.writeFileSync` directly | Bypasses atomic write guarantees, can corrupt frontmatter |
-| Injecting file content into prompts | Bloats context. Use `--add-dir` and let the agent read natively. |
-| Implementing task discovery locally | Import from `src/executor/selectTask.ts` — single implementation |
-| Hard-coding model names | Read from `config.modelTiers` |
-| Transitioning FSM state without `setPhaseTag()` | State and tags can diverge; healer will flag it as drift |
-| Running `onyx run` without first running `onyx doctor` | Config errors surface late and cryptically |
-| Skipping `onyx explain` before debugging | The healer may have already fixed the issue; explain shows current state |
-
----
-
-*ONYX Architecture Directive v4.0 — Updated 2026-04-16*
 *Maintained in: `08 - System/Agent Directives/ONYX Architecture Directive.md`*
+*Related: [[08 - System/ONYX - Zero-Code Architecture Vision.md|Zero-Code Architecture Vision]] · [[08 - System/ONYX Master Directive.md|ONYX Master Directive]]*
