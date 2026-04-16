@@ -2,7 +2,7 @@
 tags: [onyx, system, guide, status-active]
 graph_domain: system
 created: 2026-04-14
-updated: 2026-04-14
+updated: 2026-04-16
 type: guide
 ---
 
@@ -52,17 +52,19 @@ Every project has a profile set in `Overview.md` frontmatter. The profile tells 
 - What bundle documents to create at init
 - What context to inject into the agent
 
-Seven profiles:
+Nine profiles:
 
 | Profile | Domain | Key required fields | Acceptance gate |
 |---|---|---|---|
 | `general` | Catch-all — start here if unsure | none | all tasks checked + output documented |
 | `engineering` | Software with a git repo | `repo_path`, `test_command` | test command exits 0 |
 | `content` | Podcast, newsletter, video pipeline | `voice_profile`, `pipeline_stage` | safety filter + voice check |
-| `research` | Investigation, analysis, synthesis | `research_question`, `source_constraints`, `output_format` | source count + confidence |
-| `operations` | System ops, incidents, maintenance | `monitored_systems`, `runbook_path` | runbook followed + outcome documented |
+| `research` | Investigation, analysis, synthesis | `research_question`, `source_constraints`, `output_format` | source count + confidence gaps declared |
+| `operations` | System ops, incidents, monitoring | `monitored_systems`, `runbook_path` | runbook followed + outcome documented |
 | `trading` | Algorithmic strategies, exchange bots | `exchange`, `strategy_type`, `risk_limits`, `backtest_command` | backtest passes + risk compliance |
 | `experimenter` | Systematic experimentation, A/B testing | `hypothesis`, `success_metric`, `baseline_value` | result recorded + Cognition Store updated |
+| `accounting` | Bookkeeping, reconciliation, reporting | `ledger_path`, `reporting_period` | trial balance verified + human sign-off |
+| `legal` | Contracts, research, compliance | `jurisdiction`, `matter_type` | citations verified + professional review required |
 
 → Full specs: [[08 - System/Profiles/Profiles Hub.md|Profiles Hub]]
 
@@ -225,7 +227,10 @@ onyx status
 # What is each project doing? (plain English)
 onyx explain
 
-# Run one phase of one project (safest to start)
+# Run the single highest-priority ready phase (safest way to start)
+onyx next
+
+# Run one phase of one project
 onyx run --project "ManiPlus" --once
 
 # Run all ready phases across all projects
@@ -235,7 +240,8 @@ onyx run
 onyx run --project "ManiPlus" --phase 2
 ```
 
-`--once` does one iteration: find one ready phase, run it, stop. Use this while you're getting comfortable.
+`onyx next` picks the highest-priority ready phase and runs it once — the safest single-step entry point.  
+`--once` does one loop iteration then stops. Use either while you're getting comfortable.
 
 ---
 
@@ -250,16 +256,16 @@ onyx status
 
 # Execution log for a specific project
 onyx logs "ManiPlus"
-onyx logs "ManiPlus" --recent    # last 5 entries
+onyx logs "ManiPlus" --recent    # most recent entries
 
 # Web dashboard (localhost:7070)
 onyx dashboard
 ```
 
-`onyx explain` is your primary window into what's happening. It shows:
+`onyx explain` is your primary debugging tool. It reads the vault directly (no LLM) and shows:
 - Active phase + which directive is running + acceptance criteria
-- Queued phases + their priorities
-- Blocked phases + how to unblock
+- Queued phases + their priorities + auto-wired directives
+- Blocked phases + the human requirement that needs resolving
 - Knowledge.md summary and Cognition Store state (for experimenter projects)
 
 ---
@@ -422,30 +428,42 @@ onyx init "Project" --profile content # create bundle
 
 # Visibility
 onyx explain                          # all projects, plain English
-onyx explain "Project"                # one project, detailed
+onyx explain "Project"                # one project, detailed (no LLM — pure vault read)
 onyx status                           # all projects, phase states
 onyx logs "Project"                   # execution log
-onyx logs "Project" --recent          # last 5 entries
+onyx logs "Project" --recent          # most recent entries
+onyx logs --audit                     # full audit trail
 
 # Execution
-onyx run                              # all ready phases
+onyx next                             # run single highest-priority ready phase
+onyx run                              # all ready phases, autonomous loop
 onyx run --project "Project"          # one project
-onyx run --once                       # single iteration
-onyx run --phase 2                    # specific phase
+onyx run --once                       # single iteration then exit
+onyx run --phase 2                    # specific phase number
+onyx run --dry-run                    # preview without executing
 
 # Planning
 onyx plan "Project"                   # decompose + atomise
-onyx decompose "Project"              # Overview → phase stubs
+onyx plan "Project" --extend          # add new phases to existing project
+onyx decompose "Project"              # Overview → phase stubs only
 onyx atomise "Project" 1              # one phase → tasks
 
-# State management
-onyx reset "Project"                  # unblock → ready
-onyx heal                             # fix stale locks, drift
-onyx set-state <path> ready           # force state change
+# Phase state
+onyx ready "Project"                  # pick next backlog phase → set ready
+onyx ready "Project" 3                # set specific phase to ready
+onyx reset "Project"                  # unblock → ready (after fixing the blocker)
+onyx block "Project" "reason"         # manually block an active phase
+onyx set-state <path> ready           # force state change (for scripts)
 
-# Vault
+# Maintenance
+onyx heal                             # fix stale locks, drift, graph links
+onyx check "Project"                  # validate vault state (fields, deps, directives)
 onyx consolidate "Project"            # manually trigger Knowledge consolidation
 onyx refresh-context "Project"        # re-scan repo, update Repo Context
+
+# Capture & daily work
+onyx capture "note text"              # append to Inbox.md
+onyx daily-plan                       # generate today's time-blocked plan
 
 # Integrations
 onyx dashboard                        # web dashboard on :7070
@@ -517,7 +535,7 @@ ONYX gets smarter in three layers:
 
 ## Reference
 
-- [[08 - System/Profiles/Profiles Hub.md|Profiles Hub]] — all 7 profiles with full specs
+- [[08 - System/Profiles/Profiles Hub.md|Profiles Hub]] — all 9 profiles with full specs
 - [[08 - System/Agent Directives/Agent Directives Hub.md|Agent Directives Hub]] — all system directives (15 professional roles + system roles)
 - [[08 - System/ONYX Integrations.md|ONYX Integrations]] — integration catalogue: APIs, tiers, env vars
 - [[08 - System/Agent Directives/ONYX Architecture Directive.md|ONYX Architecture Directive]] — full system internals

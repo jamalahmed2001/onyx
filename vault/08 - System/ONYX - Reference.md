@@ -352,7 +352,7 @@ Profiles live in `08 - System/Profiles/` — one markdown file per domain. Set `
 
 Results accumulate in the Cognition Store. Every negative result is as valuable as a positive one — the system learns what doesn't work.
 
-→ Full specs: [[08 - System/Profiles/Profiles Hub.md|Profiles Hub]]
+→ Full profile specs: [[08 - System/Profiles/Profiles Hub.md|Profiles Hub]]
 
 ---
 
@@ -511,12 +511,26 @@ When ONYX spawns an agent for a phase, it assembles and injects context in this 
 
 The agent reads this concatenated context as a single prompt. It knows its identity, its domain rules, its project's history and learnings, and its current task — all before it starts reasoning.
 
-**Agent spawn command:**
-```bash
-claude --dangerously-skip-permissions --print "<assembled context>" --add-dir /path/to/repo
+**Agent spawn — the lean prompt pattern:**
+
+ONYX does NOT inject file content into the prompt. Instead, the assembled context is a lightweight prompt that points the agent at file paths:
+
+```
+Read these files before starting:
+- /vault/08 - System/Agent Directives/script-writer.md   (who you are)
+- /vault/08 - System/Profiles/content.md                 (domain rules)
+- /vault/ManiPlus/ManiPlus - Overview.md                 (project goals)
+- /vault/ManiPlus/ManiPlus - Knowledge.md                (prior learnings)
+- /vault/ManiPlus/Docs/ManiPlus - Source Context.md      (voice + safety)
+- /vault/ManiPlus/Phases/P2 - Write Script.md            (what to do now)
+
+Your working directories: /vault/ManiPlus, /home/jamal/clawd/maniplus
+Current task: Write script for episode 12
 ```
 
-The `--print` flag runs Claude Code in non-interactive print mode — it executes the context as a prompt and writes output to stdout. ONYX captures this output, ticks completed tasks, and updates the log note.
+The agent reads the actual vault files natively via `--add-dir`. No content is duplicated in the prompt. Context stays tight. The agent reasons against the real files, not a snapshot.
+
+This is why agents can discover things in the vault that weren't anticipated — they have full read access to the bundle, not a pre-filtered excerpt.
 
 ---
 
@@ -549,7 +563,7 @@ The default behaviour appends learnings as a chronological log. For long project
 
 ### Cross-project learning
 
-[[08 - System/Skills/Skills Index.md|Skills Index]] captures learnings that apply across all projects. Update it when you discover something generally applicable — patterns, anti-patterns, architectural decisions that transcend any single project.
+[[08 - System/Cross-Project Knowledge.md|Cross-Project Knowledge]] captures learnings that apply across all projects. The consolidator's LLM call automatically deduplicates new learnings against this file and adds only genuinely universal principles. Update it directly when you discover something generally applicable — patterns, anti-patterns, architectural decisions that transcend any single project.
 
 ---
 
@@ -604,43 +618,55 @@ Same vault. Same CLI. Same `onyx run`. Two projects. The build project creates t
 Every `onyx run` executes this sequence:
 
 ```
-1. Heal       — clear stale locks, fix frontmatter drift, repair graph links
-2. Discover   — scan vault paths matching projects_glob for phase-ready notes
-3. Sort       — by priority (desc) → risk (high first) → phase_number (asc)
-4. For each ready phase:
+1. Heal       — 5 healers: clear stale locks, fix drift, migrate logs, repair project IDs, recover orphaned locks
+2. Graph      — maintain vault graph + consolidate nodes
+3. Discover   — scan vault paths matching projects_glob; find ALL phases (any state)
+4. Cycle detect — detectDependencyCycles() warns on deadlocks; stops if cycles found
+5. Route      — for each phase: router maps state → operation (atomise / execute / wait / skip / surface_blocker)
+6. For each executable phase:
    a. Check depends_on — skip if any dependency is not completed
-   b. Acquire lock     — write locked_by, locked_at, lock_pid, lock_ttl_ms to frontmatter
-   c. Flip state       — tag: phase-active, state: active
-   d. Assemble context — directive + profile + overview + knowledge + context doc + phase
-   e. Spawn agent      — claude --dangerously-skip-permissions --print "<context>"
-   f. Monitor output   — tick completed tasks in phase note, append to log note
-   g. Verify           — run profile acceptance gate (test_command, safety filter, etc.)
-   h. Transition       — completed or blocked based on outcome
-   i. Release lock     — clear locked_by, locked_at, lock_pid, lock_ttl_ms
-5. Consolidate — extract learnings from newly completed phases into Knowledge.md
-6. Repeat      — loop until no actionable phases remain (or --once exits)
+   b. Backup           — write .bak of phase file before touching anything
+   c. Acquire lock     — write locked_by, locked_at, lock_pid, lock_ttl_ms
+   d. Preflight        — validate profile required_fields; fatal if any missing
+   e. Flip state       — tag: phase-active, state: active
+   f. Build prompt     — lean prompt: file PATHS (not content); agent reads natively via --add-dir
+   g. Spawn agent      — claude --dangerously-skip-permissions with --add-dir {bundleDir} [repoPath]
+   h. Task loop        — agent executes tasks, ticks checkboxes; 3-strike retry on failure
+   i. Acceptance check — run profile acceptance gate (test_command, safety filter, etc.)
+   j. Transition       — completed (git-tag repo) or blocked (write Human Requirements)
+   k. Release lock     — clear all lock fields
+7. Consolidate — extract learnings from completed + blocked phases into Knowledge.md
+8. Repeat      — loop until no actionable phases remain (or --once exits after first phase)
 ```
 
-`--once` mode: performs one iteration (one phase) then exits. Useful for cron, careful first runs.
+`onyx next` runs step 6 for exactly one phase (highest priority) and exits.  
+`--once` performs one full loop iteration (may include atomising + executing) then exits.  
+Cron-safe: `onyx run --once >> /var/log/onyx.log 2>&1`
 
 ### The healer
 
-`runAllHeals()` runs at the start of every `onyx run`. All repairs are idempotent — safe to run repeatedly. After lock/drift repairs, `onyx heal` also runs graph maintenance and node consolidation.
+`runAllHeals()` runs at the start of every `onyx run`. All repairs are idempotent — safe to run repeatedly.
 
-| Repair type | Detection | Action |
+Five healers, each targeting a specific failure mode:
+
+| Healer | Detection | Action |
 |---|---|---|
-| `stale_lock_cleared` | Lock age > `stale_lock_threshold_ms` (default 5 min) | Clear locked_by, locked_at, lock_pid, lock_ttl_ms |
-| `frontmatter_drift` | `state:` field doesn't match `tags:` array | Normalize both to the canonical FSM state |
-| `orphaned_phase` | Phase `active` AND all task checkboxes ticked | Transition → `completed` |
+| `staleLocks` | Lock age > `stale_lock_threshold_ms` (default 5 min) | Clear locked_by, locked_at, lock_pid, lock_ttl_ms; reset to phase-ready |
+| `drift` | `state:` field doesn't match `tags:` array; duplicate or malformed tags | Normalize both to the canonical FSM state; fix tag format |
+| `migrateLogs` | Legacy log format in old location | Migrate to current `Logs/L{n} - ...md` structure |
+| `repairProjectId` | Phase frontmatter missing `project_id` field | Infer project_id from bundle folder path and write it |
+| `recoverOrphanedLocks` | Phase locked by a PID that no longer exists | Clear lock fields; reset to phase-ready |
 
-Graph maintenance (`maintainVaultGraph`):
+After all five healers, `onyx heal` also runs:
+
+**Graph maintenance** (`maintainVaultGraph`):
 - Repairs nav links between phases
 - Removes stale cross-links
-- Splits phase hub notes with more than 8 phases
+- Maintains the vault graph for the web dashboard visualization
 
-Node consolidation (`consolidateVaultNodes`):
-- Archives completed phases older than the retention threshold
+**Node consolidation** (`consolidateVaultNodes`):
 - Merges duplicate docs
+- Maintains hub note structure
 
 ### Atomic locking
 
@@ -658,7 +684,16 @@ Lock release clears all four fields. The healer clears any lock older than `lock
 
 ### Phase discovery
 
-ONYX discovers phases by scanning vault paths matching `projects_glob` in `onyx.config.json`. Any `.md` file with `tags: [onyx-phase, phase-ready]` in its frontmatter is a candidate. ONYX extracts frontmatter for routing decisions without reading the full note body at discovery time.
+ONYX discovers **all** phases in the vault — not just ready ones — by scanning `.md` files in `Phases/` directories inside paths matching `projects_glob`. A file is recognized as a phase if it has an `onyx-phase` tag, a `phase_number` frontmatter field, or simply lives in a `/Phases/` directory.
+
+The router then decides what to do with each phase based on its state:
+- `backlog` → atomise (generate tasks)
+- `planning` → wait (atomiser in flight)
+- `ready` or `active` → execute
+- `blocked` → surface the blocker
+- `completed` → skip
+
+Dependency filtering happens at discovery time for ready phases — a phase with unmet `depends_on` is held out of the execution queue until all dependencies are `completed`.
 
 ### Vault graph
 
@@ -674,6 +709,7 @@ ONYX discovers phases by scanning vault paths matching `projects_glob` in `onyx.
 ### Daily execution
 
 ```bash
+onyx next                             # find highest-priority ready phase and run it
 onyx run                              # full autonomous loop across all ready phases
 onyx run --project "My Project"       # scope to one project only
 onyx run --once                       # single iteration then exit (safe for cron)
