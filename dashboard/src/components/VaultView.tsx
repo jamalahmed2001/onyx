@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChevronRight, ChevronDown, FileText, Folder, FolderOpen } from 'lucide-react';
 import type { VaultFileNode } from '@/lib/types';
 import type { VaultGraphNode, VaultGraphLink } from '@/app/api/onyx/vault-graph/route';
-import PortalView from './PortalView';
+import VaultUniverse from './VaultUniverse';
 import HandTracker, { type HandGestureState, type GestureType } from './HandTracker';
 
 interface Props { tree: VaultFileNode[]; onOpenFile: (path: string) => void }
@@ -1151,11 +1151,11 @@ function VaultGraph({ onOpenFile }: { onOpenFile: (p: string) => void }) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function VaultView({ tree, onOpenFile }: Props) {
-  const [view, setView] = useState<'portal' | 'graph' | 'tree'>('portal');
+  const [view, setView] = useState<'universe' | 'graph' | 'tree'>('universe');
   const views: Array<{ key: typeof view; label: string }> = [
-    { key: 'portal', label: 'Portal' },
-    { key: 'graph',  label: 'Graph'  },
-    { key: 'tree',   label: 'File Tree' },
+    { key: 'universe', label: 'Universe' },
+    { key: 'graph',    label: 'Graph'    },
+    { key: 'tree',     label: 'File Tree' },
   ];
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1179,7 +1179,7 @@ export default function VaultView({ tree, onOpenFile }: Props) {
         ) : view === 'graph' ? (
           <VaultGraph onOpenFile={onOpenFile}/>
         ) : (
-          <PortalView onOpenFile={onOpenFile}/>
+          <VaultUniverse onOpenFile={onOpenFile}/>
         )}
       </div>
     </div>
