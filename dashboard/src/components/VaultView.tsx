@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChevronRight, ChevronDown, FileText, Folder, FolderOpen } from 'lucide-react';
 import type { VaultFileNode } from '@/lib/types';
 import type { VaultGraphNode, VaultGraphLink } from '@/app/api/onyx/vault-graph/route';
+import PortalView from './PortalView';
 import HandTracker, { type HandGestureState, type GestureType } from './HandTracker';
 
 interface Props { tree: VaultFileNode[]; onOpenFile: (path: string) => void }
@@ -1150,19 +1151,24 @@ function VaultGraph({ onOpenFile }: { onOpenFile: (p: string) => void }) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function VaultView({ tree, onOpenFile }: Props) {
-  const [view, setView] = useState<'graph' | 'tree'>('graph');
+  const [view, setView] = useState<'portal' | 'graph' | 'tree'>('portal');
+  const views: Array<{ key: typeof view; label: string }> = [
+    { key: 'portal', label: 'Portal' },
+    { key: 'graph',  label: 'Graph'  },
+    { key: 'tree',   label: 'File Tree' },
+  ];
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ display: 'flex', gap: 0, padding: '6px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg-1)' }}>
-        {(['graph', 'tree'] as const).map(v => (
-          <button key={v} onClick={() => setView(v)} style={{
+        {views.map((v, i) => (
+          <button key={v.key} onClick={() => setView(v.key)} style={{
             padding: '4px 14px', border: '1px solid var(--border)',
-            borderRadius: v === 'graph' ? '4px 0 0 4px' : '0 4px 4px 0',
-            background: view === v ? 'var(--bg-3)' : 'transparent',
-            color: view === v ? 'var(--text-str)' : 'var(--text-faint)',
+            borderRadius: i === 0 ? '4px 0 0 4px' : i === views.length - 1 ? '0 4px 4px 0' : '0',
+            background: view === v.key ? 'var(--bg-3)' : 'transparent',
+            color: view === v.key ? 'var(--text-str)' : 'var(--text-faint)',
             cursor: 'pointer', fontSize: 11, fontFamily: 'inherit',
-            marginLeft: v === 'tree' ? -1 : 0,
-          }}>{v === 'graph' ? 'Graph' : 'File Tree'}</button>
+            marginLeft: i === 0 ? 0 : -1,
+          }}>{v.label}</button>
         ))}
       </div>
       <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -1170,8 +1176,10 @@ export default function VaultView({ tree, onOpenFile }: Props) {
           <div style={{ height: '100%', overflow: 'auto', padding: '6px 2px', background: 'var(--bg)' }}>
             {tree.map(n => <TreeNode key={n.path} node={n} depth={0} onOpen={onOpenFile}/>)}
           </div>
-        ) : (
+        ) : view === 'graph' ? (
           <VaultGraph onOpenFile={onOpenFile}/>
+        ) : (
+          <PortalView onOpenFile={onOpenFile}/>
         )}
       </div>
     </div>

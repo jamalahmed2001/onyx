@@ -80,3 +80,56 @@ export async function readForever<T>(key: string): Promise<T | null> {
   const record = await readCache<CachedWithTime<T>>(key);
   return record?.data ?? null;
 }
+
+// ── Account failure tracking (for exponential backoff + 3-strikes disable) ─
+
+export interface AccountFailureState {
+  consecutiveFailures: number;
+  lastFailureTs: number;   // ms epoch
+  lastErrorMessage: string;
+}
+
+const FAILURE_KEY = 'account-failures';
+
+export async function readAccountFailures(): Promise<Record<string, AccountFailureState>> {
+  return (await readCache<Record<string, AccountFailureState>>(FAILURE_KEY)) ?? {};
+}
+
+export async function writeAccountFailures(map: Record<string, AccountFailureState>): Promise<void> {
+  await writeCache(FAILURE_KEY, map);
+}
+
+export async function recordAccountFailure(user: string, error: string): Promise<AccountFailureState> {
+  const map = await readAccountFailures();
+  const prev = map[user] ?? { consecutiveFailures: 0, lastFailureTs: 0, lastErrorMessage: '' };
+  const next: AccountFailureState = {
+    consecutiveFailures: prev.consecutiveFailures + 1,
+    lastFailureTs: Date.now(),
+    lastErrorMessage: error.slice(0, 200),
+  };
+  map[user] = next;
+  await writeAccountFailures(map);
+  return next;
+}
+
+export async function recordAccountSuccess(user: string): Promise<void> {
+  const map = await readAccountFailures();
+  if (map[user]) {
+    delete map[user];
+    await writeAccountFailures(map);
+  }
+}
+
+/**
+ * Backoff policy: after N consecutive failures, skip the account for
+ *   min(60s * 2^(N-1), 1h).
+ * Returns the ms remaining before next retry (0 = can retry now).
+ */
+export function backoffRemainingMs(state: AccountFailureState | undefined): number {
+  if (!state || state.consecutiveFailures === 0) return 0;
+  const base = 60_000; // 1 minute
+  const cap = 60 * 60_000; // 1 hour
+  const delay = Math.min(base * Math.pow(2, state.consecutiveFailures - 1), cap);
+  const remaining = (state.lastFailureTs + delay) - Date.now();
+  return Math.max(0, remaining);
+}

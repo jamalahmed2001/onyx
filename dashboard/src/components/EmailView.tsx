@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Mail, RefreshCw, AlertCircle, Zap, Info, VolumeX, PenLine, Copy, Check,
   X, ChevronDown, ChevronRight, Inbox, Globe, User, Folder, WifiOff,
+  Send, Save, Sparkles,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -75,14 +76,23 @@ function fmtDate(iso: string): string {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
-// ── Draft modal ────────────────────────────────────────────────────────────────
+// ── Draft modal — 3-stage flow: generate → preview+edit → confirm (save|send) ──
+
+type DraftStage = 'compose' | 'preview' | 'confirmSend' | 'sending' | 'sent';
 
 function DraftModal({ email, body, onClose }: { email: TriagedEmail; body: EmailBody | null; onClose: () => void }) {
-  const [context, setContext] = useState('');
-  const [draft, setDraft]     = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
-  const [copied, setCopied]   = useState(false);
+  const [stage, setStage]       = useState<DraftStage>('compose');
+  const [context, setContext]   = useState('');
+  const [draft, setDraft]       = useState('');
+  const [subject, setSubject]   = useState(`Re: ${email.subject.replace(/^re:\s*/i, '')}`);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+  const [copied, setCopied]     = useState(false);
+  const [saveResult, setSaveResult] = useState<string | null>(null);
+
+  // Derive recipient from the "from" of the original email (proper reply)
+  const parsedFrom  = parseFrom(email.from);
+  const toAddress   = parsedFrom.address;
 
   const generate = async () => {
     setLoading(true); setError(null);
@@ -90,11 +100,18 @@ function DraftModal({ email, body, onClose }: { email: TriagedEmail; body: Email
       const res = await fetch('/api/mailcow/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject: email.subject, from: email.from, body: body?.text ?? email.snippet ?? '', project: email.project, context: context.trim() || undefined }),
+        body: JSON.stringify({
+          subject: email.subject,
+          from: email.from,
+          body: body?.text ?? email.snippet ?? '',
+          project: email.project,
+          context: context.trim() || undefined,
+        }),
       });
       const d = await res.json() as { draft?: string; error?: string };
       if (!res.ok || d.error) throw new Error(d.error ?? 'Failed');
       setDraft(d.draft ?? '');
+      setStage('preview');
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
   };
@@ -105,37 +122,222 @@ function DraftModal({ email, body, onClose }: { email: TriagedEmail; body: Email
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const saveDraft = async () => {
+    setLoading(true); setError(null); setSaveResult(null);
+    try {
+      const res = await fetch('/api/mailcow/save-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account: email.account,
+          to: toAddress,
+          subject,
+          body: draft,
+        }),
+      });
+      const d = await res.json() as { ok?: boolean; uid?: number; mailbox?: string; error?: string };
+      if (!res.ok || d.error) throw new Error(d.error ?? 'Failed');
+      setSaveResult(`Saved to ${d.mailbox ?? 'Drafts'}${d.uid ? ` (uid ${d.uid})` : ''}`);
+    } catch (e) { setError((e as Error).message); }
+    finally { setLoading(false); }
+  };
+
+  const sendReply = async () => {
+    setStage('sending'); setError(null);
+    try {
+      const res = await fetch('/api/mailcow/send-reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account: email.account,
+          to: toAddress,
+          subject,
+          body: draft,
+        }),
+      });
+      const d = await res.json() as { ok?: boolean; messageId?: string; response?: string; error?: string };
+      if (!res.ok || d.error) throw new Error(d.error ?? 'Failed');
+      setStage('sent');
+    } catch (e) {
+      setError((e as Error).message);
+      setStage('preview');
+    }
+  };
+
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 400 }}/>
-      <div style={{ position: 'fixed', top: '10%', left: '50%', transform: 'translateX(-50%)', width: 580, maxHeight: '80vh', display: 'flex', flexDirection: 'column', background: 'rgba(10,14,22,0.98)', backdropFilter: 'blur(32px)', border: '1px solid rgba(77,156,248,0.25)', borderRadius: 12, zIndex: 401, boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+      <div onClick={stage === 'sending' ? undefined : onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 400 }}/>
+      <div style={{ position: 'fixed', top: '7%', left: '50%', transform: 'translateX(-50%)', width: 620, maxHeight: '86vh', display: 'flex', flexDirection: 'column', background: 'rgba(10,14,22,0.98)', backdropFilter: 'blur(32px)', border: '1px solid rgba(77,156,248,0.25)', borderRadius: 12, zIndex: 401, boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+
+        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderBottom: '1px solid var(--glass-b)', flexShrink: 0 }}>
           <PenLine size={13} style={{ color: 'var(--accent)' }}/>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-str)', flex: 1 }}>Draft Reply</span>
-          <span style={{ fontSize: 11, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>Re: {email.subject}</span>
-          <button onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-faint)' }}><X size={14}/></button>
-        </div>
-        <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 10, color: 'var(--text-faint)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Your intent (optional)</div>
-            <textarea value={context} onChange={e => setContext(e.target.value)} placeholder="e.g. Agree to the proposal, ask for timeline. Decline politely…" rows={2}
-              style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--glass-b)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-str)', fontSize: 12, outline: 'none', fontFamily: 'inherit', resize: 'none', lineHeight: 1.4 }}/>
-          </div>
-          <button onClick={() => void generate()} disabled={loading}
-            style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(77,156,248,0.4)', background: loading ? 'transparent' : 'rgba(77,156,248,0.1)', cursor: loading ? 'not-allowed' : 'pointer', fontSize: 12, color: 'var(--accent)', fontFamily: 'inherit', fontWeight: 500, alignSelf: 'flex-start' }}>
-            {loading ? 'Generating…' : draft ? 'Regenerate' : 'Generate Draft'}
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-str)', flex: 1 }}>
+            {stage === 'sent' ? 'Sent' : stage === 'sending' ? 'Sending…' : stage === 'confirmSend' ? 'Confirm send' : 'Reply'}
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>
+            {parsedFrom.name} &lt;{toAddress}&gt;
+          </span>
+          <button onClick={onClose} disabled={stage === 'sending'} style={{ border: 'none', background: 'transparent', cursor: stage === 'sending' ? 'not-allowed' : 'pointer', color: 'var(--text-faint)' }}>
+            <X size={14}/>
           </button>
-          {error && <div style={{ fontSize: 11, color: '#f87171', padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(248,113,113,0.2)', background: 'rgba(248,113,113,0.05)' }}>{error}</div>}
-          {draft && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, flex: 1 }}>Generated Draft</div>
-                <button onClick={() => void copy()} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--glass-b)', background: 'transparent', cursor: 'pointer', fontSize: 10, color: copied ? 'var(--ready)' : 'var(--text-dim)', fontFamily: 'inherit' }}>
-                  {copied ? <Check size={10}/> : <Copy size={10}/>}{copied ? 'Copied' : 'Copy'}
+        </div>
+
+        <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+          {/* Stage indicator */}
+          <div style={{ display: 'flex', gap: 6, fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+            <span style={{ color: stage === 'compose' ? 'var(--accent)' : 'var(--text-faint)' }}>1. Compose</span>
+            <span>›</span>
+            <span style={{ color: stage === 'preview' ? 'var(--accent)' : 'var(--text-faint)' }}>2. Preview</span>
+            <span>›</span>
+            <span style={{ color: stage === 'confirmSend' || stage === 'sending' || stage === 'sent' ? 'var(--accent)' : 'var(--text-faint)' }}>3. Confirm</span>
+          </div>
+
+          {/* Stage: compose */}
+          {stage === 'compose' && (
+            <>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-faint)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Your intent (optional)</div>
+                <textarea
+                  value={context}
+                  onChange={e => setContext(e.target.value)}
+                  placeholder="e.g. Agree to the proposal, ask for timeline. Decline politely…"
+                  rows={3}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--glass-b)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-str)', fontSize: 12, outline: 'none', fontFamily: 'inherit', resize: 'none', lineHeight: 1.4 }}
+                />
+              </div>
+              <button
+                onClick={() => void generate()}
+                disabled={loading}
+                style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(77,156,248,0.4)', background: loading ? 'transparent' : 'rgba(77,156,248,0.1)', cursor: loading ? 'not-allowed' : 'pointer', fontSize: 12, color: 'var(--accent)', fontFamily: 'inherit', fontWeight: 500, alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <Sparkles size={12}/>
+                {loading ? 'Generating…' : 'Generate Draft'}
+              </button>
+            </>
+          )}
+
+          {/* Stage: preview (editable) */}
+          {stage === 'preview' && (
+            <>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-faint)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>To</div>
+                <input
+                  value={toAddress}
+                  readOnly
+                  style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--glass-b)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontSize: 12, outline: 'none', fontFamily: 'inherit' }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-faint)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Subject</div>
+                <input
+                  value={subject}
+                  onChange={e => setSubject(e.target.value)}
+                  style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--glass-b)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-str)', fontSize: 12, outline: 'none', fontFamily: 'inherit' }}
+                />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, flex: 1 }}>Body</div>
+                  <button onClick={() => void copy()} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--glass-b)', background: 'transparent', cursor: 'pointer', fontSize: 10, color: copied ? 'var(--ready)' : 'var(--text-dim)', fontFamily: 'inherit' }}>
+                    {copied ? <Check size={10}/> : <Copy size={10}/>}{copied ? 'Copied' : 'Copy'}
+                  </button>
+                  <button onClick={() => { setDraft(''); setStage('compose'); }} style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid var(--glass-b)', background: 'transparent', cursor: 'pointer', fontSize: 10, color: 'var(--text-dim)', fontFamily: 'inherit' }}>
+                    Regenerate
+                  </button>
+                </div>
+                <textarea
+                  value={draft}
+                  onChange={e => setDraft(e.target.value)}
+                  rows={14}
+                  style={{ width: '100%', padding: '10px', borderRadius: 6, border: '1px solid var(--glass-b)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-str)', fontSize: 12, outline: 'none', fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.6, caretColor: 'var(--accent)' }}
+                />
+              </div>
+              {saveResult && (
+                <div style={{ fontSize: 11, color: 'var(--ready)', padding: '6px 10px', borderRadius: 5, border: '1px solid rgba(34,197,94,0.2)', background: 'rgba(34,197,94,0.05)' }}>
+                  ✓ {saveResult}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+                <button
+                  onClick={() => void saveDraft()}
+                  disabled={loading || !draft.trim()}
+                  style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid var(--glass-b)', background: 'transparent', cursor: loading ? 'not-allowed' : 'pointer', fontSize: 12, color: 'var(--text-dim)', fontFamily: 'inherit', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Save size={12}/> {loading ? 'Saving…' : 'Save as Draft'}
+                </button>
+                <button
+                  onClick={() => setStage('confirmSend')}
+                  disabled={loading || !draft.trim() || !toAddress}
+                  style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(77,156,248,0.5)', background: 'rgba(77,156,248,0.1)', cursor: loading ? 'not-allowed' : 'pointer', fontSize: 12, color: 'var(--accent)', fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}
+                >
+                  <Send size={12}/> Send…
                 </button>
               </div>
-              <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={12}
-                style={{ width: '100%', padding: '10px', borderRadius: 6, border: '1px solid var(--glass-b)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-str)', fontSize: 12, outline: 'none', fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.6, caretColor: 'var(--accent)' }}/>
+            </>
+          )}
+
+          {/* Stage: confirm-send */}
+          {stage === 'confirmSend' && (
+            <>
+              <div style={{ padding: 14, borderRadius: 8, border: '1px solid rgba(251,146,60,0.3)', background: 'rgba(251,146,60,0.05)' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-str)', marginBottom: 10, fontWeight: 600 }}>
+                  Send this reply?
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>
+                  <strong style={{ color: 'var(--text-faint)' }}>From:</strong> {email.account}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>
+                  <strong style={{ color: 'var(--text-faint)' }}>To:</strong> {toAddress}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>
+                  <strong style={{ color: 'var(--text-faint)' }}>Subject:</strong> {subject}
+                </div>
+                <pre style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'inherit', margin: 0, maxHeight: 280, overflow: 'auto', padding: 10, borderRadius: 5, background: 'rgba(0,0,0,0.2)' }}>
+                  {draft}
+                </pre>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => setStage('preview')}
+                  style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid var(--glass-b)', background: 'transparent', cursor: 'pointer', fontSize: 12, color: 'var(--text-dim)', fontFamily: 'inherit' }}
+                >
+                  ← Back to edit
+                </button>
+                <button
+                  onClick={() => void sendReply()}
+                  style={{ padding: '8px 20px', borderRadius: 6, border: '1px solid rgba(77,156,248,0.5)', background: 'rgba(77,156,248,0.15)', cursor: 'pointer', fontSize: 12, color: 'var(--accent)', fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}
+                >
+                  <Send size={12}/> Yes, send now
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Stage: sending */}
+          {stage === 'sending' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px', justifyContent: 'center', color: 'var(--accent)', fontSize: 12 }}>
+              <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }}/>
+              Sending via {email.account}…
+            </div>
+          )}
+
+          {/* Stage: sent */}
+          {stage === 'sent' && (
+            <div style={{ padding: 18, borderRadius: 8, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.06)', textAlign: 'center' }}>
+              <Check size={28} style={{ color: 'var(--ready)', marginBottom: 8 }}/>
+              <div style={{ fontSize: 13, color: 'var(--text-str)', fontWeight: 600, marginBottom: 4 }}>Reply sent</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>To {toAddress}</div>
+              <button onClick={onClose} style={{ marginTop: 14, padding: '6px 16px', borderRadius: 6, border: '1px solid var(--glass-b)', background: 'transparent', cursor: 'pointer', fontSize: 11, color: 'var(--text-dim)', fontFamily: 'inherit' }}>
+                Close
+              </button>
+            </div>
+          )}
+
+          {error && (
+            <div style={{ fontSize: 11, color: '#f87171', padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(248,113,113,0.2)', background: 'rgba(248,113,113,0.05)' }}>
+              {error}
             </div>
           )}
         </div>

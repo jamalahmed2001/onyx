@@ -1,8 +1,18 @@
 import 'server-only';
 
 import { ImapFlow } from 'imapflow';
-import { getAccounts, imapConfigFor } from './mailcowImap';
-import { readCache, writeCache } from './mailcowCache';
+import { readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { getAccounts, imapConfigFor, type MailcowAccount } from './mailcowImap';
+import {
+  readCache,
+  writeCache,
+  readAccountFailures,
+  recordAccountFailure,
+  recordAccountSuccess,
+  backoffRemainingMs,
+  type AccountFailureState,
+} from './mailcowCache';
 
 export type FolderInfo = {
   name: string;
@@ -45,15 +55,19 @@ function toDisplay(name: string): string {
   return DISPLAY_NAME[stripped] ?? DISPLAY_NAME[name] ?? stripped;
 }
 
-// Tuning knobs — mail servers (Dovecot) often rate-limit concurrent connections per IP,
-// so keep concurrency modest and per-account timeout tight enough that a dead host
-// never hangs the whole tree for more than ~10s.
+// Tuning knobs — mail servers (Dovecot / mailcow fail2ban) rate-limit aggressively
+// on repeated auth attempts from one IP. Keep concurrency at 2 to minimise the
+// risk of tripping the recidive jail (which hard-bans for 1 week).
 const PER_ACCOUNT_TIMEOUT_MS = 10_000;
-const CONCURRENCY = 4;
+const CONCURRENCY = 2;
 // Whole-tree hard ceiling — if discovery isn't done by this point, return what we have.
 const TREE_HARD_TIMEOUT_MS = 45_000;
 const MEMORY_CACHE_TTL_MS = 60_000;
 const DISK_CACHE_TTL_MS = 10 * 60_000;
+
+// Auto-disable threshold: after N consecutive failures, mark the account
+// `disabled: true` in mailcow-accounts.json so it's never probed again.
+const FAILURE_DISABLE_THRESHOLD = 3;
 
 let memCache: { tree: DomainInfo[]; ts: number } | null = null;
 
@@ -84,9 +98,55 @@ async function pMapConcurrent<T, R>(
   return results;
 }
 
-async function discoverSingleAccount(acct: { user: string; pass: string; label?: string }): Promise<AccountInfo> {
+/**
+ * Auto-disable an account in mailcow-accounts.json by setting `disabled: true`.
+ * Atomic write (temp file + rename) so a concurrent reader never sees a partial file.
+ * Preserves all other fields and accounts untouched.
+ */
+async function disableAccountInJson(user: string, reason: string): Promise<void> {
+  const jsonPath = process.env.MAILCOW_IMAP_ACCOUNTS_PATH;
+  if (!jsonPath) {
+    console.warn(`[mailcowAccounts] can't auto-disable ${user}: MAILCOW_IMAP_ACCOUNTS_PATH not set`);
+    return;
+  }
+  const abs = jsonPath.startsWith('/') ? jsonPath : path.resolve(process.cwd(), jsonPath);
+  try {
+    const raw = await readFile(abs, 'utf8');
+    const accounts = JSON.parse(raw) as MailcowAccount[];
+    let changed = false;
+    for (const a of accounts) {
+      if (a.user === user && !a.disabled) {
+        a.disabled = true;
+        // Leave a breadcrumb for the operator
+        (a as MailcowAccount & { disabled_at?: string; disabled_reason?: string }).disabled_at = new Date().toISOString();
+        (a as MailcowAccount & { disabled_at?: string; disabled_reason?: string }).disabled_reason = reason;
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    const tmp = abs + '.tmp';
+    await writeFile(tmp, JSON.stringify(accounts, null, 2), 'utf8');
+    const fs = await import('node:fs/promises');
+    await fs.rename(tmp, abs);
+    console.warn(`[mailcowAccounts] auto-disabled ${user} after ${FAILURE_DISABLE_THRESHOLD} consecutive failures — reason: ${reason}`);
+  } catch (e) {
+    console.warn(`[mailcowAccounts] failed to update accounts JSON for ${user}: ${(e as Error).message}`);
+  }
+}
+
+async function discoverSingleAccount(
+  acct: MailcowAccount,
+  failureMap: Record<string, AccountFailureState>,
+): Promise<AccountInfo> {
   const domain = acct.user.split('@')[1] ?? acct.user;
   const label = acct.label ?? acct.user.split('@')[0] ?? acct.user;
+
+  // Backoff: if this account recently failed, skip it until its cooldown elapses.
+  const existing = failureMap[acct.user];
+  const remaining = backoffRemainingMs(existing);
+  if (remaining > 0) {
+    return { user: acct.user, label, domain, folders: [], unread: 0, connected: false };
+  }
 
   const task = (async (): Promise<AccountInfo> => {
     const client = new ImapFlow({
@@ -109,7 +169,6 @@ async function discoverSingleAccount(acct: { user: string; pass: string; label?:
       let unread = 0;
       if (folders.find(f => f.name === 'INBOX')) {
         try {
-          // STATUS is cheaper than opening the mailbox — use it first
           const status = await client.status('INBOX', { unseen: true }) as { unseen?: number };
           if (typeof status.unseen === 'number') unread = status.unseen;
         } catch {
@@ -123,9 +182,18 @@ async function discoverSingleAccount(acct: { user: string; pass: string; label?:
   })();
 
   try {
-    return await withTimeout(task, PER_ACCOUNT_TIMEOUT_MS, `discover:${acct.user}`);
+    const result = await withTimeout(task, PER_ACCOUNT_TIMEOUT_MS, `discover:${acct.user}`);
+    // Success: clear any failure state
+    await recordAccountSuccess(acct.user);
+    return result;
   } catch (e) {
-    console.warn(`[mailcowAccounts] discover failed for ${acct.user}: ${(e as Error).message}`);
+    const msg = (e as Error).message;
+    console.warn(`[mailcowAccounts] discover failed for ${acct.user}: ${msg}`);
+    // Record failure + decide whether to auto-disable
+    const state = await recordAccountFailure(acct.user, msg);
+    if (state.consecutiveFailures >= FAILURE_DISABLE_THRESHOLD) {
+      await disableAccountInJson(acct.user, msg);
+    }
     return { user: acct.user, label, domain, folders: [], unread: 0, connected: false };
   }
 }
@@ -146,11 +214,12 @@ export async function getAccountTree(forceRefresh = false): Promise<DomainInfo[]
   }
 
   const accounts = getAccounts();
+  const failureMap = await readAccountFailures();
 
   // Parallel discovery with concurrency limit + per-account timeout.
   // Wrap the whole tree in a hard deadline — if some accounts are dog-slow we
   // return whatever completed rather than hanging the UI forever.
-  const discovery = pMapConcurrent(accounts, CONCURRENCY, discoverSingleAccount);
+  const discovery = pMapConcurrent(accounts, CONCURRENCY, (a) => discoverSingleAccount(a, failureMap));
   const infos: AccountInfo[] = await Promise.race([
     discovery,
     new Promise<AccountInfo[]>((resolve) => {

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.34",
+    "@types/nodemailer": "^8.0.0",
     "d3-force": "^3.0.0",
     "d3-timer": "^3.0.1",
     "gray-matter": "^4.0.3",
@@ -17,6 +18,7 @@
     "lucide-react": "^0.475.0",
     "mailparser": "^3.9.8",
     "next": "^15.3.0",
+    "nodemailer": "^8.0.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
