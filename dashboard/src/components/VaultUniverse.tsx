@@ -1,24 +1,19 @@
 'use client';
 
 /**
- * VaultUniverse — three-level 3D vault navigation.
+ * VaultUniverse — first-person recursive vault navigation.
  *
- *   Level 0 (Universe):  all project-bundle overviews as labeled spheres spread
- *                        across 3D space. Orbit to look around.
- *   Level 1 (Project):   click a bundle → camera flies to it → its fractal star
- *                        expands: Overview at center, hubs orbiting, leaves
- *                        orbiting each hub. Orbit to inspect.
- *   Level 2 (Detail):    click any leaf → right sidebar slides in with the
- *                        markdown. Scene stays visible. Close sidebar or
- *                        Esc returns to Level 1.
+ * You stand at the origin. The current node's neighbours form a ring around
+ * you. Drag (mouse or touch) to spin, tap a node to walk into it. Leaves open
+ * a detail sidebar with phase actions (launch agent, mark ready, open).
  *
- * Reuses /api/onyx/vault-graph (nodes + links) and /api/onyx/vault-file (raw md).
- * No new backend.
+ * A project quick-jump bar at the top lets you teleport straight to any
+ * project bundle without recursive walking.
  */
 
 import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Html, Stars } from '@react-three/drei';
+import { Html, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 import type { VaultGraphNode, VaultGraphLink } from '@/app/api/onyx/vault-graph/route';
 
@@ -26,449 +21,420 @@ interface Props {
   onOpenFile: (path: string) => void;
 }
 
-// ── Domain palette (matches VaultView's topFolder conventions) ──────────────
+// ── Palette ────────────────────────────────────────────────────────────────
 
 const DOMAIN_COLORS: Record<string, string> = {
-  '00': '#4493f8', // Dashboard
-  '03': '#ff9f0a', // Ventures
-  '04': '#00dcb4', // Finance
-  '05': '#b478ff', // Systems
-  '08': '#dc6e6e', // System
-  '09': '#787878', // Archive
-  '10': '#ffc850', // OpenClaw
+  '00': '#4493f8', '03': '#ff9f0a', '04': '#00dcb4', '05': '#b478ff',
+  '08': '#dc6e6e', '09': '#787878', '10': '#ffc850',
 };
-
 function colorForTopFolder(topFolder: string): string {
   const prefix = topFolder.match(/^(\d{2})/)?.[1];
   return (prefix && DOMAIN_COLORS[prefix]) ?? '#9aa4b2';
 }
-
-// ── Bundle discovery ────────────────────────────────────────────────────────
-
-interface Bundle {
-  id: string;
-  label: string;
-  topFolder: string;
-  overview: VaultGraphNode;
-  color: string;
-  position: THREE.Vector3;
-  linkCount: number;
-}
-
-/**
- * A "project bundle" is a directory with an Overview.md or Hub.md file.
- * We detect these by scanning the nodes for label matches, then use the file's
- * parent directory as the bundle identifier.
- */
-function detectBundles(nodes: VaultGraphNode[]): VaultGraphNode[] {
-  const bundles: VaultGraphNode[] = [];
-  const seenDirs = new Set<string>();
-  const OVERVIEW_RE = /^(.+\s[-–]\s)?Overview(\.md)?$/i;
-  const HUB_RE = /^(.+\s[-–]\s)?(System\s)?Hub(\.md)?$/i;
-
-  // Pass 1 — prefer project-level Overviews (one per directory, deepest wins)
-  for (const n of nodes) {
-    if (OVERVIEW_RE.test(n.label)) {
-      if (!seenDirs.has(n.folder)) {
-        seenDirs.add(n.folder);
-        bundles.push(n);
-      }
-    }
-  }
-  // Pass 2 — add top-level Hubs for domains without an Overview-based bundle
-  for (const n of nodes) {
-    if (HUB_RE.test(n.label) && n.folder === n.topFolder) {
-      const already = bundles.some((b) => b.topFolder === n.topFolder);
-      if (!already) bundles.push(n);
-    }
-  }
-  return bundles;
-}
-
-/**
- * Lay out bundles on a wide horizontal disc so they're clearly separated with
- * real depth. Uses a golden-angle spiral for a tidy, non-grid layout.
- */
-function layoutBundles(nodes: VaultGraphNode[]): Bundle[] {
-  const n = nodes.length;
-  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-  const baseRadius = Math.max(14, 4 + n * 1.2);
-
-  return nodes.map((node, i) => {
-    const t = (i + 0.5) / n;
-    const radius = Math.sqrt(t) * baseRadius;
-    const theta = i * goldenAngle;
-    const x = Math.cos(theta) * radius;
-    const z = Math.sin(theta) * radius;
-    // Small Y variation keeps them from being perfectly flat
-    const y = ((i * 0.372) % 1 - 0.5) * radius * 0.25;
-    return {
-      id: node.id,
-      label: cleanLabel(node.label),
-      topFolder: node.topFolder,
-      overview: node,
-      color: colorForTopFolder(node.topFolder),
-      position: new THREE.Vector3(x, y, z),
-      linkCount: node.linkCount,
-    };
-  });
-}
-
-// ── Project-level fractal-star layout ───────────────────────────────────────
-
-interface ProjectNode {
-  node: VaultGraphNode;
-  position: THREE.Vector3;
-  ring: 0 | 1 | 2;     // 0 = overview, 1 = hub, 2 = leaf
-  parentId: string | null;
-  color: string;
-}
-
-/** Generate N evenly-distributed points on a sphere via the Fibonacci algorithm. */
-function fibonacciSphere(count: number, radius: number, yOffset = 0): THREE.Vector3[] {
-  const points: THREE.Vector3[] = [];
-  const golden = Math.PI * (3 - Math.sqrt(5));
-  if (count === 1) return [new THREE.Vector3(0, yOffset, 0)];
-  for (let i = 0; i < count; i++) {
-    const y = 1 - (i / (count - 1)) * 2;
-    const r = Math.sqrt(Math.max(0, 1 - y * y));
-    const theta = golden * i;
-    points.push(new THREE.Vector3(
-      Math.cos(theta) * r * radius,
-      y * radius + yOffset,
-      Math.sin(theta) * r * radius,
-    ));
-  }
-  return points;
-}
-
-function isHubLike(node: VaultGraphNode): boolean {
-  return /(overview|hub|kanban)$/i.test(node.label.replace(/\.md$/, ''));
-}
-
-/**
- * Build the Level-1 layout for a given bundle. Places the Overview at the
- * origin, hub-like children on a medium-radius sphere, and leaves on an outer
- * sphere clustered near their parent hub.
- */
-function layoutProject(
-  bundle: Bundle,
-  nodes: Map<string, VaultGraphNode>,
-  links: VaultGraphLink[],
-): ProjectNode[] {
-  const out: ProjectNode[] = [];
-  const color = bundle.color;
-
-  // Neighbours of the Overview
-  const neighbourIds = new Set<string>();
-  for (const l of links) {
-    if (l.source === bundle.id) neighbourIds.add(l.target);
-    else if (l.target === bundle.id) neighbourIds.add(l.source);
-  }
-  const neighbours: VaultGraphNode[] = [];
-  for (const id of neighbourIds) {
-    const n = nodes.get(id);
-    if (n) neighbours.push(n);
-  }
-
-  const hubs = neighbours.filter(isHubLike);
-  const leaves = neighbours.filter((n) => !isHubLike(n));
-
-  // Overview at origin
-  out.push({
-    node: bundle.overview,
-    position: new THREE.Vector3(0, 0, 0),
-    ring: 0,
-    parentId: null,
-    color,
-  });
-
-  // Hubs on a small sphere
-  const hubPositions = fibonacciSphere(hubs.length, 5);
-  hubs.forEach((h, i) => {
-    out.push({ node: h, position: hubPositions[i], ring: 1, parentId: bundle.id, color });
-  });
-
-  // Leaves connected directly to the Overview → spread on a larger sphere
-  const overviewLeavesPositions = fibonacciSphere(leaves.length, 9);
-  leaves.forEach((l, i) => {
-    out.push({ node: l, position: overviewLeavesPositions[i], ring: 2, parentId: bundle.id, color });
-  });
-
-  // Leaves connected to a hub (second-degree neighbours of the Overview) —
-  // place them orbiting their hub on a local small sphere.
-  const alreadyPlaced = new Set(out.map((p) => p.node.id));
-  for (const hub of hubs) {
-    const hubNeighbours = new Set<string>();
-    for (const l of links) {
-      if (l.source === hub.id) hubNeighbours.add(l.target);
-      else if (l.target === hub.id) hubNeighbours.add(l.source);
-    }
-    const toPlace: VaultGraphNode[] = [];
-    for (const id of hubNeighbours) {
-      if (alreadyPlaced.has(id) || id === bundle.id) continue;
-      const n = nodes.get(id);
-      if (n) toPlace.push(n);
-    }
-    const local = fibonacciSphere(toPlace.length, 2.2);
-    const hubPos = out.find((p) => p.node.id === hub.id)!.position;
-    toPlace.forEach((leaf, i) => {
-      alreadyPlaced.add(leaf.id);
-      out.push({
-        node: leaf,
-        position: new THREE.Vector3().copy(hubPos).add(local[i]),
-        ring: 2,
-        parentId: hub.id,
-        color,
-      });
-    });
-  }
-
-  return out;
-}
-
 function cleanLabel(label: string): string {
   return label.replace(/\.md$/, '').replace(/^\d+\s*[-–]\s*/, '');
 }
 
-// ── 3D nodes ────────────────────────────────────────────────────────────────
+// ── Graph helpers ──────────────────────────────────────────────────────────
 
-function BundleSphere({
-  bundle, onClick, faded,
-}: { bundle: Bundle; onClick: () => void; faded: boolean }) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const radius = Math.max(0.8, Math.min(2.4, 0.9 + bundle.linkCount * 0.05));
-  const [hovered, setHovered] = useState(false);
-
-  useFrame((_, delta) => {
-    if (meshRef.current) meshRef.current.rotation.y += delta * 0.15;
-  });
-
-  return (
-    <group position={bundle.position}>
-      <mesh
-        ref={meshRef}
-        onClick={(e) => { e.stopPropagation(); onClick(); }}
-        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
-        onPointerOut={() => { setHovered(false); document.body.style.cursor = ''; }}
-      >
-        <sphereGeometry args={[radius, 32, 24]} />
-        <meshStandardMaterial
-          color={bundle.color}
-          emissive={bundle.color}
-          emissiveIntensity={hovered ? 0.8 : 0.4}
-          roughness={0.5}
-          metalness={0.1}
-          opacity={faded ? 0.15 : 1}
-          transparent={faded}
-        />
-      </mesh>
-      {/* Glow halo */}
-      <mesh>
-        <sphereGeometry args={[radius * 1.6, 24, 16]} />
-        <meshBasicMaterial color={bundle.color} transparent opacity={faded ? 0.02 : (hovered ? 0.18 : 0.09)} />
-      </mesh>
-      {!faded && (
-        <Html
-          position={[0, radius + 0.9, 0]}
-          center
-          distanceFactor={10}
-          style={{
-            pointerEvents: 'none',
-            color: '#e6edf3',
-            fontSize: 12,
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-            fontWeight: 600,
-            textShadow: '0 2px 6px rgba(0,0,0,0.8)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {bundle.label}
-        </Html>
-      )}
-    </group>
-  );
+function findRoot(nodes: VaultGraphNode[]): VaultGraphNode | null {
+  const dashboard = nodes.find((n) => /dashboard/i.test(n.label) && n.topFolder.startsWith('00'));
+  if (dashboard) return dashboard;
+  return nodes.find((n) => n.topFolder.startsWith('00')) ?? nodes[0] ?? null;
 }
 
-function ProjectNodeMesh({
-  n, onClick,
-}: { n: ProjectNode; onClick: (node: VaultGraphNode) => void }) {
+function neighboursOf(
+  hubId: string,
+  links: VaultGraphLink[],
+  nodes: Map<string, VaultGraphNode>,
+  exclude: Set<string>,
+): VaultGraphNode[] {
+  const seen = new Set<string>();
+  const out: VaultGraphNode[] = [];
+  for (const l of links) {
+    let neighbourId: string | null = null;
+    if (l.source === hubId) neighbourId = l.target;
+    else if (l.target === hubId) neighbourId = l.source;
+    if (!neighbourId || seen.has(neighbourId) || exclude.has(neighbourId)) continue;
+    seen.add(neighbourId);
+    const n = nodes.get(neighbourId);
+    if (n) out.push(n);
+  }
+  out.sort((a, b) => {
+    const aHub = /overview|hub|kanban$/i.test(a.label) ? 1 : 0;
+    const bHub = /overview|hub|kanban$/i.test(b.label) ? 1 : 0;
+    if (aHub !== bHub) return bHub - aHub;
+    return b.linkCount - a.linkCount;
+  });
+  return out;
+}
+
+/** Detect project bundles for the quick-jump bar. */
+function detectBundles(nodes: VaultGraphNode[]): VaultGraphNode[] {
+  const bundles: VaultGraphNode[] = [];
+  const seenDirs = new Set<string>();
+  const OVERVIEW_RE = /^(.+\s[-–]\s)?Overview(\.md)?$/i;
+  for (const n of nodes) {
+    if (OVERVIEW_RE.test(n.label) && !seenDirs.has(n.folder)) {
+      seenDirs.add(n.folder);
+      bundles.push(n);
+    }
+  }
+  return bundles.sort((a, b) => a.topFolder.localeCompare(b.topFolder));
+}
+
+/** Guess the project id for a phase node from its path. */
+function projectIdFor(node: VaultGraphNode): string | null {
+  // e.g. "10 - OpenClaw/Automated Distribution Pipelines/ManiPlus/Phases/… .md"
+  // → "ManiPlus"
+  const parts = node.id.split('/');
+  const phasesIdx = parts.lastIndexOf('Phases');
+  if (phasesIdx > 0) return parts[phasesIdx - 1];
+  return null;
+}
+
+// ── Adaptive ring layout ───────────────────────────────────────────────────
+
+interface RingNode {
+  node: VaultGraphNode;
+  position: THREE.Vector3;
+  angle: number;
+}
+
+interface LayoutConfig {
+  radius: number;
+  nodeScale: number;
+  arcSweep: number;   // radians — <2π means front-only arc, 2π = full ring
+  labelFont: number;
+}
+
+function configFor(count: number): LayoutConfig {
+  // Few nodes → front arc, readable big spheres. Many → full ring, smaller spheres.
+  if (count <= 1) return { radius: 4, nodeScale: 1.25, arcSweep: 0,               labelFont: 20 };
+  if (count <= 3) return { radius: 5, nodeScale: 1.15, arcSweep: Math.PI * 0.8,   labelFont: 19 };
+  if (count <= 5) return { radius: 6, nodeScale: 1.0,  arcSweep: Math.PI * 1.1,   labelFont: 18 };
+  if (count <= 8) return { radius: 7, nodeScale: 0.9,  arcSweep: Math.PI * 1.55,  labelFont: 17 };
+  if (count <= 14) return { radius: 9, nodeScale: 0.8, arcSweep: Math.PI * 2,     labelFont: 16 };
+  // Large sets — full ring, small spheres, smaller labels.
+  return { radius: 10 + Math.min(4, (count - 14) * 0.25), nodeScale: 0.7, arcSweep: Math.PI * 2, labelFont: 15 };
+}
+
+function layoutRing(nodes: VaultGraphNode[], cfg: LayoutConfig): RingNode[] {
+  const n = nodes.length;
+  if (n === 0) return [];
+  if (n === 1) {
+    return [{
+      node: nodes[0],
+      angle: 0,
+      position: new THREE.Vector3(0, 0, -cfg.radius),
+    }];
+  }
+  return nodes.map((node, i) => {
+    // For full ring: 0..2π spaced evenly. For arc: centered around 0 (dead ahead).
+    let angle: number;
+    if (cfg.arcSweep >= Math.PI * 1.99) {
+      angle = (i / n) * Math.PI * 2;
+    } else {
+      const t = n > 1 ? i / (n - 1) : 0.5;
+      angle = (t - 0.5) * cfg.arcSweep;
+    }
+    const x = Math.sin(angle) * cfg.radius;
+    const z = -Math.cos(angle) * cfg.radius;
+    return { node, angle, position: new THREE.Vector3(x, 0, z) };
+  });
+}
+
+// ── Node mesh ──────────────────────────────────────────────────────────────
+
+function WorldNode({
+  ringNode, scale, labelFont, walking, walkingTargetId, currentYawRef, onEnter, index, count,
+}: {
+  ringNode: RingNode;
+  scale: number;
+  labelFont: number;
+  walking: boolean;
+  walkingTargetId: string | null;
+  currentYawRef: React.MutableRefObject<number>;
+  onEnter: (id: string) => void;
+  index: number;
+  count: number;
+}) {
   const [hovered, setHovered] = useState(false);
-  const radius = n.ring === 0 ? 0.9 : n.ring === 1 ? 0.5 : 0.3;
-  const isPhase = n.node.isPhase;
-  const phaseStatus = n.node.phaseStatus;
-  const isActive = phaseStatus === 'active' || phaseStatus === 'ready';
   const meshRef = useRef<THREE.Mesh>(null);
+  const color = colorForTopFolder(ringNode.node.topFolder);
+  const isActive = ringNode.node.phaseStatus === 'active' || ringNode.node.phaseStatus === 'ready';
+  const isWalkingTarget = walking && walkingTargetId === ringNode.node.id;
 
   useFrame((_, delta) => {
-    if (meshRef.current && isActive) {
-      // Subtle pulse on ready/active phases
+    if (!meshRef.current) return;
+    meshRef.current.rotation.y += delta * 0.2;
+    if (isActive) {
       const pulse = 1 + Math.sin(performance.now() * 0.004) * 0.08;
       meshRef.current.scale.setScalar(pulse);
     }
   });
 
+  const hoverScale = hovered ? 1.12 : 1;
+  const enterScale = isWalkingTarget ? 1.6 : 1;
+  const radius = 0.65 * scale;
+
+  // "Looking-at" highlight — node glows brighter when near center of view
+  const angleDiff = Math.abs(((ringNode.angle - currentYawRef.current + Math.PI) % (Math.PI * 2)) - Math.PI);
+  const inFront = angleDiff < 0.35;
+
   return (
-    <group position={n.position}>
+    <group position={ringNode.position} scale={hoverScale * enterScale}>
+      {/* Glow halo */}
+      <mesh>
+        <sphereGeometry args={[radius * 1.5, 20, 14]} />
+        <meshBasicMaterial color={color} transparent opacity={hovered ? 0.24 : (inFront ? 0.16 : 0.1)} />
+      </mesh>
+      {/* Core sphere */}
       <mesh
         ref={meshRef}
-        onClick={(e) => { e.stopPropagation(); onClick(n.node); }}
+        onClick={(e) => { e.stopPropagation(); onEnter(ringNode.node.id); }}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = ''; }}
       >
-        <sphereGeometry args={[radius, 20, 16]} />
+        <sphereGeometry args={[radius, 32, 24]} />
         <meshStandardMaterial
-          color={n.color}
-          emissive={n.color}
-          emissiveIntensity={hovered ? 0.9 : (isActive ? 0.6 : 0.25)}
-          roughness={0.6}
-          metalness={0.1}
+          color={color}
+          emissive={color}
+          emissiveIntensity={hovered ? 1.1 : (inFront ? 0.8 : 0.4)}
+          roughness={0.45}
+          metalness={0.15}
         />
       </mesh>
-      {(n.ring <= 1 || hovered) && (
+      {/* Ring index (1-9) — fast keyboard shortcut */}
+      {index < 9 && (
         <Html
-          position={[0, radius + 0.3, 0]}
+          position={[0, radius * 1.1, 0]}
+          center
+          distanceFactor={10}
+          style={{
+            pointerEvents: 'none',
+            userSelect: 'none',
+            fontSize: 11,
+            fontWeight: 700,
+            color: '#0d1117',
+            background: '#fff',
+            padding: '1px 5px',
+            borderRadius: 8,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+          }}
+        >
+          {index + 1}
+        </Html>
+      )}
+      {/* Label */}
+      <Html
+        position={[0, -radius - 0.4, 0]}
+        center
+        distanceFactor={6}
+        style={{
+          pointerEvents: 'none',
+          userSelect: 'none',
+          color: '#ffffff',
+          fontSize: labelFont,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fontWeight: 600,
+          letterSpacing: '0.01em',
+          textShadow: '0 2px 10px rgba(0,0,0,0.95), 0 0 3px rgba(0,0,0,0.9)',
+          whiteSpace: 'nowrap',
+          textAlign: 'center',
+        }}
+      >
+        {cleanLabel(ringNode.node.label)}
+      </Html>
+      {/* Phase status badge */}
+      {ringNode.node.isPhase && ringNode.node.phaseStatus && (
+        <Html
+          position={[0, radius + 0.35, 0]}
           center
           distanceFactor={8}
           style={{
             pointerEvents: 'none',
-            color: n.ring === 0 ? '#fff' : '#e6edf3',
-            fontSize: n.ring === 0 ? 12 : 10,
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-            fontWeight: n.ring === 0 ? 700 : 500,
-            textShadow: '0 2px 6px rgba(0,0,0,0.9)',
+            userSelect: 'none',
+            fontSize: 10,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            color: isActive ? '#00dcb4' : 'rgba(200,210,230,0.8)',
+            background: 'rgba(0,0,0,0.7)',
+            padding: '2px 6px',
+            borderRadius: 3,
             whiteSpace: 'nowrap',
-            opacity: n.ring === 2 ? 0.85 : 1,
           }}
         >
-          {cleanLabel(n.node.label)}
+          {ringNode.node.phaseStatus}
         </Html>
       )}
     </group>
   );
 }
 
-function ProjectEdges({ projectNodes }: { projectNodes: ProjectNode[] }) {
-  const lines = useMemo(() => {
-    const out: Array<{ a: THREE.Vector3; b: THREE.Vector3; color: string }> = [];
-    const byId = new Map(projectNodes.map((p) => [p.node.id, p]));
-    for (const n of projectNodes) {
-      if (!n.parentId) continue;
-      const parent = byId.get(n.parentId) ?? projectNodes.find((p) => p.ring === 0);
-      if (!parent) continue;
-      out.push({ a: parent.position, b: n.position, color: n.color });
-    }
-    return out;
-  }, [projectNodes]);
+// ── Floor disc — gives sense of "where you're standing" ────────────────────
 
+function FloorDisc({ color }: { color: string }) {
   return (
-    <group>
-      {lines.map((l, i) => (
-        <line key={i}>
-          <bufferGeometry attach="geometry">
-            <bufferAttribute
-              attach="attributes-position"
-              args={[new Float32Array([l.a.x, l.a.y, l.a.z, l.b.x, l.b.y, l.b.z]), 3]}
-            />
-          </bufferGeometry>
-          <lineBasicMaterial color={l.color} transparent opacity={0.35} />
-        </line>
-      ))}
-    </group>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.2, 0]}>
+      <ringGeometry args={[0.5, 3, 48]} />
+      <meshBasicMaterial color={color} transparent opacity={0.08} side={THREE.DoubleSide} />
+    </mesh>
   );
 }
 
-// ── Camera animation ────────────────────────────────────────────────────────
+// ── Camera ─────────────────────────────────────────────────────────────────
 
-interface CameraTarget { position: THREE.Vector3; lookAt: THREE.Vector3 }
-
-function CameraFlyer({ target, controlsRef }: { target: CameraTarget; controlsRef: React.RefObject<{ target: THREE.Vector3; update: () => void } | null> }) {
+function FirstPersonCamera({
+  yaw, walkProgress, walkTargetPosition,
+}: {
+  yaw: number;
+  walkProgress: number;
+  walkTargetPosition: THREE.Vector3 | null;
+}) {
   const { camera } = useThree();
   useFrame(() => {
-    camera.position.lerp(target.position, 0.08);
-    if (controlsRef.current) {
-      controlsRef.current.target.lerp(target.lookAt, 0.12);
-      controlsRef.current.update();
+    if (walkTargetPosition && walkProgress > 0) {
+      camera.position.lerpVectors(new THREE.Vector3(0, 0, 0), walkTargetPosition, walkProgress);
+    } else {
+      camera.position.set(0, 0, 0);
     }
+    const lookX = Math.sin(yaw) * 10;
+    const lookZ = -Math.cos(yaw) * 10;
+    camera.lookAt(camera.position.x + lookX, camera.position.y, camera.position.z + lookZ);
   });
   return null;
 }
 
-// ── Detail sidebar ──────────────────────────────────────────────────────────
+// ── Detail sidebar with phase actions ──────────────────────────────────────
 
 function DetailSidebar({
-  node, onClose, onOpenFile,
-}: { node: VaultGraphNode; onClose: () => void; onOpenFile: (p: string) => void }) {
+  node, onClose, onOpenFile, onAction,
+}: {
+  node: VaultGraphNode;
+  onClose: () => void;
+  onOpenFile: (p: string) => void;
+  onAction: (verb: string) => Promise<void>;
+}) {
   const [raw, setRaw] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
-    setRaw(null);
-    setErr(null);
+    setRaw(null); setErr(null);
     fetch(`/api/onyx/vault-file?path=${encodeURIComponent(node.id)}`)
       .then((r) => r.ok ? r.json() : Promise.reject(r.statusText))
       .then((d: { raw?: string; content?: string }) => setRaw(d.raw ?? d.content ?? ''))
       .catch((e) => setErr(String(e)));
   }, [node.id]);
 
+  const isPhase = node.isPhase;
+  const isActive = node.phaseStatus === 'active';
+  const isBlocked = node.phaseStatus === 'blocked';
+  const isReady = node.phaseStatus === 'ready';
+
+  const runAction = async (verb: string) => {
+    setBusy(verb);
+    try { await onAction(verb); } finally { setBusy(null); }
+  };
+
   return (
     <div style={{
-      position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(520px, 42vw)',
-      background: 'rgba(13,17,23,0.96)', borderLeft: '1px solid rgba(48,54,61,0.9)',
+      position: 'absolute', top: 0, right: 0, bottom: 0,
+      width: 'min(520px, 100vw)',
+      background: 'rgba(13,17,23,0.97)', borderLeft: '1px solid rgba(48,54,61,0.9)',
       backdropFilter: 'blur(10px)', display: 'flex', flexDirection: 'column',
-      boxShadow: '-8px 0 32px rgba(0,0,0,0.5)', zIndex: 20,
+      boxShadow: '-8px 0 32px rgba(0,0,0,0.5)', zIndex: 30,
     }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
-        borderBottom: '1px solid rgba(48,54,61,0.9)', flexShrink: 0,
-      }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid rgba(48,54,61,0.9)', flexShrink: 0 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#e6edf3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#e6edf3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {cleanLabel(node.label)}
           </div>
           <div style={{ fontSize: 10, color: 'rgba(139,148,158,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {node.id}
           </div>
         </div>
-        <button onClick={() => onOpenFile(node.id)} style={{
-          padding: '4px 9px', fontSize: 10, fontFamily: 'inherit',
-          background: 'rgba(68,147,248,0.15)', color: '#4493f8',
-          border: '1px solid rgba(68,147,248,0.5)', borderRadius: 4, cursor: 'pointer',
-        }}>Open</button>
-        <button onClick={onClose} style={{
-          padding: '4px 9px', fontSize: 10, fontFamily: 'inherit',
+        <button onClick={onClose} aria-label="Close" style={{
+          padding: '4px 10px', fontSize: 12, fontFamily: 'inherit',
           background: 'rgba(22,27,34,0.85)', color: 'rgba(200,210,230,0.9)',
           border: '1px solid rgba(48,54,61,0.9)', borderRadius: 4, cursor: 'pointer',
-        }}>Close</button>
+        }}>×</button>
       </div>
-      <div style={{ flex: 1, overflow: 'auto', padding: '12px 16px', fontSize: 11, lineHeight: 1.55, color: 'var(--text-dim, #9aa4b2)', fontFamily: 'ui-monospace, monospace', whiteSpace: 'pre-wrap' }}>
-        {err ? (
-          <div style={{ color: '#dc6e6e' }}>Failed to load: {err}</div>
-        ) : raw === null ? (
-          <div style={{ color: 'rgba(139,148,158,0.5)' }}>Loading…</div>
-        ) : raw}
+
+      {/* Action bar */}
+      <div style={{ display: 'flex', gap: 6, padding: '8px 12px', borderBottom: '1px solid rgba(48,54,61,0.6)', flexWrap: 'wrap', flexShrink: 0 }}>
+        <button
+          onClick={() => onOpenFile(node.id)}
+          style={actionBtnStyle('#4493f8')}
+        >Open in editor</button>
+
+        {isPhase && !isActive && (isReady || isBlocked || node.phaseStatus === 'backlog') && (
+          <button
+            disabled={!!busy}
+            onClick={() => runAction('launch')}
+            style={actionBtnStyle('#00dcb4', busy === 'launch')}
+          >{busy === 'launch' ? 'Launching…' : 'Launch agent'}</button>
+        )}
+        {isPhase && isActive && (
+          <button
+            disabled={!!busy}
+            onClick={() => runAction('stop')}
+            style={actionBtnStyle('#ff9f0a', busy === 'stop')}
+          >{busy === 'stop' ? 'Stopping…' : 'Stop + reset'}</button>
+        )}
+        {isPhase && !isActive && node.phaseStatus !== 'ready' && (
+          <button
+            disabled={!!busy}
+            onClick={() => runAction('ready')}
+            style={actionBtnStyle('#b478ff', busy === 'ready')}
+          >{busy === 'ready' ? 'Marking…' : 'Mark ready'}</button>
+        )}
+      </div>
+
+      <div style={{ flex: 1, overflow: 'auto', padding: '12px 16px', fontSize: 11, lineHeight: 1.55, color: '#c9d1d9', fontFamily: 'ui-monospace, SFMono-Regular, monospace', whiteSpace: 'pre-wrap' }}>
+        {err ? <div style={{ color: '#dc6e6e' }}>Failed to load: {err}</div>
+          : raw === null ? <div style={{ color: 'rgba(139,148,158,0.5)' }}>Loading…</div>
+          : raw}
       </div>
     </div>
   );
 }
 
-// ── Main component ──────────────────────────────────────────────────────────
+function actionBtnStyle(color: string, busy = false): React.CSSProperties {
+  return {
+    padding: '5px 11px', fontSize: 11, fontFamily: 'inherit',
+    background: busy ? `${color}22` : `${color}15`, color,
+    border: `1px solid ${color}66`, borderRadius: 4,
+    cursor: busy ? 'wait' : 'pointer', fontWeight: 500,
+    opacity: busy ? 0.7 : 1,
+  };
+}
 
-type Level = 'universe' | 'project';
+// ── Main ──────────────────────────────────────────────────────────────────
 
 export default function VaultUniverse({ onOpenFile }: Props) {
   const [nodes, setNodes] = useState<Map<string, VaultGraphNode>>(new Map());
   const [links, setLinks] = useState<VaultGraphLink[]>([]);
-  const [bundles, setBundles] = useState<Bundle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bundles, setBundles] = useState<VaultGraphNode[]>([]);
 
-  const [level, setLevel] = useState<Level>('universe');
-  const [focusedBundleId, setFocusedBundleId] = useState<string | null>(null);
+  const [stack, setStack] = useState<string[]>([]);
+
+  const [yaw, setYaw] = useState(0);
+  const yawRef = useRef(0);
+  useEffect(() => { yawRef.current = yaw; }, [yaw]);
+
+  const [walkProgress, setWalkProgress] = useState(0);
+  const walkTargetIdRef = useRef<string | null>(null);
+  const walkTargetPosRef = useRef<THREE.Vector3 | null>(null);
+
   const [detailNode, setDetailNode] = useState<VaultGraphNode | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
-  const controlsRef = useRef<{ target: THREE.Vector3; update: () => void } | null>(null);
+  const dragRef = useRef<{ x: number; yaw0: number; moved: boolean } | null>(null);
 
-  // ── Data fetch ────────────────────────────────────────────────────────────
   useEffect(() => {
     fetch('/api/onyx/vault-graph').then((r) => r.json()).then(
       (d: { nodes: VaultGraphNode[]; links: VaultGraphLink[] }) => {
@@ -476,156 +442,280 @@ export default function VaultUniverse({ onOpenFile }: Props) {
         for (const n of d.nodes) map.set(n.id, n);
         setNodes(map);
         setLinks(d.links);
-        setBundles(layoutBundles(detectBundles(d.nodes)));
+        setBundles(detectBundles(d.nodes));
+        const root = findRoot(d.nodes);
+        if (root) setStack([root.id]);
         setLoading(false);
       },
     );
   }, []);
 
-  // ── Project layout derived from focused bundle ────────────────────────────
-  const focusedBundle = useMemo(
-    () => bundles.find((b) => b.id === focusedBundleId) ?? null,
-    [bundles, focusedBundleId],
-  );
+  const currentId = stack[stack.length - 1] ?? null;
+  const currentNode = useMemo(() => currentId ? nodes.get(currentId) ?? null : null, [currentId, nodes]);
+  const parentId = stack.length >= 2 ? stack[stack.length - 2] : null;
 
-  const projectNodes = useMemo(() => {
-    if (!focusedBundle) return [];
-    return layoutProject(focusedBundle, nodes, links);
-  }, [focusedBundle, nodes, links]);
+  const { ringNodes, cfg } = useMemo(() => {
+    if (!currentId) return { ringNodes: [] as RingNode[], cfg: configFor(0) };
+    const exclude = new Set<string>();
+    if (parentId) exclude.add(parentId);
+    const neighbours = neighboursOf(currentId, links, nodes, exclude);
+    const c = configFor(neighbours.length);
+    return { ringNodes: layoutRing(neighbours, c), cfg: c };
+  }, [currentId, parentId, links, nodes]);
 
-  // ── Camera target ─────────────────────────────────────────────────────────
-  const cameraTarget: CameraTarget = useMemo(() => {
-    if (level === 'project' && focusedBundle) {
-      // Position camera outside the project sphere, looking at the Overview
-      const dir = focusedBundle.position.clone().normalize();
-      const pos = focusedBundle.position.clone().add(dir.multiplyScalar(14));
-      pos.y += 3;
-      return { position: pos, lookAt: focusedBundle.position };
-    }
-    // Universe view — far enough back to see everything
-    const span = Math.max(22, bundles.length * 1.8);
-    return {
-      position: new THREE.Vector3(0, span * 0.5, span),
-      lookAt: new THREE.Vector3(0, 0, 0),
-    };
-  }, [level, focusedBundle, bundles.length]);
+  const currentColor = currentNode ? colorForTopFolder(currentNode.topFolder) : '#4493f8';
 
-  // ── Navigation actions ────────────────────────────────────────────────────
-  const enterBundle = useCallback((id: string) => {
-    setFocusedBundleId(id);
-    setLevel('project');
+  // ── Navigation ────────────────────────────────────────────────────────
+  const walkInto = useCallback((id: string) => {
+    const ringNode = ringNodes.find((r) => r.node.id === id);
+    if (!ringNode) return;
+    walkTargetIdRef.current = id;
+    walkTargetPosRef.current = ringNode.position.clone();
+    setWalkProgress(0.001);
+  }, [ringNodes]);
+
+  // Animate walk-in
+  useEffect(() => {
+    if (walkProgress === 0 || walkProgress >= 1) return;
+    const raf = requestAnimationFrame(() => {
+      const next = Math.min(1, walkProgress + 0.04);
+      if (next >= 1) {
+        const id = walkTargetIdRef.current;
+        walkTargetIdRef.current = null;
+        walkTargetPosRef.current = null;
+        setWalkProgress(0);
+        if (!id) return;
+        const node = nodes.get(id);
+        if (!node) return;
+        // If the entered node is a leaf (no further usable neighbours), open sidebar.
+        const remaining = neighboursOf(id, links, nodes, new Set(stack));
+        if (remaining.length === 0) {
+          setDetailNode(node);
+        } else {
+          setStack((s) => [...s, id]);
+          setYaw(0);
+        }
+      } else {
+        setWalkProgress(next);
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [walkProgress, nodes, links, stack]);
+
+  const jumpToBundle = useCallback((id: string) => {
+    // Teleport — set the stack to a path from root to this bundle so Back still works.
+    setStack((s) => {
+      const root = s[0];
+      if (!root || root === id) return s.length > 0 ? s : [id];
+      // Simple stack: root → bundle. (Could reconstruct path via BFS but this is fast + useful.)
+      return [root, id];
+    });
+    setYaw(0);
+    setDetailNode(null);
   }, []);
 
   const goBack = useCallback(() => {
     if (detailNode) { setDetailNode(null); return; }
-    if (level === 'project') { setLevel('universe'); setFocusedBundleId(null); return; }
-  }, [detailNode, level]);
+    if (stack.length > 1) {
+      setStack((s) => s.slice(0, -1));
+      setYaw(0);
+    }
+  }, [detailNode, stack.length]);
 
-  // ESC key
+  const jumpTo = useCallback((stackIndex: number) => {
+    setStack((s) => s.slice(0, stackIndex + 1));
+    setYaw(0);
+    setDetailNode(null);
+  }, []);
+
+  // Keyboard: Esc/Backspace = back; 1-9 = walk into Nth node
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') goBack();
+      const target = e.target as HTMLElement | null;
+      if (target && /INPUT|TEXTAREA/.test(target.tagName)) return;
+      if (e.key === 'Escape' || e.key === 'Backspace') { e.preventDefault(); goBack(); return; }
+      const digit = parseInt(e.key, 10);
+      if (!isNaN(digit) && digit >= 1 && digit <= 9 && ringNodes[digit - 1]) {
+        e.preventDefault();
+        walkInto(ringNodes[digit - 1].node.id);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [goBack]);
+  }, [goBack, ringNodes, walkInto]);
 
-  // Offset project nodes by the bundle's position (so they render in the right place in world space)
-  const projectNodesInWorld = useMemo(() => {
-    if (!focusedBundle) return [];
-    return projectNodes.map((p) => ({
-      ...p,
-      position: p.position.clone().add(focusedBundle.position),
-    }));
-  }, [projectNodes, focusedBundle]);
+  // ── Pointer (mouse + touch) drag-to-spin ──────────────────────────────
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    // Ignore drags starting on the sidebar / buttons — those have their own handlers.
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-sidebar="true"]')) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = { x: e.clientX, yaw0: yawRef.current, moved: false };
+  }, []);
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.x;
+    if (Math.abs(dx) > 3) dragRef.current.moved = true;
+    setYaw(dragRef.current.yaw0 + dx * 0.005);
+  }, []);
+  const onPointerUp = useCallback(() => { dragRef.current = null; }, []);
+
+  // ── Phase actions ─────────────────────────────────────────────────────
+  const runPhaseAction = useCallback(async (verb: string) => {
+    if (!detailNode) return;
+    const projectId = projectIdFor(detailNode);
+    try {
+      if (verb === 'launch') {
+        if (!projectId) throw new Error('Cannot determine project id from phase path');
+        const res = await fetch('/api/onyx/cli', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cmd: 'run', args: ['--project', projectId] }),
+        });
+        if (!res.ok) throw new Error(`CLI run failed (${res.status})`);
+        setToast(`🚀 onyx run --project ${projectId}`);
+      } else if (verb === 'stop' || verb === 'ready') {
+        if (!projectId) throw new Error('Cannot determine project id');
+        const res = await fetch(`/api/onyx/projects/${encodeURIComponent(projectId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phasePath: detailNode.id, status: 'ready' }),
+        });
+        if (!res.ok) throw new Error(`Status change failed (${res.status})`);
+        setToast(verb === 'stop' ? 'Reset to ready' : 'Marked ready');
+      }
+    } catch (err) {
+      setToast(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    setTimeout(() => setToast(null), 3500);
+  }, [detailNode]);
+
+  // ── Breadcrumbs ───────────────────────────────────────────────────────
+  const breadcrumbs = useMemo(() => stack.map((id) => nodes.get(id)).filter((n): n is VaultGraphNode => !!n), [stack, nodes]);
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative', background: '#05070d' }}>
-      <Canvas
-        camera={{ position: [0, 15, 30], fov: 50, near: 0.1, far: 500 }}
-        style={{ width: '100%', height: '100%' }}
-      >
+    <div
+      style={{
+        width: '100%', height: '100%', position: 'relative',
+        background: '#05070d', overflow: 'hidden',
+        cursor: dragRef.current ? 'grabbing' : 'grab',
+        touchAction: 'none',
+      }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      <Canvas camera={{ position: [0, 0, 0], fov: 70, near: 0.1, far: 200 }}>
         <Suspense fallback={null}>
-          <ambientLight intensity={0.4} />
-          <pointLight position={[10, 20, 10]} intensity={1} />
-          <pointLight position={[-10, -10, -10]} intensity={0.5} color="#4493f8" />
-          <Stars radius={200} depth={50} count={1500} factor={5} fade speed={0.5} />
+          <ambientLight intensity={0.5} />
+          <pointLight position={[0, 4, 0]} intensity={1.2} />
+          <pointLight position={[0, -4, 0]} intensity={0.4} color="#4493f8" />
+          <Stars radius={80} depth={40} count={800} factor={3} fade speed={0.3} />
 
-          <OrbitControls
-            ref={controlsRef as unknown as React.Ref<never>}
-            enablePan={false}
-            minDistance={3}
-            maxDistance={80}
-            dampingFactor={0.08}
-            enableDamping
+          <FirstPersonCamera
+            yaw={yaw}
+            walkProgress={walkProgress}
+            walkTargetPosition={walkTargetPosRef.current}
           />
+          <FloorDisc color={currentColor} />
 
-          <CameraFlyer target={cameraTarget} controlsRef={controlsRef} />
-
-          {/* Level 0: Universe — all bundles */}
-          {bundles.map((b) => (
-            <BundleSphere
-              key={b.id}
-              bundle={b}
-              onClick={() => enterBundle(b.id)}
-              faded={level === 'project' && b.id !== focusedBundleId}
+          {ringNodes.map((r, i) => (
+            <WorldNode
+              key={r.node.id}
+              ringNode={r}
+              scale={cfg.nodeScale}
+              labelFont={cfg.labelFont}
+              walking={walkProgress > 0}
+              walkingTargetId={walkTargetIdRef.current}
+              currentYawRef={yawRef}
+              onEnter={walkInto}
+              index={i}
+              count={ringNodes.length}
             />
           ))}
-
-          {/* Level 1: Project — fractal star for focused bundle */}
-          {level === 'project' && focusedBundle && (
-            <>
-              <ProjectEdges projectNodes={projectNodesInWorld} />
-              {projectNodesInWorld.map((p) => (
-                <ProjectNodeMesh
-                  key={p.node.id}
-                  n={p}
-                  onClick={(node) => setDetailNode(node)}
-                />
-              ))}
-            </>
-          )}
         </Suspense>
       </Canvas>
 
-      {/* ── Overlays ──────────────────────────────────────────────────────── */}
+      {/* ── Overlays ─────────────────────────────────────────────────────── */}
 
-      {/* Breadcrumb */}
+      {/* Top bar: breadcrumb + project quick-jump */}
       <div style={{
-        position: 'absolute', top: 12, left: 12, zIndex: 10,
-        display: 'flex', gap: 6, alignItems: 'center',
-        fontSize: 11, color: 'rgba(200,210,230,0.7)', pointerEvents: 'none',
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 12,
+        background: 'linear-gradient(rgba(5,7,13,0.9), rgba(5,7,13,0.5))',
+        padding: '10px 12px 12px',
+        pointerEvents: 'none',
       }}>
-        <span style={{ opacity: level === 'universe' ? 1 : 0.6, fontWeight: level === 'universe' ? 600 : 400 }}>
-          Universe
-        </span>
-        {focusedBundle && (
-          <>
-            <span style={{ opacity: 0.4 }}>›</span>
-            <span style={{ color: focusedBundle.color, fontWeight: 600 }}>
-              {focusedBundle.label}
-            </span>
-          </>
-        )}
-        {detailNode && (
-          <>
-            <span style={{ opacity: 0.4 }}>›</span>
-            <span style={{ color: '#e6edf3', fontWeight: 500 }}>
-              {cleanLabel(detailNode.label)}
-            </span>
-          </>
+        {/* Breadcrumb */}
+        <div style={{
+          display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap',
+          fontSize: 11, color: 'rgba(200,210,230,0.7)',
+          marginBottom: bundles.length > 0 ? 8 : 0,
+        }}>
+          {breadcrumbs.map((n, i) => {
+            const isLast = i === breadcrumbs.length - 1;
+            return (
+              <span key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); jumpTo(i); }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  style={{
+                    pointerEvents: 'auto',
+                    background: 'transparent', border: 'none', padding: 0, margin: 0,
+                    color: isLast ? '#e6edf3' : 'rgba(150,160,180,0.8)',
+                    fontWeight: isLast ? 700 : 400, fontSize: 11, cursor: isLast ? 'default' : 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >{cleanLabel(n.label)}</button>
+                {!isLast && <span style={{ opacity: 0.4 }}>›</span>}
+              </span>
+            );
+          })}
+        </div>
+
+        {/* Project quick-jump pills */}
+        {bundles.length > 0 && (
+          <div style={{
+            display: 'flex', gap: 5, flexWrap: 'wrap',
+            overflowX: 'auto', paddingBottom: 2,
+          }}>
+            {bundles.map((b) => {
+              const active = currentId === b.id;
+              const color = colorForTopFolder(b.topFolder);
+              return (
+                <button
+                  key={b.id}
+                  onClick={(e) => { e.stopPropagation(); jumpToBundle(b.id); }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  style={{
+                    pointerEvents: 'auto',
+                    padding: '3px 10px', fontSize: 10, fontFamily: 'inherit',
+                    background: active ? `${color}2a` : 'rgba(22,27,34,0.9)',
+                    color: active ? color : 'rgba(200,210,230,0.85)',
+                    border: `1px solid ${active ? color + '88' : 'rgba(48,54,61,0.9)'}`,
+                    borderRadius: 999, cursor: 'pointer',
+                    whiteSpace: 'nowrap', flexShrink: 0,
+                    fontWeight: active ? 600 : 400,
+                  }}
+                >{cleanLabel(b.label)}</button>
+              );
+            })}
+          </div>
         )}
       </div>
 
       {/* Back button */}
-      {(level === 'project' || detailNode) && (
-        <button onClick={goBack} style={{
-          position: 'absolute', top: 36, left: 12, zIndex: 10,
-          padding: '5px 12px', fontSize: 11, fontFamily: 'inherit',
-          background: 'rgba(22,27,34,0.85)', color: 'rgba(200,210,230,0.9)',
-          border: '1px solid rgba(48,54,61,0.9)', borderRadius: 5, cursor: 'pointer',
-          backdropFilter: 'blur(4px)',
-        }}>← Back (Esc)</button>
+      {(stack.length > 1 || detailNode) && (
+        <button
+          onClick={(e) => { e.stopPropagation(); goBack(); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: bundles.length > 0 ? 72 : 40, left: 12, zIndex: 15,
+            padding: '5px 12px', fontSize: 11, fontFamily: 'inherit',
+            background: 'rgba(22,27,34,0.9)', color: 'rgba(200,210,230,0.95)',
+            border: '1px solid rgba(48,54,61,0.95)', borderRadius: 5, cursor: 'pointer',
+            backdropFilter: 'blur(4px)',
+          }}>← Back</button>
       )}
 
       {/* Help */}
@@ -633,24 +723,32 @@ export default function VaultUniverse({ onOpenFile }: Props) {
         position: 'absolute', bottom: 12, left: 12, zIndex: 10,
         fontSize: 10, color: 'rgba(139,148,158,0.5)', pointerEvents: 'none',
       }}>
-        {level === 'universe'
-          ? 'Click a project to enter · drag to orbit · scroll to zoom'
-          : 'Click a node to open · drag to orbit · Esc to go back'}
+        Drag to spin · tap a node to walk in · 1-9 shortcuts · Esc to go back
       </div>
 
-      {/* Bundle count */}
-      {!loading && (
+      {/* Ring count badge */}
+      {!loading && currentNode && (
         <div style={{
           position: 'absolute', bottom: 12, right: 12, zIndex: 10,
           padding: '4px 10px', fontSize: 10,
-          background: 'rgba(22,27,34,0.85)', color: 'rgba(200,210,230,0.9)',
-          border: '1px solid rgba(48,54,61,0.9)', borderRadius: 5,
+          background: 'rgba(22,27,34,0.9)', color: 'rgba(200,210,230,0.95)',
+          border: '1px solid rgba(48,54,61,0.95)', borderRadius: 5,
           backdropFilter: 'blur(4px)', pointerEvents: 'none',
         }}>
-          {level === 'universe'
-            ? `${bundles.length} project${bundles.length === 1 ? '' : 's'}`
-            : `${projectNodes.length} nodes · ${projectNodes.filter(p => p.ring === 1).length} hubs · ${projectNodes.filter(p => p.ring === 2).length} leaves`}
+          {ringNodes.length} around you
         </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'absolute', bottom: 44, left: '50%', transform: 'translateX(-50%)',
+          padding: '6px 14px', fontSize: 11, zIndex: 50,
+          background: 'rgba(22,27,34,0.95)', color: '#e6edf3',
+          border: '1px solid rgba(68,147,248,0.5)', borderRadius: 20,
+          whiteSpace: 'nowrap', pointerEvents: 'none',
+          backdropFilter: 'blur(8px)',
+        }}>{toast}</div>
       )}
 
       {loading && (
@@ -660,13 +758,15 @@ export default function VaultUniverse({ onOpenFile }: Props) {
         }}>Parsing vault…</div>
       )}
 
-      {/* Detail sidebar */}
       {detailNode && (
-        <DetailSidebar
-          node={detailNode}
-          onClose={() => setDetailNode(null)}
-          onOpenFile={onOpenFile}
-        />
+        <div data-sidebar="true" onPointerDown={(e) => e.stopPropagation()}>
+          <DetailSidebar
+            node={detailNode}
+            onClose={() => setDetailNode(null)}
+            onOpenFile={onOpenFile}
+            onAction={runPhaseAction}
+          />
+        </div>
       )}
     </div>
   );
