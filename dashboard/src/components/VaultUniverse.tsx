@@ -235,11 +235,10 @@ function sectionLabelAnchors(sections: Section[]): Array<{ label: string; positi
 // ── 3D Node ────────────────────────────────────────────────────────────────
 
 function WorldNode({
-  pn, onEnter, onOpenDetail, currentYawRef,
+  pn, onTap, currentYawRef,
 }: {
   pn: PositionedNode;
-  onEnter: (id: string) => void;
-  onOpenDetail: (node: VaultGraphNode) => void;
+  onTap: (node: VaultGraphNode) => void;
   currentYawRef: React.MutableRefObject<number>;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -288,12 +287,7 @@ function WorldNode({
       {/* Core */}
       <mesh
         ref={meshRef}
-        onClick={(e) => {
-          e.stopPropagation();
-          // Primary action = see what's here. Shift/alt jumps directly.
-          if (e.shiftKey || e.altKey) onEnter(pn.node.id);
-          else onOpenDetail(pn.node);
-        }}
+        onClick={(e) => { e.stopPropagation(); onTap(pn.node); }}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = ''; }}
       >
@@ -391,79 +385,69 @@ function FirstPersonCamera({
 
 // ── Detail sidebar ─────────────────────────────────────────────────────────
 
-function DetailSidebar({
-  node, onClose, onOpenFile, onAction, onHop, canHop,
+/**
+ * Compact floating action bar — appears when a node is "selected" (last clicked).
+ * Shows phase metadata chips + actions. Content display is handled by the
+ * dashboard's main Drawer via onOpenFile, so we don't duplicate that panel.
+ */
+function NodeActionBar({
+  node, onDismiss, onOpenFile, onAction, onHop, canHop,
 }: {
   node: VaultGraphNode;
-  onClose: () => void;
+  onDismiss: () => void;
   onOpenFile: (p: string) => void;
   onAction: (verb: string) => Promise<void>;
   onHop: () => void;
   canHop: boolean;
 }) {
-  const [raw, setRaw] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-
-  useEffect(() => {
-    setRaw(null); setErr(null);
-    fetch(`/api/onyx/vault-file?path=${encodeURIComponent(node.id)}`)
-      .then((r) => r.ok ? r.json() : Promise.reject(r.statusText))
-      .then((d: { raw?: string; content?: string }) => setRaw(d.raw ?? d.content ?? ''))
-      .catch((e) => setErr(String(e)));
-  }, [node.id]);
-
   const isPhase = node.isPhase;
   const isActive = node.phaseStatus === 'active';
   const isBlocked = node.phaseStatus === 'blocked';
+  const statusColor = isActive ? '#00dcb4' : node.phaseStatus === 'ready' ? '#4493f8' : isBlocked ? '#dc6e6e' : '#9aa4b2';
 
   const run = async (verb: string) => {
     setBusy(verb);
     try { await onAction(verb); } finally { setBusy(null); }
   };
 
-  const statusColor = isActive ? '#00dcb4' : node.phaseStatus === 'ready' ? '#4493f8' : isBlocked ? '#dc6e6e' : '#9aa4b2';
-
   return (
-    <div data-sidebar="true" onPointerDown={(e) => e.stopPropagation()} style={{
-      position: 'absolute', top: 0, right: 0, bottom: 0,
-      width: 'min(520px, 100vw)',
-      background: 'rgba(13,17,23,0.97)', borderLeft: '1px solid rgba(48,54,61,0.9)',
-      backdropFilter: 'blur(10px)', display: 'flex', flexDirection: 'column',
-      boxShadow: '-8px 0 32px rgba(0,0,0,0.5)', zIndex: 30,
+    <div data-overlay="true" onPointerDown={(e) => e.stopPropagation()} style={{
+      position: 'absolute', bottom: 44, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 25,
+      maxWidth: 'calc(100vw - 24px)',
+      background: 'rgba(13,17,23,0.96)', border: '1px solid rgba(48,54,61,0.95)',
+      borderRadius: 10, backdropFilter: 'blur(10px)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+      display: 'flex', flexDirection: 'column',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid rgba(48,54,61,0.9)', flexShrink: 0 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid rgba(48,54,61,0.5)' }}>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, boxShadow: `0 0 8px ${statusColor}` }}/>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#e6edf3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#e6edf3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 360 }}>
             {cleanLabel(node.label)}
           </div>
-          <div style={{ fontSize: 10, color: 'rgba(139,148,158,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {node.id}
-          </div>
         </div>
-        <button onClick={onClose} aria-label="Close" style={{
-          padding: '4px 10px', fontSize: 14, fontFamily: 'inherit',
-          background: 'rgba(22,27,34,0.85)', color: 'rgba(200,210,230,0.9)',
-          border: '1px solid rgba(48,54,61,0.9)', borderRadius: 4, cursor: 'pointer',
+        <button onClick={onDismiss} aria-label="Dismiss" style={{
+          padding: '2px 8px', fontSize: 14, fontFamily: 'inherit',
+          background: 'transparent', color: 'rgba(139,148,158,0.8)',
+          border: 'none', cursor: 'pointer',
         }}>×</button>
       </div>
 
-      {/* Metadata */}
-      {isPhase && (
-        <div style={{ display: 'flex', gap: 10, padding: '8px 12px', flexWrap: 'wrap', fontSize: 10, borderBottom: '1px solid rgba(48,54,61,0.4)' }}>
+      {/* Metadata chips for phases */}
+      {isPhase && (node.phaseStatus || node.profile || node.directive) && (
+        <div style={{ display: 'flex', gap: 8, padding: '6px 12px', flexWrap: 'wrap', fontSize: 10, borderBottom: '1px solid rgba(48,54,61,0.4)' }}>
           {node.phaseStatus && <Chip label="STATUS" value={node.phaseStatus} color={statusColor} />}
           {node.profile && <Chip label="PROFILE" value={node.profile} />}
           {node.directive && <Chip label="DIRECTIVE" value={node.directive} />}
-          {node.projectId && <Chip label="PROJECT" value={node.projectId} />}
         </div>
       )}
 
-      {/* Action bar */}
-      <div style={{ display: 'flex', gap: 6, padding: '8px 12px', borderBottom: '1px solid rgba(48,54,61,0.4)', flexWrap: 'wrap', flexShrink: 0 }}>
-        <button
-          onClick={() => { onOpenFile(node.id); onClose(); }}
-          style={actionBtnStyle('#4493f8')}
-        >Open in editor</button>
+      {/* Actions */}
+      <div style={{ display: 'flex', gap: 6, padding: '8px 12px', flexWrap: 'wrap' }}>
+        <button onClick={() => { onOpenFile(node.id); onDismiss(); }} style={actionBtnStyle('#4493f8')}>Open</button>
         {canHop && (
           <button onClick={onHop} style={actionBtnStyle('#ffc850')}>Hop in →</button>
         )}
@@ -482,12 +466,6 @@ function DetailSidebar({
             {busy === 'ready' ? 'Marking…' : 'Mark ready'}
           </button>
         )}
-      </div>
-
-      <div style={{ flex: 1, overflow: 'auto', padding: '12px 16px', fontSize: 11, lineHeight: 1.55, color: '#c9d1d9', fontFamily: 'ui-monospace, SFMono-Regular, monospace', whiteSpace: 'pre-wrap' }}>
-        {err ? <div style={{ color: '#dc6e6e' }}>Failed to load: {err}</div>
-          : raw === null ? <div style={{ color: 'rgba(139,148,158,0.5)' }}>Loading…</div>
-          : raw}
       </div>
     </div>
   );
@@ -535,7 +513,8 @@ export default function VaultUniverse({ onOpenFile }: Props) {
   const walkTargetIdRef = useRef<string | null>(null);
   const walkTargetPosRef = useRef<THREE.Vector3 | null>(null);
 
-  const [detailNode, setDetailNode] = useState<VaultGraphNode | null>(null);
+  /** The last-tapped node. Its actions are shown in the floating action bar. */
+  const [selectedNode, setSelectedNode] = useState<VaultGraphNode | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [history, setHistory] = useState<string[]>([]);
 
@@ -600,13 +579,29 @@ export default function VaultUniverse({ onOpenFile }: Props) {
     return () => cancelAnimationFrame(raf);
   }, [walkProgress, currentId]);
 
+  /**
+   * Auto-routing tap: hub-like nodes hop the camera; everything else
+   * (phases, docs, logs — atoms) opens the dashboard's main drawer AND
+   * surfaces the floating action bar when it's a phase.
+   */
+  const handleTap = useCallback((node: VaultGraphNode) => {
+    if (isHubLike(node)) {
+      hopTo(node.id);
+      setSelectedNode(null);
+      return;
+    }
+    onOpenFile(node.id);
+    if (node.isPhase) setSelectedNode(node);
+    else setSelectedNode(null);
+  }, [hopTo, onOpenFile]);
+
   const jumpToBundle = useCallback((id: string) => {
     if (id === currentId) return;
     setPreviousId(currentId);
     setHistory((h) => (currentId ? [...h, currentId] : h));
     setCurrentId(id);
     setYaw(0);
-    setDetailNode(null);
+    setSelectedNode(null);
   }, [currentId]);
 
   const jumpToHistory = useCallback((index: number) => {
@@ -616,7 +611,7 @@ export default function VaultUniverse({ onOpenFile }: Props) {
         setPreviousId(currentId);
         setCurrentId(target);
         setYaw(0);
-        setDetailNode(null);
+        setSelectedNode(null);
         return h.slice(0, index);
       }
       return h;
@@ -624,7 +619,7 @@ export default function VaultUniverse({ onOpenFile }: Props) {
   }, [currentId]);
 
   const goBack = useCallback(() => {
-    if (detailNode) { setDetailNode(null); return; }
+    if (selectedNode) { setSelectedNode(null); return; }
     if (history.length > 0) {
       const last = history[history.length - 1];
       setHistory((h) => h.slice(0, -1));
@@ -632,7 +627,7 @@ export default function VaultUniverse({ onOpenFile }: Props) {
       setCurrentId(last);
       setYaw(0);
     }
-  }, [detailNode, history, currentId]);
+  }, [selectedNode, history, currentId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -645,24 +640,36 @@ export default function VaultUniverse({ onOpenFile }: Props) {
   }, [goBack]);
 
   // ── Pointer drag to spin ────────────────────────────────────────────
+  // Capture is deferred until the pointer actually moves past the drag
+  // threshold — otherwise setPointerCapture swallows the node click.
+  const captureIdRef = useRef<number | null>(null);
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('[data-sidebar="true"]') || target.closest('[data-overlay="true"]')) return;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    if (target.closest('[data-overlay="true"]')) return;
     dragRef.current = { x: e.clientX, yaw0: yawRef.current, moved: false };
+    captureIdRef.current = e.pointerId;
   }, []);
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current) return;
     const dx = e.clientX - dragRef.current.x;
-    if (Math.abs(dx) > 3) dragRef.current.moved = true;
-    setYaw(dragRef.current.yaw0 + dx * 0.005);
+    if (!dragRef.current.moved && Math.abs(dx) > 4) {
+      dragRef.current.moved = true;
+      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* noop */ }
+    }
+    if (dragRef.current.moved) setYaw(dragRef.current.yaw0 + dx * 0.005);
   }, []);
-  const onPointerUp = useCallback(() => { dragRef.current = null; }, []);
+  const onPointerUp = useCallback((e: React.PointerEvent) => {
+    if (captureIdRef.current !== null) {
+      try { (e.currentTarget as HTMLElement).releasePointerCapture(captureIdRef.current); } catch { /* noop */ }
+      captureIdRef.current = null;
+    }
+    dragRef.current = null;
+  }, []);
 
   // ── Phase actions ────────────────────────────────────────────────────
   const runPhaseAction = useCallback(async (verb: string) => {
-    if (!detailNode) return;
-    const projectId = detailNode.projectId;
+    if (!selectedNode) return;
+    const projectId = selectedNode.projectId;
     try {
       if (verb === 'launch') {
         if (!projectId) throw new Error('No project id on phase');
@@ -676,7 +683,7 @@ export default function VaultUniverse({ onOpenFile }: Props) {
         if (!projectId) throw new Error('No project id');
         const res = await fetch(`/api/onyx/projects/${encodeURIComponent(projectId)}`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phasePath: detailNode.id, status: 'ready' }),
+          body: JSON.stringify({ phasePath: selectedNode.id, status: 'ready' }),
         });
         if (!res.ok) throw new Error(`Status change failed (${res.status})`);
         setToast(verb === 'stop' ? 'Reset to ready' : 'Marked ready');
@@ -685,7 +692,7 @@ export default function VaultUniverse({ onOpenFile }: Props) {
       setToast(`Error: ${err instanceof Error ? err.message : String(err)}`);
     }
     setTimeout(() => setToast(null), 3500);
-  }, [detailNode]);
+  }, [selectedNode]);
 
   // ── History crumbs ───────────────────────────────────────────────────
   const crumbs = useMemo(() => {
@@ -727,8 +734,7 @@ export default function VaultUniverse({ onOpenFile }: Props) {
             <WorldNode
               key={p.node.id}
               pn={p}
-              onEnter={hopTo}
-              onOpenDetail={setDetailNode}
+              onTap={handleTap}
               currentYawRef={yawRef}
             />
           ))}
@@ -808,7 +814,7 @@ export default function VaultUniverse({ onOpenFile }: Props) {
       </div>
 
       {/* Back button */}
-      {(history.length > 0 || detailNode) && (
+      {(history.length > 0 || selectedNode) && (
         <button
           onClick={(e) => { e.stopPropagation(); goBack(); }}
           onPointerDown={(e) => e.stopPropagation()}
@@ -826,7 +832,7 @@ export default function VaultUniverse({ onOpenFile }: Props) {
         position: 'absolute', bottom: 12, left: 12, zIndex: 10,
         fontSize: 10, color: 'rgba(139,148,158,0.5)', pointerEvents: 'none',
       }}>
-        Drag to spin · tap node to open · Shift+tap to hop · Esc to go back
+        Drag to spin · tap a hub to hop · tap a leaf to open · Esc to go back
       </div>
 
       {/* Toast */}
@@ -847,18 +853,18 @@ export default function VaultUniverse({ onOpenFile }: Props) {
         </div>
       )}
 
-      {detailNode && (
-        <DetailSidebar
-          node={detailNode}
-          onClose={() => setDetailNode(null)}
+      {selectedNode && (
+        <NodeActionBar
+          node={selectedNode}
+          onDismiss={() => setSelectedNode(null)}
           onOpenFile={onOpenFile}
           onAction={runPhaseAction}
           onHop={() => {
-            const id = detailNode.id;
-            setDetailNode(null);
+            const id = selectedNode.id;
+            setSelectedNode(null);
             hopTo(id);
           }}
-          canHop={neighboursOf(detailNode.id, links, nodes).length > 0 && detailNode.id !== currentId}
+          canHop={neighboursOf(selectedNode.id, links, nodes).length > 0 && selectedNode.id !== currentId}
         />
       )}
     </div>
