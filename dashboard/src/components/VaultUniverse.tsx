@@ -290,8 +290,9 @@ function WorldNode({
         ref={meshRef}
         onClick={(e) => {
           e.stopPropagation();
-          if (e.shiftKey || e.metaKey || e.ctrlKey) onOpenDetail(pn.node);
-          else onEnter(pn.node.id);
+          // Primary action = see what's here. Shift/alt jumps directly.
+          if (e.shiftKey || e.altKey) onEnter(pn.node.id);
+          else onOpenDetail(pn.node);
         }}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = ''; }}
@@ -391,12 +392,14 @@ function FirstPersonCamera({
 // ── Detail sidebar ─────────────────────────────────────────────────────────
 
 function DetailSidebar({
-  node, onClose, onOpenFile, onAction,
+  node, onClose, onOpenFile, onAction, onHop, canHop,
 }: {
   node: VaultGraphNode;
   onClose: () => void;
   onOpenFile: (p: string) => void;
   onAction: (verb: string) => Promise<void>;
+  onHop: () => void;
+  canHop: boolean;
 }) {
   const [raw, setRaw] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -457,7 +460,13 @@ function DetailSidebar({
 
       {/* Action bar */}
       <div style={{ display: 'flex', gap: 6, padding: '8px 12px', borderBottom: '1px solid rgba(48,54,61,0.4)', flexWrap: 'wrap', flexShrink: 0 }}>
-        <button onClick={() => onOpenFile(node.id)} style={actionBtnStyle('#4493f8')}>Open</button>
+        <button
+          onClick={() => { onOpenFile(node.id); onClose(); }}
+          style={actionBtnStyle('#4493f8')}
+        >Open in editor</button>
+        {canHop && (
+          <button onClick={onHop} style={actionBtnStyle('#ffc850')}>Hop in →</button>
+        )}
         {isPhase && !isActive && (
           <button disabled={!!busy} onClick={() => run('launch')} style={actionBtnStyle('#00dcb4', busy === 'launch')}>
             {busy === 'launch' ? 'Launching…' : 'Launch agent'}
@@ -817,7 +826,7 @@ export default function VaultUniverse({ onOpenFile }: Props) {
         position: 'absolute', bottom: 12, left: 12, zIndex: 10,
         fontSize: 10, color: 'rgba(139,148,158,0.5)', pointerEvents: 'none',
       }}>
-        Drag to spin · tap node to hop · Shift+tap for details · Esc to go back
+        Drag to spin · tap node to open · Shift+tap to hop · Esc to go back
       </div>
 
       {/* Toast */}
@@ -844,6 +853,12 @@ export default function VaultUniverse({ onOpenFile }: Props) {
           onClose={() => setDetailNode(null)}
           onOpenFile={onOpenFile}
           onAction={runPhaseAction}
+          onHop={() => {
+            const id = detailNode.id;
+            setDetailNode(null);
+            hopTo(id);
+          }}
+          canHop={neighboursOf(detailNode.id, links, nodes).length > 0 && detailNode.id !== currentId}
         />
       )}
     </div>
