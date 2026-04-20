@@ -38,7 +38,7 @@ up: OpenClaw Projects Hub
 This directive is anchored to one on-disk vault for illustration:
 
 ```text
-/home/jamal/clawd/openclaw/vaults/OnyxVault
+$ONYX_VAULT_ROOT
 ```
 
 ---

@@ -475,6 +475,7 @@ program
 program
   .command('consolidate [args...]')
   .description('Manually trigger vault consolidation (project phases/docs)')
+  .allowUnknownOption(true)
   .action(async (args) => { await runConsolidate(args ?? []); });
 
 // ── monthly-consolidate ───────────────────────────────────────────────────

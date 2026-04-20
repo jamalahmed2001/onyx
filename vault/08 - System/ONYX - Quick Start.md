@@ -303,7 +303,7 @@ After a phase completes:
 ```yaml
 # Overview.md frontmatter
 profile: engineering
-repo_path: /home/jamal/clawd/krakenbot
+repo_path: ~/workspace/krakenbot
 test_command: pnpm test
 stack: TypeScript, Fastify, Prisma
 ```

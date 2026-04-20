@@ -488,7 +488,7 @@ A phase is complete when:
 title: KrakenBot
 project_id: KrakenBot
 profile: engineering
-repo_path: /home/jamal/clawd/openclaw/projects/krakenbot
+repo_path: ~/workspace/projects/krakenbot
 test_command: pnpm test
 stack: TypeScript, Fastify, WebSocket, Kraken API
 status: active

@@ -60,7 +60,7 @@ One field in the project Overview.md frontmatter:
 ---
 project_id: "MyProject"
 profile: engineering
-repo_path: /home/jamal/clawd/myproject
+repo_path: ~/workspace/myproject
 test_command: pnpm test
 ---
 ```

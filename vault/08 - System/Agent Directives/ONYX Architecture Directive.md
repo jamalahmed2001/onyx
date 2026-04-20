@@ -144,7 +144,7 @@ Every piece of project state lives as a human-readable markdown file. The Orches
 ```jsonc
 {
   "project_id": "OpenClaw/Almani",        // Unique project identifier
-  "repo_path": "/home/jamal/dev/almani",  // Absolute path to code repo
+  "repo_path": "~/workspace/almani",  // Absolute path to code repo
   "bundle_path": "10 - OpenClaw/Ventures/Almani", // Vault-relative
   "status": "active",                     // ProjectState FSM value
   "active_phase": 2,                      // Which phase is currently executing
@@ -889,7 +889,7 @@ EXCLUDED_TASK_HEADINGS = [
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `ONYX_VAULT_ROOT` | `/home/jamal/Obsidian/OnyxVault` | Vault root path |
+| `ONYX_VAULT_ROOT` | `$ONYX_VAULT_ROOT` | Vault root path |
 | `ONYX_EXEC_MODELS` | `composer-2,gpt-4.1-mini,sonnet-4` | Executor model list (comma-sep, tried in order) |
 | `ONYX_PLAN_MODELS` | `composer-2,gpt-4.1-mini` | Planner model list |
 | `ONYX_WHATSAPP_RECIPIENT` | — | Phone number for WhatsApp notifications (e.g. `+447700000000`). If unset, WhatsApp delivery is silently skipped. |

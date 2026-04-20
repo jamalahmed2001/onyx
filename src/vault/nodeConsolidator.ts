@@ -164,8 +164,13 @@ function trashCompletedGroupPhasesIfArchived(
   const phasesDir = path.join(bundleDir, 'Phases');
   if (!fs.existsSync(phasesDir)) return linkMapOut;
 
-  const phasePaths = glob.sync('P*.md', { cwd: phasesDir, absolute: true }).filter(p => {
-    const n = parseInt(path.basename(p).match(/\d+/)?.[0] ?? '0', 10);
+  const phasePaths = glob.sync('*.md', { cwd: phasesDir, absolute: true }).filter(p => {
+    const node = readPhaseNode(p);
+    const fmNumber = Number(node.frontmatter['phase_number'] ?? NaN);
+    if (!Number.isNaN(fmNumber)) return fmNumber >= start && fmNumber <= end;
+    const m = path.basename(p).match(/\s-\s[PR](\d+(?:\.\d+)?)\s-\s/);
+    if (!m) return false;
+    const n = parseInt(m[1]!, 10);
     return n >= start && n <= end;
   });
   if (phasePaths.length === 0) return linkMapOut;
@@ -337,14 +342,24 @@ function consolidatePhaseGroup(
   const groupNum = Number(groupNode.frontmatter['phase_group'] ?? 0);
   const groupName = path.basename(groupPath, '.md');
 
-  // Find all phases in this group
+  // Find all phase files in this group. Match any .md that has phase_number in frontmatter
+  // OR whose basename contains " - P<digits> - " / " - R<digits> - " (common naming).
   const phasesDir = path.join(bundleDir, 'Phases');
-  const allPhases = glob.sync('P*.md', { cwd: phasesDir, absolute: true });
+  const allPhases = glob.sync('*.md', { cwd: phasesDir, absolute: true });
 
   const { start, end } = getPhaseGroupRange(groupNum);
 
   const groupPhases = allPhases.filter(p => {
-    const n = parseInt(path.basename(p).match(/\d+/)?.[0] ?? '0', 10);
+    const node = readPhaseNode(p);
+    const fmNumber = Number(node.frontmatter['phase_number'] ?? NaN);
+    if (!Number.isNaN(fmNumber)) {
+      return fmNumber >= start && fmNumber <= end;
+    }
+    // Fallback: parse from filename — match patterns like "... - P13 - ..." or "... - R1 - ..."
+    const basename = path.basename(p);
+    const m = basename.match(/\s-\s[PR](\d+(?:\.\d+)?)\s-\s/);
+    if (!m) return false;
+    const n = parseInt(m[1]!, 10);
     return n >= start && n <= end;
   });
 

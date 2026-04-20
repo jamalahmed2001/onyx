@@ -49,7 +49,7 @@ exchange: kraken                               # target exchange (kraken, binanc
 strategy_type: arbitrage                       # arbitrage | trend | mean-reversion | market-making | hybrid
 risk_limits: "max_position_usd: 500, max_drawdown_pct: 3, max_daily_loss_usd: 200"
 backtest_command: pnpm backtest                # command to run backtest suite
-repo_path: /home/jamal/clawd/krakenbot        # where the code lives
+repo_path: ~/workspace/krakenbot        # where the code lives
 test_command: pnpm test                        # unit + integration tests
 live_enabled: false                            # true only when strategy is approved for live
 ```
