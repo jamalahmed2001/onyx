@@ -34,7 +34,7 @@ onyx heal             fix vault drift
 
 ## Projects
 
-- [[My Projects Hub|My Projects Hub]]
+- [[01 - Projects/My Projects Hub|My Projects Hub]]
 
 ---
 

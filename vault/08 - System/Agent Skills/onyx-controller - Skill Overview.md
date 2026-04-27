@@ -164,7 +164,7 @@ This is composed mode, not the default for every request.
 | Phase Planner | `planProject(..., { forceReplan })` | ✅ |
 | Phase Executor | `runExecutorOnce()` / `runExecutorForPhase()` | ✅ |
 | Consolidate | `vault-consolidator.cjs` wrapper | ✅ partial |
-| Notify | `notify-phase.sh` via `runNotifyStep()` | ✅ |
+| Notify | direct `openclaw` invocation per [[08 - System/ONYX Master Directive.md\|Master Directive §15]] | ✅ |
 
 ## Direct-call surface
 
@@ -177,7 +177,7 @@ The directive wants clean isolated flows. The controller now aligns with these c
 - `replan-phase`
 - `execute-phase`
 - `consolidate`
-- `notify`
+- `notify` *(via `openclaw` per Master Directive §15, no dedicated skill)*
 
 The controller is the composed orchestrator over that surface, not a replacement for it.
 

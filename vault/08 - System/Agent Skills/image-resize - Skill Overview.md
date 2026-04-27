@@ -1,7 +1,7 @@
 ---
 tool: image-resize
 type: npm
-repo: ~/clawd/openclaw/projects/my-podcast-agent
+repo: /path/to/your/repo
 script: image:resize
 free: true
 open_source: true
@@ -16,7 +16,7 @@ up: Agent Skills Hub
 ## Invocation
 
 ```bash
-cd ~/clawd/openclaw/projects/my-podcast-agent
+cd /path/to/your/repo
 npm run image:resize -- --input path/to/image.jpg --output path/to/out.jpg --width 1280 --height 720
 ```
 

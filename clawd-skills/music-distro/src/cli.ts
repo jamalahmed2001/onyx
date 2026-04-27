@@ -100,7 +100,7 @@ Subcommands:
         --genre <text>           Primary genre
         --secondary-genre <text> Secondary genre
         --language <text>        Lyrics language (default: English)
-        --songwriter <text>      Songwriter credit (can repeat: --songwriter "Jamal" --songwriter "...")
+        --songwriter <text>      Songwriter credit (can repeat: --songwriter "Author Name" --songwriter "...")
         --producer <text>        Producer credit (repeatable)
         --featuring <text>       Featured artist (repeatable)
         --instrumental           Mark instrumental (no lyrics)

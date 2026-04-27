@@ -61,10 +61,10 @@ Generates (or updates) a podcast RSS 2.0 + iTunes feed XML file.
 
 Channel JSON example:
 {
-  "title": "The Beating Edge with Mani+",
+  "title": "Example Podcast Title",
   "link": "https://mani.plus",
   "description": "A British, heartfelt podcast ...",
-  "author": "Mani",
+  "author": "Example Author",
   "email": "hello@mani.plus",
   "language": "en-GB",
   "category": "Health & Fitness",

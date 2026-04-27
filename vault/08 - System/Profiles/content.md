@@ -90,7 +90,7 @@ My Project/
 
 The **Source Context** note is content-specific. It defines the show's identity, target audience, tone, and positioning — the stable facts every agent needs before touching anything. The bootstrap phase populates it from the Overview and any existing brand documents.
 
-The **Directives/** folder lives inside the bundle (not in the system folder) because content pipeline directives are project-specific — they encode Mani's voice, this newsletter's tone, not generic rules.
+The **Directives/** folder lives inside the bundle (not in the system folder) because content pipeline directives are project-specific — they encode the host's voice, this newsletter's tone, not generic rules.
 
 ---
 

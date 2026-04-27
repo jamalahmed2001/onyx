@@ -4,7 +4,7 @@ graph_domain: system
 status: active
 skill_name: notion-context
 version: 0.1.0
-author: Jamal + Claw
+author: <the-author>
 source_skill_path: ~/clawd/skills/notion-context/SKILL.md
 updated: 2026-03-25
 up: Agent Skills Hub

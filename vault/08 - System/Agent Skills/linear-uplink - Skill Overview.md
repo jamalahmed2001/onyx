@@ -29,7 +29,7 @@ Bidirectional synchronization from Obsidian vault to Linear. Creates issues, upd
 
 ## 🎯 Purpose
 Pushes vault-side updates back to Linear while maintaining:
-- Proper issue assignment to Jamal
+- Proper issue assignment to the configured user
 - Project and cycle association
 - Consistent labeling (Creator Experience, etc.)
 - State synchronization
@@ -159,7 +159,7 @@ LINEAR_PROJECT_ID=project-id  # Fallback if not in issue metadata
 LINEAR_CYCLE_ID=cycle-id      # Optional: for sprint association
 
 # User Assignment
-LINEAR_USER_ID=user-id         # Jamal's Linear user ID
+LINEAR_USER_ID=user-id         # Linear user ID to assign to
 LINEAR_USER_EMAIL=<your-email>
 
 # Labels
@@ -203,7 +203,7 @@ Add vault metadata to Linear issue:
 
 ## Linear Integration
 - **Project:** [Linear Project Name]
-- **Assignee:** Jamal
+- **Assignee:** the configured user
 - **Labels:** Creator Experience, [Domain]
 
 ## Acceptance Criteria
@@ -217,7 +217,7 @@ Query Linear for:
 - Project ID
 - State IDs (Backlog, Todo, In Progress, Done)
 - Label IDs (Creator Experience, <workplace>, etc.)
-- User ID (Jamal)
+- User ID
 
 ```graphql
 query GetIDs($teamKey: String!, $projectName: String!) {
@@ -255,7 +255,7 @@ query GetIDs($teamKey: String!, $projectName: String!) {
 
 #### Step 4: Create Issue with Proper Assignments
 Use fetched IDs to create issue:
-- Assign to Jamal (`LINEAR_USER_ID`)
+- Assign to the configured user (`LINEAR_USER_ID`)
 - Add to correct project
 - Apply standard labels
 - Set initial state to "Backlog" or "Todo"
@@ -317,7 +317,7 @@ mutation CreateSubtask($parentId: ID!, $title: String!) {
 ## 📊 Success Criteria
 
 ✅ **Issues created** in Linear with proper project/assignment
-✅ **Jamal assigned** to all vault-created issues
+✅ **User assigned** to all vault-created issues
 ✅ **Standard labels** applied (Creator Experience, etc.)
 ✅ **State synchronized** between vault and Linear
 ✅ **Linear IDs** added back to vault files
@@ -328,7 +328,7 @@ mutation CreateSubtask($parentId: ID!, $title: String!) {
 ## 🛡️ Error Handling
 
 ### Assignment Failures
-- If Jamal ID not found, use project default
+- If user ID not found, use project default
 - Log warning and proceed with issue creation
 - Add comment to issue requesting manual assignment
 
@@ -395,7 +395,7 @@ linear-uplink sync vault-file.md
 
 # 3. Issue created in Linear
 # - Title: New Feature: Dark Mode
-# - Assigned: Jamal
+# - Assigned: <user>
 # - Project: <workplace>
 # - Labels: Creator Experience, <workplace>
 # - State: Backlog

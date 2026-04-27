@@ -77,7 +77,7 @@ knowledge:
   file: 10 - OpenClaw/Platform/OpenClaw Ops/OpenClaw Ops - Knowledge.md
   excerpts:
     - "Phase 5 Cron and Automation Inventory: ... no old vault paths remain."
-    - "Workspace config: vault_root=$ONYX_VAULT_ROOT, projects_root=~/clawd/openclaw/projects."
+    - "Workspace config: vault_root=$ONYX_VAULT_ROOT, projects_root=/path/to/your/repos."
 ```
 
 ```query

@@ -50,10 +50,10 @@ rss-publish \
 
 ```json
 {
-  "title": "The Beating Edge with Mani+",
+  "title": "Example Podcast Title",
   "link": "https://mani.plus",
   "description": "A British, heartfelt podcast about kidney disease, transplant, dialysis, and thriving beyond chronic illness.",
-  "author": "Mani",
+  "author": "Example Author",
   "email": "hello@mani.plus",
   "language": "en-GB",
   "category": "Health & Fitness",

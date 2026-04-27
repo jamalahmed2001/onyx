@@ -6,7 +6,7 @@ updated: 2026-03-25
 status: active
 version: 3.0
 up: Agent Directives Hub
-owner: Jamal
+owner: <the-author>
 ---
 ## 🔗 Navigation
 

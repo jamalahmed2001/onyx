@@ -121,7 +121,7 @@ suno generate --prompt "warm British piano ballad" --output-dir ./
 music-distro release-create \
   --audio ./track-01.mp3 \
   --title "Quiet Resolve" \
-  --artist "Mani+" \
+  --artist "Example Artist" \
   --art ./cover-3000x3000.jpg \
   --release-date 2026-05-20 \
   --genre "Alternative" \

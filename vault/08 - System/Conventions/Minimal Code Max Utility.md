@@ -48,7 +48,7 @@ Examples of what belongs **in** a skill:
 - Output schema (consistent across callers)
 
 Examples of what does **not** belong in a skill:
-- "Default to Mani's voice" — no, make the caller pass the voice ID
+- "Default to a specific voice" — no, make the caller pass the voice ID
 - "Apply the My Podcast pronunciation dictionary" — no, that's a directive's pre-processing step
 - "Hard-coded Suno channel config" — no, take it as `--channel-file`
 

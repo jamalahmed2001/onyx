@@ -64,7 +64,7 @@ Emits structured JSON on stdout (`{ok, outputs[], voice_id, model_id, total_char
 
 | Project | Directive | Voice | Notes |
 |---|---|---|---|
-| My Podcast | `my-podcast-audio-producer` | `95OogFxnvKSZHBucz1nN` (Mani profile) | Model: `eleven_multilingual_v2` |
+| My Podcast | `my-podcast-audio-producer` | `<voice-id>` (example voice) | Model: `eleven_multilingual_v2` |
 | My Show | `cartoon-voice-director` | locked per character in the Character Bible (P03) | Per-character stability/similarity settings |
 
 Add rows here when new voices are adopted.

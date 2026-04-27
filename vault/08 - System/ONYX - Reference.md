@@ -235,7 +235,7 @@ project: My Podcast
 
 ## Role
 You are the My Podcast Script Writer. Your job is to produce episode scripts
-that match Mani's voice, build on previous episodes, and stay within
+that match the host's voice, build on previous episodes, and stay within
 medical safety constraints.
 
 ## Context you must load before starting
@@ -246,7 +246,7 @@ medical safety constraints.
 ## How to function
 - Always read the previous 3 episodes before writing
 - Story-first structure: real story → insight → practical takeaway
-- Keep sentences short. Mani's voice is conversational, not clinical.
+- Keep sentences short. the host's voice is conversational, not clinical.
 
 ## Output format
 - 800–1,200 words for a full episode script
@@ -319,11 +319,11 @@ That's it. This rule is what makes multi-agent coordination safe. No agent can c
 | Directive | Role | What it enforces |
 |---|---|---|
 | `my-podcast-researcher` | Weekly health topic research | Source constraints, citation format, topic selection rules |
-| `my-podcast-script-writer` | Episode script generation | Mani's voice, continuity, medical safety, output format |
+| `my-podcast-script-writer` | Episode script generation | the host's voice, continuity, medical safety, output format |
 | `my-podcast-audio-producer` | ElevenLabs voice generation | Pronunciation rules, pacing markers, file naming |
 | `my-podcast-video-composer` | Long video + shorts assembly | Branding rules, caption requirements, aspect ratios |
 | `my-podcast-distributor` | RSS + YouTube + TikTok publish | Platform-specific format rules, description templates |
-| `my-podcast-engagement` | Comment ingestion + reply assist | Mani's reply voice, escalation rules, response time norms |
+| `my-podcast-engagement` | Comment ingestion + reply assist | the host's reply voice, escalation rules, response time norms |
 | `my-podcast-analyst` | Analytics → vault learning loop | What to measure, how to write learnings back to Knowledge |
 | `my-podcast-meta` | Full pipeline orchestration | Delegates to all the above in sequence |
 

@@ -41,7 +41,7 @@ Set `ELEVENLABS_API_KEY` in the caller's environment. Commercial use requires th
 ```bash
 elevenlabs-tts \
   --text "Assalamu alaikum, welcome back." \
-  --voice-id "95OogFxnvKSZHBucz1nN" \
+  --voice-id "<voice-id>" \
   --model-id "eleven_multilingual_v2" \
   --stability 0.5 \
   --similarity-boost 0.75 \
@@ -54,7 +54,7 @@ Emits JSON on stdout:
 {
   "ok": true,
   "outputs": ["./out.mp3"],
-  "voice_id": "95OogFxnvKSZHBucz1nN",
+  "voice_id": "<voice-id>",
   "model_id": "eleven_multilingual_v2",
   "total_chars": 33,
   "bytes": 48192
@@ -68,7 +68,7 @@ Exit code: 0 on success, non-zero with a JSON error on stderr on failure.
 ```bash
 elevenlabs-tts \
   --text-file ./line.txt \
-  --voice-id 95OogFxnvKSZHBucz1nN \
+  --voice-id <voice-id> \
   --output ./out.mp3
 ```
 
@@ -78,14 +78,14 @@ Input JSON: an array of `{id, text}`. Each segment becomes `<output-dir>/<NN>-<i
 
 ```bash
 echo '[
-  {"id": "hook",     "text": "Welcome back to Mani.Plus."},
+  {"id": "hook",     "text": "Welcome back to the show."},
   {"id": "story",    "text": "Today I want to share a story…"},
   {"id": "insight-1","text": "Published research shows that…"}
 ]' > segments.json
 
 elevenlabs-tts \
   --segments-file segments.json \
-  --voice-id 95OogFxnvKSZHBucz1nN \
+  --voice-id <voice-id> \
   --model-id eleven_multilingual_v2 \
   --output-dir ./out/
 ```
@@ -100,7 +100,7 @@ Emits:
     "./out/02-story.mp3",
     "./out/03-insight-1.mp3"
   ],
-  "voice_id": "95OogFxnvKSZHBucz1nN",
+  "voice_id": "<voice-id>",
   "model_id": "eleven_multilingual_v2",
   "total_chars": 118,
   "segments": 3

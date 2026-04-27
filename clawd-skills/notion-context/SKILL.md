@@ -2,7 +2,7 @@
 name: notion-context
 description: Fetch project-scoped context from Notion using the official REST API for use in <workplace>ProjectSync and other orchestrators.
 version: 0.1.0
-author: Jamal + Claw
+author: <the-author>
 metadata:
   clawdbot:
     emoji: 🧱

@@ -1,7 +1,7 @@
 ---
 tool: rss-publish
 type: npm
-repo: ~/clawd/openclaw/projects/my-podcast-agent
+repo: /path/to/your/repo
 script: publish:rss
 free: true
 open_source: true
@@ -16,7 +16,7 @@ up: Agent Skills Hub
 ## Invocation
 
 ```bash
-cd ~/clawd/openclaw/projects/my-podcast-agent
+cd /path/to/your/repo
 npm run publish:rss -- --episode <episode-id>
 ```
 

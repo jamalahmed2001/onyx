@@ -30,7 +30,7 @@ migration_stage: 6
 
 ## Invocation context
 - Explicit: `onyx replan <project> <n>` or `onyx reset <project>` (which can trigger replan on the reactivated phase).
-- From [[08 - System/Operations/execute-phase.md|execute-phase]] when a task kept failing but the operator wants an automatic second attempt (not default — must be configured per phase).
+- From [[08 - System/Operations/execute-phase.md|execute-phase]] when a task kept failing but the project wants an automatic second attempt (not default — must be configured per phase).
 
 ## Read order
 1. Phase file — full content (current Tasks, Blockers, Human Requirements, Acceptance Criteria).

@@ -183,12 +183,12 @@ The **skill surface layer** (§10 of the Master Directive) is everything an agen
 | Category | Skills |
 |---|---|
 | Agent Execution | `agent-spawn`, `onyx-controller`, `context-orchestrator` |
-| Integrations | `linear-fetch`, `linear-uplink`, `notion-context`, `notify-phase`, `rss-fetch` |
+| Integrations | `linear-fetch`, `linear-uplink`, `notion-context`, `rss-fetch` |
 | Media & Content | `whisper-groq`, `elevenlabs-tts`, `audio-master`, `suno`, `pubmed-search`, `remotion-best-practices` |
 | Distribution | `spotify-creators`, `music-distro`, `rss-publish`, `youtube-publish`, `youtube-comments`, `tiktok-publish`, `instagram-publish`, `analytics-pull` |
 | Personal & Productivity | `plan-my-day` |
 | Infrastructure | `headless-browser`, `browser-automate`, `cloudflare-dns-sync`, `housekeeping`, `obsidian`, `project-health` |
-| Utilities | `prompt-optimizer`, `clawdbot-cost-tracker`, `image-resize`, `pdf-extract`, `comment-safety-filter`, `notify` |
+| Utilities | `prompt-optimizer`, `clawdbot-cost-tracker`, `image-resize`, `pdf-extract`, `comment-safety-filter` |
 
 A phase, directive, or profile can declare `skills:` in frontmatter to whitelist its allowed surface. Outside that set → log a warning.
 
@@ -267,7 +267,7 @@ OPENROUTER_API_KEY=sk-or-...
 {
   "vault_root": "/absolute/path/to/your/obsidian/vault",
   "agent_driver": "claude-code",
-  "projects_glob": "{01 - Projects/**,03 - Ventures/**,10 - OpenClaw/**}",
+  "projects_glob": "01 - Projects/**",
   "model_tiers": {
     "planning": "anthropic/claude-opus-4-6",
     "light":    "anthropic/claude-haiku-4-5-20251001",

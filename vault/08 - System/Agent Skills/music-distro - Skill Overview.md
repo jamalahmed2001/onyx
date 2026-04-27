@@ -34,7 +34,7 @@ export MUSIC_DISTRO_PROVIDER=distrokid   # default; or tunecore, amuse, etc.
 music-distro release-create \
   --audio ./mastered.mp3 \
   --title "Quiet Resolve" \
-  --artist "Mani+" \
+  --artist "Example Artist" \
   --art ./cover-3000.jpg \
   --release-date 2026-05-20 \
   --genre "Alternative" \

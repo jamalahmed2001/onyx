@@ -24,11 +24,11 @@ Deep data retrieval from Linear GraphQL API for comprehensive project synchroniz
 > Updated 2026-03-17 v2.1: Children nodes now include `identifier`, `description`, and structured `state` object (previously only `id, title, state, priority, url`). This enables project-atomizer to correctly classify child tasks by content when building overview-spec roadmaps.
 
 ## 🎯 Purpose
-Fetches Jamal's relevant Linear projects and dynamically filters to identify active work.
+Fetches the user's relevant Linear projects and dynamically filters to identify active work.
 
 A project should be included if **either**:
-- Jamal is the **project lead/owner** on the project, or
-- Jamal has **issues assigned** inside the project.
+- the user is the **project lead/owner** on the project, or
+- the user has **issues assigned** inside the project.
 
 Filtering:
 - **INCLUDE:** Started (monitoring), Planned (ready), Backlog (queued)
@@ -38,14 +38,14 @@ Filtering:
 ## 🛠️ Operation Mode
 
 ### Input
-- **Option A (Specific Project):** Fetch specific project by ID or name with Jamal's assigned issues
+- **Option A (Specific Project):** Fetch specific project by ID or name with the user's assigned issues
 - **Option B (Relevant Projects):** Fetch the union of:
-  - projects where Jamal is the **project lead/owner**
-  - projects that contain **issues assigned to Jamal**
+  - projects where the user is the **project lead/owner**
+  - projects that contain **issues assigned to the user**
 - **User ID:** Automatically retrieved from `viewer` query
 
 ### CRITICAL: Use viewer.assignedIssues (NOT team.issues)
-**ALWAYS use `viewer.assignedIssues` to ONLY fetch Jamal's assigned issues:**
+**ALWAYS use `viewer.assignedIssues` to ONLY fetch the user's assigned issues:**
 
 ```graphql
 viewer {
@@ -61,7 +61,7 @@ viewer {
 ```
 
 **Filtering Rules:**
-- ✅ `viewer.assignedIssues` = ONLY Jamal's assigned issues
+- ✅ `viewer.assignedIssues` = ONLY the user's assigned issues
 - ❌ DO NOT use `team.issues` = Shows ALL team issues (wrong!)
 - ❌ DO NOT filter by project ID first (issues may span projects)
 - ✅ Filter by project AFTER fetching assigned issues
@@ -70,7 +70,7 @@ viewer {
 
 ### GraphQL Query Structure
 
-#### Option A: Specific Project with Jamal's Issues
+#### Option A: Specific Project with the user's Issues
 ```graphql
 query GetYourProject(\$projectId: ID!, \$userId: String!) {
   project(id: \$projectId) {
@@ -83,7 +83,7 @@ query GetYourProject(\$projectId: ID!, \$userId: String!) {
     cycles(first: 10) { nodes { id name } }
     labels(first: 20) { nodes { id name color } }
 
-    # ONLY fetch Jamal's assigned issues
+    # ONLY fetch the user's assigned issues
     issues(filter: { assignee: { id: { eq: \$userId } } }) {
       nodes {
         id
@@ -122,9 +122,9 @@ query GetYourProject(\$projectId: ID!, \$userId: String!) {
 }
 ```
 
-#### Option B: All of Jamal's Assigned Issues (DYNAMIC FILTERING)
+#### Option B: All of the user's Assigned Issues (DYNAMIC FILTERING)
 ```graphql
-query GetJamalAssignedIssues($excludeStates: [String!]!) {
+query Getthe userAssignedIssues($excludeStates: [String!]!) {
   viewer {
     id
     name
@@ -188,7 +188,7 @@ $excludeStates: ["Completed", "Canceled"]
 - ❌ **EXCLUDE:** Completed, Canceled (no sync needed)
 - 🔍 **DYNAMIC:** Auto-detect which projects need sync (not hardcoded)
 
-**Result:** Returns ONLY active/ready projects that Jamal is working on.
+**Result:** Returns ONLY active/ready projects that the user is working on.
 
 **CRITICAL:** Always use `viewer.assignedIssues` for Option B. For Option A, use `project.issues` with `assignee` filter. DO NOT use team-wide queries.
 
@@ -231,7 +231,7 @@ JSON stored in temporary location for consumption by `project-atomizer`:
 {
   "viewer": {
     "id": "67440994-08f8-40cc-aa1d-6bce08b6e48a",
-    "name": "Jamal Ahmed",
+    "name": "<the-user>",
     "email": "<your-email>"
   },
   "projects": [
@@ -285,17 +285,17 @@ if [ -z "$LINEAR_USER_ID" ]; then
   exit 1
 fi
 
-# Verify Jamal's user ID
+# Verify the user's user ID
 echo "Fetching for: LINEAR_USER_ID=$LINEAR_USER_ID"
-echo "Jamal Ahmed (67440994-08f8-40cc-aa1d-6bce08b6e48a)"
+echo "<the-user> (67440994-08f8-40cc-aa1d-6bce08b6e48a)"
 ```
 
 **Pre-Fetch Checklist:**
 - ✅ `LINEAR_USER_ID` is configured in `.env`
 - ✅ User ID matches: `67440994-08f8-40cc-aa1d-6bce08b6e48a`
 - ✅ GraphQL filter includes: `assignee: { id: { eq: $userId } }`
-- ✅ Project has at least 1 issue assigned to Jamal
-- ❌ Reject projects with 0 assigned issues to Jamal
+- ✅ Project has at least 1 issue assigned to the user
+- ❌ Reject projects with 0 assigned issues to the user
 
 **Project Eligibility Test:**
 ```graphql
@@ -313,7 +313,7 @@ query CheckEligibility($projectId: ID!, $userId: String!) {
 }
 ```
 
-If result has 0 issues, skip project (Jamal not assigned).
+If result has 0 issues, skip project (the user not assigned).
 
 ## 🔧 Configuration
 
@@ -361,7 +361,7 @@ query {
 ✅ **All issues retrieved** with descriptions and state
 ✅ **Issue relationships mapped** (parent/child)
 ✅ **Labels extracted** for domain classification
-✅ **Assignee information captured** (specifically Jamal's ID)
+✅ **Assignee information captured** (specifically the user's ID)
 ✅ **Output saved** in structured JSON format
 ✅ **Error logs** generated for any failures
 
