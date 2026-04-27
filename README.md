@@ -34,6 +34,15 @@ ONYX is five primitives, one directive, one loop.
 
 **Every new thing must be one of these five.** No new category without evidence.
 
+**The two conventions** that hold the graph together:
+
+| Convention | What it enforces | Where it lives |
+|---|---|---|
+| **Tag Convention** | 8 canonical tag families with one **kind tag** per note (`onyx-phase`, `onyx-operative`, `onyx-directive`, `onyx-artefact`, `onyx-show`, `onyx-episode`, `onyx-track`, `hub-domain`/`hub-subdomain`/`hub-project`/`hub-bundle`). Drives Obsidian colour-coding so the graph is legible at a glance. | `08 - System/Conventions/Tag Convention.md` |
+| **Project ID Convention** | `project_id` is a **kebab-case slug ≤ 30 chars**, unique vault-wide. Everything else (folder name, hub names, phase prefixes, project tag) cascades from it. Renames go through one operation: [[heal-project-id-migrate]]. | `08 - System/Conventions/Project ID Convention.md` |
+
+Plus the **Fractal Linking Convention** — every folder with ≥ 2 markdown files has a hub; hubs walk up to a single parent; cross-branch relationships live in frontmatter, never in body wikilinks.
+
 ---
 
 ## Why it exists
@@ -93,8 +102,8 @@ vault/
     ├── Doctor Directive.md         # pre-flight health checks
     ├── Agent Directives/           # role-archetype contracts
     ├── Agent Skills/               # skill overviews + _onyx-runtime/ primitives
-    ├── Conventions/                # authoring guides (minimal-code, fractal-linking, tags, browser-automation)
-    ├── Operations/                 # the nine runtime operations (heal, route, atomise, execute, …)
+    ├── Conventions/                # tag, project-id, fractal-linking, minimal-code, browser-automation
+    ├── Operations/                 # runtime operations (heal, consolidate, route, atomise, execute, …)
     ├── Principles/                 # distilled wisdom (universal + storytelling + engineering principles)
     ├── Memory/                     # decision tree for Plan/Memory/Cross-Project/Principles + entry examples
     ├── Profiles/                   # project-type contracts (engineering, content, audio-production, …)
@@ -221,6 +230,50 @@ Each starter pulls the relevant directives from `08 - System/Agent Directives/` 
 
 ---
 
+## Heal — the meta-operation
+
+`heal` is run before every iteration (and on a daily cron) to keep the vault graph self-consistent. It is a **meta-directive** that delegates to small, single-purpose sub-skills under `08 - System/Agent Skills/_onyx-runtime/`. Each sub-skill is independently invokable; the meta-directive just composes them in the right order.
+
+| Sub-skill | What it fixes |
+|---|---|
+| `heal-stale-locks` | Phase locks older than the threshold get cleared so work is no longer wedged behind a dead agent. |
+| `heal-frontmatter-drift` | Required fields per profile/kind get backfilled; aliases collapsed; ISO timestamps normalised. |
+| `heal-kind-tag` | Adds the canonical kind tag (one per note) using a 19-rule location + name classifier. |
+| `heal-project-id` | Validates `project_id` format + uniqueness across the vault; flags hub-name mismatches. |
+| `heal-project-id-migrate` | One-shot renamer: cascade a `project_id` change across the bundle's folder, hubs, phases, and tags. |
+| `heal-orphan-locks` | Frontmatter `lock:` entries that no agent claims any longer get released. |
+| `heal-dup-nav` | Duplicate `**UP:**` lines, parallel headings, navigation drift collapsed back to one. |
+| `heal-fractal-links` | Recursive bottom-up walker: every folder with ≥ 2 md gets a hub; orphan back-links and cross-branch wikilinks repaired. |
+| `heal-bundle-shape` | Bundle skeleton (Overview, Knowledge, Phases, Logs, Directives) enforced; cross-bundle wikilinks pruned. |
+| `heal-cross-link` | Frontmatter relations (`profile:`, `directive:`, `based_on:`) verified to point at real files. |
+| `heal-migrate-logs` | Ad-hoc per-phase log files folded back into the bundle's canonical `Logs/` structure. |
+
+Run the meta from the CLI:
+
+```bash
+onyx heal                  # run all sub-skills in order
+onyx heal --dry-run        # report what would change without writing
+onyx heal --skill heal-kind-tag    # invoke one sub-skill directly
+```
+
+A daily cron (`0 5 * * *` UTC) running `onyx heal` keeps long-lived vaults self-consistent without manual triage.
+
+---
+
+## Consolidate — one operation, one principle
+
+`consolidate` collapses N children into one info-dense parent, then archives the children. There are no modes or tiers — the agent reads every child, picks the right output shape (prose for narrative, table for structured atoms like shots/takes/beats, mixed for both), rewrites incoming wikilinks to the new anchors, and moves the originals to `_archive/`.
+
+```bash
+onyx consolidate "<bundle>"           # collapse a bundle's child notes into the Overview
+onyx consolidate --children "<parent>" # absorb same-folder atoms into the parent's body
+onyx monthly-consolidate --prune --delete-dailies     # roll daily notes into a monthly digest
+```
+
+Earlier names (`absorb-shots`, `consolidate-bundle`, `consolidate-children`) remain as redirect files so existing wikilinks still resolve, but all paths point at the same `consolidate` directive. KISS — there is one operation for "merge children into parent" because that is one principle.
+
+---
+
 ## Wisdom: the Principles library
 
 `08 - System/Principles/` distils ~18 generalised principles earned from running real pipelines. Universal pipeline principles (audio-first pipeline, QC gate between every phase, single canonical tool per task, vault frontmatter as source of truth, memory as feedback not state). Engineering principles (phase atomisation discipline, fail and fix not bypass, backwards compat only at boundaries, no features beyond task, CDP attach over persistent profile). Storytelling / content principles (avatar diversity across episodes, no invented specifics, no chained identity signifiers, verifiable contact details only, no dated citations you can't pin, show don't say, concept mandate, narrator no stage directions).
@@ -338,6 +391,9 @@ Open `./vault/` in Obsidian for the live docs:
 | File | What's in it |
 |---|---|
 | `08 - System/ONYX Master Directive.md` | **The runtime spec.** Every agent reads this first. Everything flows from here. |
+| `08 - System/Conventions/Tag Convention.md` | The 8 tag families + canonical kind tags + Obsidian colour-coding |
+| `08 - System/Conventions/Project ID Convention.md` | Kebab-case slug rules; everything cascades from `project_id` |
+| `08 - System/Conventions/Fractal Linking Convention.md` | Hubs, `up:`, no body wikilinks across bundles |
 | `08 - System/Conventions/Minimal Code Max Utility.md` | Authoring convention for skills, directives, and phase work |
 | `08 - System/Conventions/Browser Automation for Services Without APIs.md` | CDP-attach pattern for Clerk-protected / session-bound services |
 | `08 - System/Agent Skills/Agent Skills Hub.md` | Registry of all skills, grouped by category |
