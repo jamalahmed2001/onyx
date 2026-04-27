@@ -15,9 +15,11 @@ status: active
 
 # Cross-Project Knowledge
 
-> **What lives here.** Principles and learnings that have proven themselves across more than one project. This is the graduation target for findings that started in a single project's Knowledge.md and turned out to generalise.
+> **What lives here.** Learnings that have proven themselves across more than one of *your* projects. This is the graduation target for findings that started in a single project's Knowledge.md and turned out to generalise.
 
 > **Started empty.** A fresh ONYX install ships this file as a placeholder. As you run projects, the [[08 - System/Operations/consolidate.md|consolidate]] operation will surface cross-project candidates here. Don't pre-fill it — let the patterns emerge.
+
+> **Cross-Project Knowledge vs Principles.** This file is **operator-specific** — it accretes through *your* project work, on *your* machine. [[08 - System/Principles/Principles Hub.md|Principles]] are different — they ship with ONYX as framework-canonical wisdom, the same set for every user, lifted from broad multi-operator experience. The 3-tier graduation is: **per-project Knowledge.md** → **Cross-Project Knowledge** (this file) → **Principles** (only when an entry here is not just true for you, but true for *anyone* running the framework, and a maintainer accepts a PR promoting it).
 
 ---
 

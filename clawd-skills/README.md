@@ -52,7 +52,7 @@ Each skill's `SKILL.md` documents its exact credential shape. Nothing is committ
 | `headless-browser` | Quick-shot Puppeteer/Playwright screenshots + PDFs | Chrome |
 | `housekeeping` | Backup pruning + disk/cache hygiene | — |
 | `instagram-publish` | Reels + post uploader via Graph API | Meta Graph API token |
-| `music-distro` | DistroKid uploader (browser-automate driven) | DistroKid account |
+| `music-distro` | Music-release uploader for distributors without public APIs (browser-automate driven; DistroKid implementation initial) | account at the chosen distributor |
 | `notion-context` | Pull Notion pages into vault markdown | Notion integration token |
 | `obsidian` | Read/write/search Obsidian vaults from outside | — |
 | `prompt-optimizer` | LLM prompt rewriter (style, length, structure) | OpenRouter |

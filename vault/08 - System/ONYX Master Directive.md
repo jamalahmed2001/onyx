@@ -1747,7 +1747,7 @@ Never try to paste the full phase note or repo listing into the prompt. Referenc
 
 ### 20.2 Skills & browser automation
 
-- **No paid third-party gateways when the user's own session exists.** If the user pays for Suno Pro, Spotify Pro, DistroKid, etc., drive their own web UI under their session rather than paying a proxy. Their session is free, legitimate, and licence-clear. (Operator preference, documented 2026-04-19.)
+- **No paid third-party gateways when the user's own session exists.** If the user pays for Suno Pro, Spotify Pro, a music distributor, etc., drive their own web UI under their session rather than paying a proxy. Their session is free, legitimate, and licence-clear.
 - **CDP attach beats Playwright persistent profiles** for Clerk-protected services. Clerk server-side clears sessions via a handshake redirect on every fresh Playwright-context launch. Attach to ONE long-lived Chrome (seeded from daily profile) and keep it running.
 - **Always `browser.close()` in `finally` for CDP-attach mode.** `chromium.connectOverCDP(url)` opens a WebSocket that pins the Node event loop. Without explicit close, the process hangs forever after the recipe returns. On a CDP-connected browser, close only disconnects — it does not kill the user's Chrome.
 - **Sniff real endpoints before building DOM-driven recipes.** Ten minutes capturing the UI's actual API calls saves hours of fragile selector maintenance. Graduation path: DOM → network capture → direct HTTP via captured Bearer token.

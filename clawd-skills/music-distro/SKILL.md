@@ -10,7 +10,7 @@ metadata:
 
 # Music Distro
 
-Generic music-release automation. Default provider: DistroKid. Swap via `MUSIC_DISTRO_PROVIDER` env var.
+Generic music-release automation. Initial provider implementation: DistroKid (other providers — TuneCore, Amuse, RouteNote — pluggable via `MUSIC_DISTRO_PROVIDER` env var; recipes are added as needed).
 
 Pattern mirrors `spotify-creators` and `suno` — shell out to `browser-automate` via CDP attach. No API keys, no paid gateways, uses your already-signed-in browser session under your paid distributor account.
 

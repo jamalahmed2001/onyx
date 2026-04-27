@@ -661,7 +661,7 @@ OPENROUTER_API_KEY=sk-or-...
 {
   "vault_root": "/absolute/path/to/vault",
   "agent_driver": "claude-code",
-  "projects_glob": "{02 - <workplace>/**,03 - Ventures/**}",
+  "projects_glob": "01 - Projects/**",
   "model_tiers": {
     "planning": "anthropic/claude-opus-4-6",
     "light":    "anthropic/claude-haiku-4-5-20251001",
