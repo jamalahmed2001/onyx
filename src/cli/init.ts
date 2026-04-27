@@ -14,7 +14,7 @@ const PROFILES = ['general', 'engineering', 'content', 'research', 'operations',
 type ProfileName = typeof PROFILES[number];
 
 // Extract distinct section paths from a projects_glob pattern.
-// Handles both single ('01 - Projects/**') and multi ('{02 - Fanvue/**,03 - Ventures/**}') forms.
+// Handles both single ('01 - Projects/**') and multi ('{02 - <workplace>/**,03 - Ventures/**}') forms.
 function extractProjectsSections(glob: string): string[] {
   const multiMatch = glob.match(/^\{(.+)\}$/);
   if (multiMatch) {

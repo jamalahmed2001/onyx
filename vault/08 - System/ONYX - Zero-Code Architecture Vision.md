@@ -29,8 +29,8 @@ The current ONYX is ~15,000 lines of TypeScript implementing a deterministic FSM
 
 But we already have a working proof that this isn't always necessary:
 
-- **ManiPlus** runs end-to-end (research → script → audio → video → publish → engage → analyse) with *seven markdown directives* and a handful of thin tool scripts (`npm run audio:generate`, etc.). The "orchestration" is whichever agent is currently active reading the directive, doing the work, writing back to the phase file, and handing off.
-- **Fanvue phase agents** operate the same way. The phase file itself contains the acceptance criteria, the directive tells the agent what success looks like, and the agent decides when a phase is done.
+- **My Podcast** runs end-to-end (research → script → audio → video → publish → engage → analyse) with *seven markdown directives* and a handful of thin tool scripts (`npm run audio:generate`, etc.). The "orchestration" is whichever agent is currently active reading the directive, doing the work, writing back to the phase file, and handing off.
+- **<workplace> phase agents** operate the same way. The phase file itself contains the acceptance criteria, the directive tells the agent what success looks like, and the agent decides when a phase is done.
 
 The code-based orchestrator is load-bearing in two places: (1) the run loop that picks up `phase-ready` phases and spawns agents, and (2) self-healing of vault drift. Everything else — routing, state transitions, telemetry, error classification — is *instructions that happen to be written in TypeScript instead of markdown*.
 
@@ -257,7 +257,7 @@ The profile is a *filter* on what the agent can do. It's the same mechanism as C
 
 A **directive** defines *who the agent is being* for a specific phase. It's a role with success criteria.
 
-Directives already work this way today in ManiPlus. The shape is:
+Directives already work this way today in My Podcast. The shape is:
 
 ```markdown
 # Directive: <Role Name> (<Phase Code>)
@@ -387,9 +387,9 @@ Today ONYX coordinates multiple agents via the lock file and the dispatcher.
 
 To test this idea without rebuilding everything:
 
-1. **Pick one project** (ManiPlus is the ideal candidate — it already works this way).
+1. **Pick one project** (My Podcast is the ideal candidate — it already works this way).
 2. **Write the Master Directive** (§6) pointed at that project's vault section.
-3. **Strip its tool invocations** to pure shell scripts (already done for ManiPlus).
+3. **Strip its tool invocations** to pure shell scripts (already done for My Podcast).
 4. **Invoke the agent manually** with: `claude --append-system "$(cat Master\ Directive.md)" --dir vault/`
 5. **Watch what happens** when you mark a phase `phase-ready`.
 
@@ -405,7 +405,7 @@ This is not really about ONYX. It's about a general pattern:
 
 > **Anywhere a rule-based system coordinates work between agents, that coordination can probably be expressed as a directive to a meta-agent instead.**
 
-The code-based ONYX is load-bearing because we didn't yet trust the agent to do the coordination. ManiPlus is proof we can. If the profiles, directives, and constraints are tight enough, the orchestrator doesn't need to be a compiled binary — it can be a paragraph.
+The code-based ONYX is load-bearing because we didn't yet trust the agent to do the coordination. My Podcast is proof we can. If the profiles, directives, and constraints are tight enough, the orchestrator doesn't need to be a compiled binary — it can be a paragraph.
 
 The end state is: **the vault runs itself, guided by its own documentation.**
 
@@ -425,11 +425,11 @@ The end state is: **the vault runs itself, guided by its own documentation.**
 
 If this vision is worth pursuing:
 
-1. Spend a week operating ManiPlus with *zero* ONYX code involvement — only the directives and tool scripts. Document what breaks.
+1. Spend a week operating My Podcast with *zero* ONYX code involvement — only the directives and tool scripts. Document what breaks.
 2. Extract the minimum shell-tool surface from the current runtime into `vault/tools/`.
 3. Draft the Master Directive based on what the current runtime actually does (not what its docs say it does).
-4. Try running a full week of ManiPlus work on the directive alone.
-5. If successful, migrate one Fanvue project. If still successful, deprecate `onyx run` for simple projects and keep the TypeScript runtime only for cases that genuinely need deterministic routing.
+4. Try running a full week of My Podcast work on the directive alone.
+5. If successful, migrate one <workplace> project. If still successful, deprecate `onyx run` for simple projects and keep the TypeScript runtime only for cases that genuinely need deterministic routing.
 
 The goal is not to delete code for its own sake. It's to reduce ONYX to its irreducible core — and discover whether that core is code at all, or just a well-written set of instructions.
 
@@ -492,7 +492,7 @@ Rather than try to replace everything at once, migrate in stages. Each milestone
   4. Operation descriptions (atomise / execute / surface_blocker / wait / skip)
   5. Error taxonomy (RECOVERABLE / BLOCKING / INTEGRITY)
   6. Tool reference (inline catalog of `vault/tools/*` scripts)
-- **Test**: run the directive on ManiPlus (which already operates this way). The first divergence from the current runtime is the first bug to fix in the directive, not the agent.
+- **Test**: run the directive on My Podcast (which already operates this way). The first divergence from the current runtime is the first bug to fix in the directive, not the agent.
 
 **Milestone 4 — Run in shadow mode**
 - For one week, have *both* the TS runtime and the directive-agent process phases, but only the TS runtime writes to the vault.
@@ -500,9 +500,9 @@ Rather than try to replace everything at once, migrate in stages. Each milestone
 - Fix divergences in the directive until the diff is consistently empty.
 
 **Milestone 5 — Flip the switch**
-- Stop `onyx run` for ManiPlus; make directive-agent the primary runtime.
+- Stop `onyx run` for My Podcast; make directive-agent the primary runtime.
 - Keep TS runtime for engineering projects initially (they exercise more edge cases — git ops, test runners).
-- After 2 weeks of stable directive-runtime ManiPlus operation, migrate one engineering project.
+- After 2 weeks of stable directive-runtime My Podcast operation, migrate one engineering project.
 - After 4 weeks, deprecate `onyx run` for anything that doesn't use the pipeline-recipe layer (which doesn't actually exist, per §25).
 
 ### 16.3 First draft structure of the Master Directive
@@ -590,7 +590,7 @@ The directive-runtime is a success if, after 4 weeks of primary operation:
 - Zero vault integrity issues that weren't caught by the heal step
 - ExecLog.md is complete and parseable (no missing entries)
 - Every Knowledge.md update can be traced to a completed phase
-- The TypeScript runtime's `src/planner/`, `src/controller/`, `src/executor/` directories can be safely deleted without affecting ManiPlus or at least one engineering project
+- The TypeScript runtime's `src/planner/`, `src/controller/`, `src/executor/` directories can be safely deleted without affecting My Podcast or at least one engineering project
 - Someone other than the author can read the Master Directive and understand how ONYX works in under 30 minutes
 
 If any of these fail, the directive isn't yet a drop-in replacement — revert to TS runtime and iterate.

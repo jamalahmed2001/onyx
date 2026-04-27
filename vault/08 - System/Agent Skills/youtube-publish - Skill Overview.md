@@ -40,7 +40,7 @@ youtube-publish account remove <ref>
 
 # Upload
 ~/clawd/skills/youtube-publish/bin/youtube-publish \
-  --account-ref maniplus \
+  --account-ref my-podcast \
   --video ./out.mp4 \
   --title "Episode 8" \
   --description-file ./desc.md \
@@ -68,7 +68,7 @@ Emits structured JSON on stdout (success) or stderr (error with classification).
 
 | Project | Directive | Which video(s) |
 |---|---|---|
-| ManiPlus | `maniplus-distributor` | Long-form episode + Short |
+| My Podcast | `my-podcast-distributor` | Long-form episode + Short |
 
 ## See also
 

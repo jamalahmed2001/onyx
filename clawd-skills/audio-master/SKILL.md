@@ -94,9 +94,9 @@ Emits JSON on stdout on success:
 
 ## Callers
 
-- ManiPlus — `maniplus-audio-producer` (concat ElevenLabs segments → episode MP3)
-- Suno Albums — `suno-track-master` (master each generated track to album LUFS)
-- Cartoon Remakes — `cartoon-voice-director` (optional: master polished voice lines)
+- My Podcast — `my-podcast-audio-producer` (concat ElevenLabs segments → episode MP3)
+- My Album — `suno-track-master` (master each generated track to album LUFS)
+- My Show — `cartoon-voice-director` (optional: master polished voice lines)
 
 ## See also
 

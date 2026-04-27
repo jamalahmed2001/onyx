@@ -150,6 +150,6 @@ You can manually refresh the profile seed by stopping the daemon, running `rsync
 ## Real-world examples in this vault
 
 - [[suno - Skill Overview|suno]] — music generation, library, download. Proven in production.
-- [[spotify-creators - Skill Overview|spotify-creators]] — podcast upload (canonical RSS host for ManiPlus).
+- [[spotify-creators - Skill Overview|spotify-creators]] — podcast upload (canonical RSS host for My Podcast).
 - [[music-distro - Skill Overview|music-distro]] — DistroKid (default), with stubs for TuneCore/Amuse/RouteNote/UnitedMasters/Ditto.
 - *(roadmap)* Udio, Runway, Midjourney web — same shape.

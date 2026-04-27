@@ -46,7 +46,7 @@ Optional. Set `PUBMED_API_KEY` env var or pass `--api-key` to bump the NCBI rate
 
 | Project | Directive | What it queries |
 |---|---|---|
-| ManiPlus | research phases | Condition-specific evidence (dialysis, transplant, etc) |
+| My Podcast | research phases | Condition-specific evidence (dialysis, transplant, etc) |
 | Any biomedical project | `clinical-researcher` | Evidence for clinical questions |
 
 ## See also

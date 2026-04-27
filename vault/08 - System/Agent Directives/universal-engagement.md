@@ -12,7 +12,7 @@ tags: [directive, engagement, community, cross-project]
 
 # Universal Engagement Directive
 
-> **Functions:** Fetch comments from a published video, filter them through a project-specific safety rulepack, generate reply suggestions, and post approved replies. Every creator-project — ManiPlus (medical-safety rules), Cartoon Remakes (copyright rules), Suno Albums (community rules) — uses the same mechanical pipeline with a different rulepack file.
+> **Functions:** Fetch comments from a published video, filter them through a project-specific safety rulepack, generate reply suggestions, and post approved replies. Every creator-project — My Podcast (medical-safety rules), My Show (copyright rules), My Album (community rules) — uses the same mechanical pipeline with a different rulepack file.
 
 This directive captures the **mechanical** engagement pipeline: fetch → filter → suggest → post. Which replies get approved and what voice they use are project decisions, made via the project's safety rulepack and voice doc — not by this directive.
 
@@ -144,7 +144,7 @@ Same pattern as `universal-publisher` — `~/.credentials/youtube-<account-ref>.
 }
 ```
 
-Projects author their own rulepack. ManiPlus's medical-advice list goes in the ManiPlus project dir; Cartoon Remakes ships copyright-phrase patterns; and so on.
+Projects author their own rulepack. My Podcast's medical-advice list goes in the My Podcast project dir; My Show ships copyright-phrase patterns; and so on.
 
 ---
 

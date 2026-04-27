@@ -25,7 +25,7 @@ pnpm run build
 ```bash
 comment-safety-filter \
   --input comments.json \
-  --rulepack rules/maniplus-safety.json \
+  --rulepack rules/my-podcast-safety.json \
   --output triaged.json
 ```
 

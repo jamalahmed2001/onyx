@@ -12,7 +12,7 @@ interface Props {
 }
 
 // Derive phase file path from log file path
-// e.g. "Fanvue (Main)/Logs/L3 - Phase 3 - Impl.md" → "Fanvue (Main)/Phases/Phase 3 - Impl.md"
+// e.g. "<workplace> (Main)/Logs/L3 - Phase 3 - Impl.md" → "<workplace> (Main)/Phases/Phase 3 - Impl.md"
 function derivePhasePathFromLog(logPath: string): string | null {
   if (!logPath.includes('/Logs/')) return null;
   const phasePart = logPath.replace(/\/Logs\/L\d+\s*-\s*/, '/Phases/');

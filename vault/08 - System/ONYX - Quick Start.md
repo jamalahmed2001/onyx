@@ -161,7 +161,7 @@ cat ~/clawd/onyx/onyx.config.json
 
 Key fields:
 - `vault_root` — your Obsidian vault path
-- `projects_glob` — which sections ONYX scans (e.g. `{02 - Fanvue/**,03 - Ventures/**}`)
+- `projects_glob` — which sections ONYX scans (e.g. `{02 - <workplace>/**,03 - Ventures/**}`)
 - `agent_driver` — `claude-code` (default) or `cursor`
 
 ---
@@ -179,7 +179,7 @@ onyx init "My Project"
 Or skip the prompt with a flag:
 ```bash
 onyx init "KrakenBot" --profile trading
-onyx init "ManiPlus" --profile content
+onyx init "My Podcast" --profile content
 onyx init "Prompt Lab" --profile experimenter
 ```
 
@@ -195,7 +195,7 @@ Every phase has the same structure. ONYX reads `state:` and `tags:` to decide wh
 
 ```markdown
 ---
-project_id: "ManiPlus"
+project_id: "My Podcast"
 phase_number: 2
 phase_name: "Write script for episode 12"
 state: ready
@@ -246,13 +246,13 @@ onyx status
 onyx explain
 
 # Run one phase of one project (safest to start)
-onyx run --project "ManiPlus" --once
+onyx run --project "My Podcast" --once
 
 # Run all ready phases across all projects
 onyx run
 
 # Run a specific phase number
-onyx run --project "ManiPlus" --phase 2
+onyx run --project "My Podcast" --phase 2
 ```
 
 `--once` does one iteration: find one ready phase, run it, stop. Use this while you're getting comfortable.
@@ -263,14 +263,14 @@ onyx run --project "ManiPlus" --phase 2
 
 ```bash
 # Plain English: what's happening, who's the agent, what's next
-onyx explain "ManiPlus"
+onyx explain "My Podcast"
 
 # All projects + phase states
 onyx status
 
 # Execution log for a specific project
-onyx logs "ManiPlus"
-onyx logs "ManiPlus" --recent    # last 5 entries
+onyx logs "My Podcast"
+onyx logs "My Podcast" --recent    # last 5 entries
 
 # Web dashboard (localhost:7070)
 onyx dashboard

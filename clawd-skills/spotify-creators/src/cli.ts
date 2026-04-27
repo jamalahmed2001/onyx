@@ -108,7 +108,7 @@ Subcommands:
         --draft                Save as draft — no publish date needed
         --schedule             Schedule for a future date.
                                Use with --publish-date/--publish-time, or --schedule-for,
-                               or alone (defaults to next Tuesday 05:00 for ManiPlus cadence).
+                               or alone (defaults to next Tuesday 05:00 for My Podcast cadence).
         --publish-date <iso>   YYYY-MM-DD (implies --schedule)
         --publish-time <HH:MM> 24-hour time (defaults to 05:00)
         --schedule-for <spec>  Shorthand: "next-tuesday 05:00", "next-monday 09:00", etc.
@@ -205,7 +205,7 @@ async function cmdEpisodeUpload(args: Record<string, string | boolean>): Promise
     publishDate = publishDate ?? resolved.date;
     publishTime = publishTime ?? resolved.time;
   }
-  // Default for ManiPlus cadence: schedule flag without explicit inputs → next Tuesday 5am
+  // Default for My Podcast cadence: schedule flag without explicit inputs → next Tuesday 5am
   if (!!args.schedule && !publishDate) {
     const d = resolveScheduleFor('next-tuesday 05:00');
     publishDate = d.date; publishTime = d.time;

@@ -32,14 +32,14 @@ up: Agent Skills Hub
 ```bash
 # Fetch
 ~/clawd/skills/youtube-comments/bin/youtube-comments \
-  --account-ref maniplus \
+  --account-ref my-podcast \
   --video-id <id> \
   --since "2026-04-10T00:00:00Z" \
   --output comments.json
 
 # Post reply
 ~/clawd/skills/youtube-comments/bin/youtube-comments \
-  --account-ref maniplus \
+  --account-ref my-podcast \
   --post-reply \
   --comment-id <parent> \
   --text "Thanks for the feedback!"
@@ -57,8 +57,8 @@ Emits structured JSON on stdout (success) or stderr (error with classification).
 
 | Project | Directive | What it does |
 |---|---|---|
-| ManiPlus | `universal-engagement` | Fetch comments, post approved replies |
-| Cartoon Remakes | `cartoon-engagement-manager` (when wired) | Same |
+| My Podcast | `universal-engagement` | Fetch comments, post approved replies |
+| My Show | `cartoon-engagement-manager` (when wired) | Same |
 
 ## See also
 

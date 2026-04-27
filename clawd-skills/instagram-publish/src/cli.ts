@@ -60,7 +60,7 @@ async function main(): Promise<void> {
 
   if (values.help) {
     process.stdout.write('See SKILL.md. Quick form:\n');
-    process.stdout.write('  instagram-publish --account-ref maniplus --video-url https://... --caption "…"\n');
+    process.stdout.write('  instagram-publish --account-ref my-podcast --video-url https://... --caption "…"\n');
     process.exit(0);
   }
 

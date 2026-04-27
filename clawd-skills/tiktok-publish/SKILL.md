@@ -36,7 +36,7 @@ Access tokens expire — refresh via your TikTok OAuth flow (the token should co
 
 ```bash
 tiktok-publish \
-  --account-ref maniplus \
+  --account-ref my-podcast \
   --video ./output/E08-9x16.mp4 \
   --title "A New Beginning — what surviving a transplant really looks like" \
   --privacy PUBLIC_TO_EVERYONE \
@@ -59,7 +59,7 @@ Emits:
 ### Check status (polling)
 
 ```bash
-tiktok-publish --account-ref maniplus --check-status v_pub_url~abc123
+tiktok-publish --account-ref my-podcast --check-status v_pub_url~abc123
 ```
 
 Status will progress: `PROCESSING_UPLOAD` → `SEND_TO_USER_INBOX` → `PUBLISH_COMPLETE`.
@@ -99,8 +99,8 @@ Unauthorised apps (not approved for public-posting) are forced to `SELF_ONLY` by
 
 ## Callers
 
-- ManiPlus — `maniplus-distributor` (short clips per episode)
-- Cartoon Remakes — `cartoon-launch-ops` (every episode as primary TikTok post)
+- My Podcast — `my-podcast-distributor` (short clips per episode)
+- My Show — `cartoon-launch-ops` (every episode as primary TikTok post)
 
 ## See also
 

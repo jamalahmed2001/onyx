@@ -78,7 +78,7 @@ Every probe entry follows this shape:
 - **Result:** 🟢 **pass** (2026-04-24) for read ops; tag deferred
 - **Date run:** 2026-04-24
 - **Caveats / notes:**
-  - Ran against `/home/jamal/clawd/onyx` (live repo with real state). All 4 read ops produced expected output via native Bash with no wrapper.
+  - Ran against `<home>/clawd/onyx` (live repo with real state). All 4 read ops produced expected output via native Bash with no wrapper.
   - `git log --oneline -10` → exactly 10 commits returned with hash + subject, identical to what `src/cli/research.ts:93` invocation produces.
   - `git diff HEAD~1 --stat` → stat output produced correctly.
   - "changed files" combined set produced via three separate git calls (`diff --cached --name-only`, `diff --name-only`, `ls-files --others --exclude-standard`) — matches the approach in `src/agents/spawnAgent.ts:11,16,24,25`.
@@ -91,7 +91,7 @@ Every probe entry follows this shape:
 - **Replaces tool:** `repo-scan.sh`
 - **Minimal task:** Given a repo path and extension list `[ts, tsx, js, py]`, produce up to 80 matching file paths, excluding `node_modules`, `dist`, `.git`.
 - **Expected outcome:** Native result ≡ wrapper result (set equality modulo ordering).
-- **Setup required:** Ran against `/home/jamal/clawd/onyx` itself.
+- **Setup required:** Ran against `<home>/clawd/onyx` itself.
 - **Result:** 🟢 **pass** (2026-04-24) — and exposed a bug in the wrapper
 - **Date run:** 2026-04-24
 - **Caveats / notes:**

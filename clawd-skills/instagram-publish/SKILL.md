@@ -42,7 +42,7 @@ Required Facebook app setup (one-time):
 
 ```bash
 instagram-publish \
-  --account-ref maniplus \
+  --account-ref my-podcast \
   --video-url "https://cdn.your-host.com/e08-9x16.mp4" \
   --caption-file ./caption.txt \
   --cover-url "https://cdn.your-host.com/e08-thumb.jpg" \
@@ -98,8 +98,8 @@ The URL must remain available during the poll window (default 5 min).
 
 ## Callers
 
-- ManiPlus — `maniplus-distributor` (Reels companion clips)
-- Cartoon Remakes — `cartoon-launch-ops` (every episode as IG Reel)
+- My Podcast — `my-podcast-distributor` (Reels companion clips)
+- My Show — `cartoon-launch-ops` (every episode as IG Reel)
 
 ## Known quirks
 

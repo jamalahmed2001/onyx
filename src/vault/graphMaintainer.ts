@@ -140,7 +140,7 @@ const GLOB_IGNORE = [
 ];
 
 function discoverBundles(vaultRoot: string, projectsGlob: string): string[] {
-  // Handle brace-expansion globs like "{02 - Fanvue/**,03 - Ventures/**,...}"
+  // Handle brace-expansion globs like "{02 - <workplace>/**,03 - Ventures/**,...}"
   const bases = projectsGlob
     .replace(/^\{/, '').replace(/\}$/, '')
     .split(',')

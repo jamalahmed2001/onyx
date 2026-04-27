@@ -12,7 +12,7 @@ tags: [directive, distribution, publishing, cross-project]
 
 # Universal Publisher Directive
 
-> **Functions:** Publish finished media (audio or video) to one or more platforms using the shared publishing skills. Every directive that distributes content — ManiPlus episodes, Cartoon Remakes shorts, Suno album tracks — picks what to publish and where; this directive encodes *how* to call the skills safely, handle errors, and write back the resulting URLs.
+> **Functions:** Publish finished media (audio or video) to one or more platforms using the shared publishing skills. Every directive that distributes content — My Podcast episodes, My Show shorts, Suno album tracks — picks what to publish and where; this directive encodes *how* to call the skills safely, handle errors, and write back the resulting URLs.
 
 This directive captures what is executable without human judgment. Creative decisions (which clips to post, what caption to use, when to schedule) are made upstream — this directive only runs the publish calls.
 
@@ -29,7 +29,7 @@ Used on phases that:
 - Schedule a future-dated publish via `--publish-at`
 
 **Not appropriate for:**
-- Platform-specific feed management (e.g. ManiPlus's RSS — stays in the project repo, not a shared skill)
+- Platform-specific feed management (e.g. My Podcast's RSS — stays in the project repo, not a shared skill)
 - Paid promotion / ads platforms (separate directive needed)
 - Anything that needs to *query* existing posts — use analytics directives
 

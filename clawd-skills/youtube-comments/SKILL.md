@@ -37,7 +37,7 @@ YOUTUBE_REFRESH_TOKEN=...      # scope: youtube.force-ssl
 
 ```bash
 youtube-comments \
-  --account-ref maniplus \
+  --account-ref my-podcast \
   --video-id dQw4w9WgXcQ \
   --max 50 \
   --since "2026-04-10T00:00:00Z" \
@@ -50,7 +50,7 @@ Writes an array of `{id, author, text, timestamp, likeCount}` to the output file
 
 ```bash
 youtube-comments \
-  --account-ref maniplus \
+  --account-ref my-podcast \
   --post-reply \
   --comment-id UgkxXXXXXX \
   --text "Thank you for sharing!"
@@ -84,8 +84,8 @@ Emits `{ok: true, op: "post-reply", reply_id, parent_id, text}` on success.
 
 ## Callers
 
-- ManiPlus — `universal-engagement` (replaces the per-project `engage:fetch` and `engage:post` scripts)
-- Cartoon Remakes — `cartoon-engagement-manager` (when that directive wires through)
+- My Podcast — `universal-engagement` (replaces the per-project `engage:fetch` and `engage:post` scripts)
+- My Show — `cartoon-engagement-manager` (when that directive wires through)
 
 ## See also
 

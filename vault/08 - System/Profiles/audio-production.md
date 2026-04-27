@@ -40,7 +40,7 @@ Use in combination with `content` for narrated podcast projects. Use alone for m
 ```yaml
 profile: audio-production
 voice_target_lufs: -16                                 # Apple Podcasts spec; YouTube re-normalises
-music_style_guide: "./ManiPlus - Music Style Guide.md" # relative path to project's music aesthetic doc
+music_style_guide: "./My Podcast - Music Style Guide.md" # relative path to project's music aesthetic doc
 ```
 
 `voice_target_lufs` controls the mastering target in every audio stage. Typical values:
@@ -112,7 +112,7 @@ A project starting a new audio-production phase for the first time must have a M
 
 ## Typical stacks
 
-**ManiPlus weekly podcast (narrated + soundbed):**
+**My Podcast weekly podcast (narrated + soundbed):**
 - R3 Audio Producer: `voice-only` mix_mode — produces `full-voice.mp3`
 - R3.5 Music Producer: `voice-over-music` mix_mode — consumes `full-voice.mp3`, produces `full.mp3`
 - R4 Video Composer: reads `full.mp3` (mixed), renders over branded visuals

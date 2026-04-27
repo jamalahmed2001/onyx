@@ -25,9 +25,9 @@ Priority order when resolving:
 ```bash
 # Account management
 fal account list
-fal account add cartoon-remakes --field FAL_KEY=sk-...
-fal account show cartoon-remakes
-fal account remove cartoon-remakes
+fal account add my-show --field FAL_KEY=sk-...
+fal account show my-show
+fal account remove my-show
 
 # Video generation (text-to-video via Veo 3 fast)
 fal video-gen \
@@ -37,9 +37,9 @@ fal video-gen \
   --duration 8 \
   --output-dir ./out/
 
-# Image-to-video (Kling, Cartoon Remakes pipeline — background motion passes)
+# Image-to-video (Kling, My Show pipeline — background motion passes)
 fal video-gen \
-  --account-ref cartoon-remakes \
+  --account-ref my-show \
   --model fal-ai/kling-video/v2/master/image-to-video \
   --image ./storyboard-panel-01.png \
   --prompt "camera slowly pushes in; subtle wind on leaves" \

@@ -36,7 +36,7 @@ Tags split into seven families by concern. They are **always** listed in frontma
 | 2 | **Note kind** | `onyx-`, `project-` | `onyx-phase`, `onyx-project`, `project-overview`, `project-knowledge`, `project-log`, `project-kanban`, `project-docs`, `directive` | What kind of note this is. One per note. |
 | 3 | **Lifecycle status** | `status-` | `status-active`, `status-draft`, `status-archived`, `status-paused` | Project / hub lifecycle. Coarser than phase state. Applied at project or hub level, not phases. |
 | 4 | **Hub tier** | `hub-` | `hub-root`, `hub-domain`, `hub-subdomain`, `hub-project`, `hub-phase-group`, `hub-log-group`, `hub-logs`, `hub-docs`, `hub-subsection` | Tier in the navigation hierarchy. One per hub note. |
-| 5 | **Pipeline** | *(no prefix — name only)* | `maniplus`, `suno-albums`, `suno-library`, `cartoon`, `hitpapers`, `gzos` | Which ONYX pipeline the note belongs to. Zero or one per note. |
+| 5 | **Pipeline** | *(no prefix — name only)* | `my-podcast`, `my-album`, `suno-library`, `cartoon`, `hitpapers`, `gzos` | Which ONYX pipeline the note belongs to. Zero or one per note. |
 | 6 | **Venture / domain** | *(no prefix)* | `fanvue`, `openclaw`, `personal`, `finance`, `legal` | Top-level business domain. Zero or one per note. |
 | 7 | **Craft / tool** | *(no prefix)* | `elevenlabs`, `ffmpeg`, `remotion`, `audio`, `video`, `cli`, `dashboard`, `obsidian` | Tools or crafts referenced. Zero to many. |
 
@@ -54,7 +54,7 @@ Assign colours by family so the eye picks up the state/kind/owner instantly. Hex
 | Note kind | **Blue** | `#3b82f6` | Structural — what the file *is*. |
 | Lifecycle status | **Amber** | `#d97706` | Caution colour — tells you if content is live, drafted, or retired. |
 | Hub tier | **Purple** | `#9333ea` | Navigation chrome. Appears on hubs only; colour signals "this is a landing page." |
-| Pipeline | **Teal** | `#0d9488` | Pipeline identity; differentiates maniplus from suno from cartoon at a glance. |
+| Pipeline | **Teal** | `#0d9488` | Pipeline identity; differentiates my-podcast from suno from cartoon at a glance. |
 | Venture / domain | **Slate** | `#334155` | Ownership signal — which business this belongs to. |
 | Craft / tool | **Stone** (neutral) | `#78716c` | Least hot signal; intentionally muted so it doesn't compete with state/kind. |
 
@@ -73,7 +73,7 @@ backlog (slate) → planning (purple) → ready (green) → active (blue) → bl
 tags:
   - phase-ready                # family 1: state
   - onyx-phase                 # family 2: kind
-  - suno-albums                # family 5: pipeline
+  - my-album                # family 5: pipeline
   - openclaw                   # family 6: venture
 ---
 ```
@@ -85,7 +85,7 @@ tags:
   - onyx-project               # family 2: kind
   - project-overview           # family 2: kind (sub)
   - status-active              # family 3: lifecycle
-  - suno-albums                # family 5: pipeline
+  - my-album                # family 5: pipeline
   - openclaw                   # family 6: venture
 ---
 ```
@@ -104,7 +104,7 @@ tags:
 ---
 tags:
   - project-log                # family 2: kind
-  - suno-albums                # family 5: pipeline
+  - my-album                # family 5: pipeline
 ---
 ```
 
@@ -186,10 +186,10 @@ Save this as `<vault>/.obsidian/snippets/tag-colours.css` and enable under Setti
 .tag[href="#hub-docs"]         { background: #9333ea; color: #fff; }
 
 /* Family 5 — Pipeline (teal) */
-.tag[href="#maniplus"],
-.tag[href="#maniplus-run"],
-.tag[href="#maniplus-weekly"],
-.tag[href="#suno-albums"],
+.tag[href="#my-podcast"],
+.tag[href="#my-podcast-run"],
+.tag[href="#my-podcast-weekly"],
+.tag[href="#my-album"],
 .tag[href="#suno-library"],
 .tag[href="#suno-run"],
 .tag[href="#suno-track"],
@@ -240,7 +240,7 @@ Obsidian's graph view supports **colour groups** via Settings → Files and link
 | Phase: completed | `tag:#phase-completed` | `#6b7280` |
 | Hubs | `tag:#hub-domain OR tag:#hub-subdomain OR tag:#hub-root` | `#9333ea` |
 | Projects | `tag:#onyx-project OR tag:#project-overview` | `#3b82f6` |
-| Pipelines | `tag:#maniplus OR tag:#suno-albums OR tag:#cartoon` | `#0d9488` |
+| Pipelines | `tag:#my-podcast OR tag:#my-album OR tag:#cartoon` | `#0d9488` |
 | Context-only (dim) | `tag:#context-only` | `#a8a29e` (opacity 40%) |
 
 Context-only nodes appear dimmed so the graph reads as "active work" vs "archival reference" at a glance.
@@ -267,6 +267,6 @@ To roll this convention onto the existing vault:
 - Phase notes have exactly one family-1 tag, matching their `status:` frontmatter.
 - Hub notes have exactly one family-4 tag.
 - Tags appear in frontmatter in family order (1→7).
-- No tag appears in two families (i.e. `suno-albums` is only a pipeline tag, never a venture tag).
+- No tag appears in two families (i.e. `my-album` is only a pipeline tag, never a venture tag).
 - `context-only` and `pipeline-artefact` are mutually exclusive.
 - Colour hex codes in the CSS snippet match the hexes listed in §2 and §4 exactly — changes happen in both places in lockstep.

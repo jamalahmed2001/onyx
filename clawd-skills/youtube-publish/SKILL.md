@@ -10,7 +10,7 @@ metadata:
 
 # YouTube Publish
 
-General-purpose YouTube uploader. Every directive that publishes to YouTube (ManiPlus podcast episodes, Cartoon Remakes shorts, any future video project) calls this skill — passing its own channel's `--account-ref` and the video file to upload.
+General-purpose YouTube uploader. Every directive that publishes to YouTube (My Podcast podcast episodes, My Show shorts, any future video project) calls this skill — passing its own channel's `--account-ref` and the video file to upload.
 
 ## Install
 
@@ -41,7 +41,7 @@ You get these from:
 
 ```bash
 youtube-publish \
-  --account-ref maniplus \
+  --account-ref my-podcast \
   --video ./output/E08.mp4 \
   --title "A New Beginning — Episode 8" \
   --description-file ./output/E08-description.md \
@@ -55,7 +55,7 @@ youtube-publish \
 
 ```bash
 youtube-publish \
-  --account-ref maniplus \
+  --account-ref my-podcast \
   --video ./out.mp4 \
   --title "..." \
   --publish-at "2026-04-22T09:00:00Z"
@@ -107,8 +107,8 @@ Emits JSON on stdout on success:
 
 ## Callers
 
-- ManiPlus — `maniplus-distributor` (publish episode long-form)
-- Cartoon Remakes — `cartoon-launch-ops` (publish Shorts)
+- My Podcast — `my-podcast-distributor` (publish episode long-form)
+- My Show — `cartoon-launch-ops` (publish Shorts)
 
 ## See also
 

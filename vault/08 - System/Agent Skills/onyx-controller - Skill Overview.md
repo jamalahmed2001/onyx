@@ -106,15 +106,15 @@ Controller flow:
 5. If no executable task exists → Plan that phase only → Execute it
 6. Notify
 
-### 6. Fanvue import-linear pipeline
+### 6. <workplace> import-linear pipeline
 Controller flow:
-1. Linear fetch (Fanvue snapshot via `getFanvueImportSnapshot()`)
-2. Project Placement (ensure bundle `Fanvue/<Project>` exists in vault)
-3. Unified project atomiser (Fanvue-aware, structured Linear issue input → 4 canonical phases)
+1. Linear fetch (<workplace> snapshot via `get<workplace>ImportSnapshot()`)
+2. Project Placement (ensure bundle `<workplace>/<Project>` exists in vault)
+3. Unified project atomiser (<workplace>-aware, structured Linear issue input → 4 canonical phases)
 4. Phase Planner (runs immediately after atomiser with `forceReplan: true`)
 5. Linear uplink / Notify
 
-The `bundleProjectId` (e.g. `Fanvue/Creator Agent Eval Suite`) is threaded through the entire chain so the vault bundle — not the Linear UUID — is used for all vault reads/writes.
+The `bundleProjectId` (e.g. `<workplace>/Creator Agent Eval Suite`) is threaded through the entire chain so the vault bundle — not the Linear UUID — is used for all vault reads/writes.
 
 ### 7. Full autonomous pipeline
 Controller flow:
@@ -156,8 +156,8 @@ This is composed mode, not the default for every request.
 
 | Sub-skill / helper | Call site | Status |
 |-----------|-----------|--------|
-| Fanvue snapshot (profile) | `getFanvueImportSnapshot()` from `skills/FanvueProjectSync/scripts/fanvue-component.js` | ✅ for Fanvue projects (snapshot-only) |
-| Fanvue import flow | Fanvue snapshot → Project Placement → Unified project atomiser → Phase Planner | ✅
+| <workplace> snapshot (profile) | `get<workplace>ImportSnapshot()` from `skills/<workplace>ProjectSync/scripts/fanvue-component.js` | ✅ for <workplace> projects (snapshot-only) |
+| <workplace> import flow | <workplace> snapshot → Project Placement → Unified project atomiser → Phase Planner | ✅
 | Project Placement | `placeIntent()` from `projectPlacement.ts` | ✅ |
 | Project Sync | `getStatus()` / `sync()` from `projectSync.ts` | ✅ |
 | Project Atomiser | `runAtomiserForProject()` | ✅ |

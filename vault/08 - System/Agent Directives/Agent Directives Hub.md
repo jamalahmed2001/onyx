@@ -160,7 +160,7 @@ Before starting any task, read (in this order):
 ## Directive quality checklist
 
 A good directive:
-- States the role in one sentence ("You are the ManiPlus Script Writer")
+- States the role in one sentence ("You are the My Podcast Script Writer")
 - Lists exactly what to read before starting (in order)
 - Has at least one safety constraint that the agent must never work around
 - Specifies the output format and location precisely

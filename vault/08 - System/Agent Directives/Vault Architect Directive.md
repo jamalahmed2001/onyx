@@ -182,12 +182,12 @@ All project‑specific work must live **inside** its bundle directory.
 
 **Docs folder semantics (graph shape):**
 - `Docs/` is the home for **supporting design/decision/spec documents** for that project (e.g. "Design System Audit", "Event Queue Model", "Polling Inventory").
-- Each project SHOULD start with a simple Docs section inside Knowledge; once `Docs/` grows beyond a few files, a dedicated **Docs Hub** note (e.g. `Almani Docs Hub.md`) becomes **required** and MUST:
+- Each project SHOULD start with a simple Docs section inside Knowledge; once `Docs/` grows beyond a few files, a dedicated **Docs Hub** note (e.g. `Example Brand Docs Hub.md`) becomes **required** and MUST:
   - Live at the root of the project bundle (alongside Overview/Kanban/Knowledge).
   - List and organise all docs from `Docs/`.
   - Link **up** to the project Overview and Knowledge.
 - Docs themselves are **owned by the project Docs Hub and Knowledge node**, not by Phases directly.
-- To keep the graph visually clean (see Almani example):
+- To keep the graph visually clean (see Example Brand example):
   - Docs should link "UP" only to the **Docs Hub** and project Knowledge node, not to phases, domain hubs, other projects, **or to other docs**.
   - Within a project, docs do not form their own mesh of cross-links; all structural linking happens via the Docs Hub and Knowledge node.
   - Phases may reference docs **indirectly** via the Knowledge node or Docs Hub ("Related Docs" / "Used in this Phase" sections), but must not treat docs as structural parents; phase nav blocks should never point "UP" to individual docs as parents.
@@ -196,7 +196,7 @@ All project‑specific work must live **inside** its bundle directory.
 
 Each project Overview has **one** parent hub, chosen from **domain + intent** — link to the correct domain hub for *this* project, not a path copied from examples.
 
-*Illustrative mapping (this vault):* employment → Fanvue hub; client → Paid hub; internal OpenClaw → OpenClaw hub; personal ventures → Personal/Projects hub — **resolve actual paths** from the live graph.
+*Illustrative mapping (this vault):* employment → <workplace> hub; client → Paid hub; internal OpenClaw → OpenClaw hub; personal ventures → Personal/Projects hub — **resolve actual paths** from the live graph.
 
 **Standard Overview nav block:**
 

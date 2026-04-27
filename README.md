@@ -126,7 +126,7 @@ One profile per project — set `profile:` in the project's `Overview.md`. The p
 | `experimenter` | A/B testing, prompt engineering, ML experiments | `hypothesis`, `success_metric`, `baseline_value` | Result recorded + Cognition Store updated |
 | `accounting` | Financial records, reconciliation, reporting | `ledger_path`, `reporting_period` | Trial balance verified |
 | `legal` | Contracts, research, compliance | `jurisdiction`, `matter_type` | Evidence hierarchy + citations verified |
-| `audio-production` | Music/audio-first pipelines (ManiPlus, Suno Albums) | `voice_profile`, `lufs_target` | Mastered audio + LUFS target met |
+| `audio-production` | Music/audio-first pipelines (My Podcast, My Album) | `voice_profile`, `lufs_target` | Mastered audio + LUFS target met |
 
 Profiles are **invariants**. If a rule only applies to some phases of a project-type, it's a directive rule, not a profile.
 

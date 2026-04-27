@@ -40,7 +40,7 @@ Each primitive has **one job**. Confusion between them is where codebases bloat.
 
 ### 1. **Skills are single-capability and project-agnostic.**
 
-A skill does ONE thing and does it well across every project that needs it. `elevenlabs-tts` synthesises speech. `rss-publish` writes a feed.xml. `audio-master` masters/concats/ducks audio. If your skill starts to have project-specific defaults or branching ("if this is ManiPlus, do X; if this is ProjectY, do Z"), **split it**. The project-specific parts belong in a directive or in a per-project config file the skill reads as a parameter.
+A skill does ONE thing and does it well across every project that needs it. `elevenlabs-tts` synthesises speech. `rss-publish` writes a feed.xml. `audio-master` masters/concats/ducks audio. If your skill starts to have project-specific defaults or branching ("if this is My Podcast, do X; if this is ProjectY, do Z"), **split it**. The project-specific parts belong in a directive or in a per-project config file the skill reads as a parameter.
 
 Examples of what belongs **in** a skill:
 - Generic CLI flags (`--voice-id`, `--output`, `--count`)
@@ -49,7 +49,7 @@ Examples of what belongs **in** a skill:
 
 Examples of what does **not** belong in a skill:
 - "Default to Mani's voice" — no, make the caller pass the voice ID
-- "Apply the ManiPlus pronunciation dictionary" — no, that's a directive's pre-processing step
+- "Apply the My Podcast pronunciation dictionary" — no, that's a directive's pre-processing step
 - "Hard-coded Suno channel config" — no, take it as `--channel-file`
 
 ### 2. **Directives orchestrate skills and write outputs to the vault. They never re-implement what a skill does.**
@@ -113,12 +113,12 @@ The skill overview (`08 - System/Agent Skills/<name> - Skill Overview.md`) descr
 
 ---
 
-## Example — the ManiPlus R3.5 music stack applied to the rules
+## Example — the My Podcast R3.5 music stack applied to the rules
 
-**The task:** generate backing music for a ManiPlus episode's voice track.
+**The task:** generate backing music for a My Podcast episode's voice track.
 
 What we did NOT do:
-- ❌ Write a ManiPlus-specific Suno client (violates rule 1)
+- ❌ Write a My Podcast-specific Suno client (violates rule 1)
 - ❌ Put the music prompt defaults in the Suno skill (violates rule 1)
 - ❌ Make the music-producer directive do the HTTP call itself (violates rule 2)
 - ❌ Start with one provider hard-coded (violates rule 4)
@@ -127,8 +127,8 @@ What we did:
 - ✅ Built `suno` as a generic skill with verbs (library, download, generate) — rule 1
 - ✅ Built `browser-automate` as a generic engine; `suno` is one of many recipes — rule 4, 5
 - ✅ Extended `audio-master` with a `duck` subcommand instead of a new skill — rule 5
-- ✅ The ManiPlus Music Style Guide lives in the bundle and is the only ManiPlus-specific input — rule 6
-- ✅ The `maniplus-music-producer` directive is 200 lines of markdown orchestrating three skill calls — rule 2
+- ✅ The My Podcast Music Style Guide lives in the bundle and is the only My Podcast-specific input — rule 6
+- ✅ The `my-podcast-music-producer` directive is 200 lines of markdown orchestrating three skill calls — rule 2
 - ✅ `audio-production` profile declares invariants (voice-first, LUFS, licensing) — rule 3
 - ✅ [[suno - Skill Overview|suno]] skill overview describes verbs, not implementation — rule 8
 - ✅ Direct-HTTP generation is in the roadmap; DOM-driven `generate` ships today — rule 7
@@ -155,7 +155,7 @@ Before opening an editor to write a new skill/directive/profile, answer these:
 
 Anti-patterns to catch in review:
 
-- A "ManiPlus-specific" skill. Skills are cross-project.
+- A "My Podcast-specific" skill. Skills are cross-project.
 - A directive that includes inline Node.js or Python code running external APIs. Extract to a skill.
 - A profile with rules that only one project would ever enforce. That's a directive rule.
 - A phase file with orchestration logic. Phases describe WHAT; directives describe HOW.

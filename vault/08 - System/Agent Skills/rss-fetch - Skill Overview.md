@@ -45,7 +45,7 @@ None — reads public feeds.
 
 | Project | Directive | What it ingests |
 |---|---|---|
-| ManiPlus | research phases | Medical blog feeds |
+| My Podcast | research phases | Medical blog feeds |
 | Any media project | `marketing-strategist` / `journalist` | Trend + news feeds |
 
 ## See also

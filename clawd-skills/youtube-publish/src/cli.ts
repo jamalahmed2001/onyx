@@ -202,7 +202,7 @@ async function main(): Promise<void> {
       '                  [--made-for-kids]',
       '',
       'Example:',
-      '  youtube-publish --account-ref cartoon-remakes --video ./ep1.mp4 --title "Episode 1"',
+      '  youtube-publish --account-ref my-show --video ./ep1.mp4 --title "Episode 1"',
       '                  --description-file notes.md --privacy unlisted --publish-at 2026-04-22T05:00:00Z',
       '',
     ].join('\n'));

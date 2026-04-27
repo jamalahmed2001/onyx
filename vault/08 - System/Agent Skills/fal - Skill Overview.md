@@ -17,7 +17,7 @@ up: Agent Skills Hub
 
 ## When a directive should call this
 
-- Generating short video clips (Cartoon Remakes backgrounds, establishing shots, motion passes)
+- Generating short video clips (My Show backgrounds, establishing shots, motion passes)
 - Generating stills (thumbnails, cover art, scene illustrations)
 - Any fal-hosted inference: flux, veo, kling, ltx, wan, imagen, runway, pika, stable-audio, etc.
 
@@ -32,9 +32,9 @@ up: Agent Skills Hub
 ```bash
 # Account management
 fal account list
-fal account add cartoon-remakes --field FAL_KEY=<key>
-fal account show cartoon-remakes
-fal account remove cartoon-remakes
+fal account add my-show --field FAL_KEY=<key>
+fal account show my-show
+fal account remove my-show
 
 # Text-to-video (Veo 3 fast)
 fal video-gen \
@@ -44,9 +44,9 @@ fal video-gen \
   --duration 8 \
   --output-dir ./out/
 
-# Image-to-video (Kling, canonical cartoon-remakes background-motion recipe)
+# Image-to-video (Kling, canonical my-show background-motion recipe)
 fal video-gen \
-  --account-ref cartoon-remakes \
+  --account-ref my-show \
   --model fal-ai/kling-video/v2/master/image-to-video \
   --image ./storyboard/panel-01.png \
   --prompt "<motion description — camera, parallax, wind, etc.>" \
@@ -120,7 +120,7 @@ Any fal model ID is valid via `--model`; the catalog is a convenience list.
 
 ## Used by
 
-- **Cartoon Remakes** — `cartoon-animator` directive. Image-to-video for backgrounds, motion passes, establishing shots.
+- **My Show** — `cartoon-animator` directive. Image-to-video for backgrounds, motion passes, establishing shots.
 - Future: any project needing ad-hoc video/image generation.
 
 ## See also

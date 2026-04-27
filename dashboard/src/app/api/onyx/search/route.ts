@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export interface SearchHit {
   path: string;       // relative path
   label: string;      // filename without .md
-  folder: string;     // parent folder display (e.g. "Fanvue / Phases")
+  folder: string;     // parent folder display (e.g. "<workplace> / Phases")
   fileType: 'phase' | 'overview' | 'hub' | 'kanban' | 'knowledge' | 'log' | 'note';
   context: string;    // best matching snippet (plain text, ~120 chars)
   matchIn: 'title' | 'content';

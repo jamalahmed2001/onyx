@@ -33,7 +33,7 @@ so that LLMs focus on **decision + code** rather than raw scanning.
 The controller (or any caller) should supply:
 
 - `project_id` (string)
-  - Vault bundle id, e.g. `Almani`, `OpenClaw/OpenClaw Workspace Migration`.
+  - Vault bundle id, e.g. `Example Brand`, `OpenClaw/OpenClaw Workspace Migration`.
 - `phase_rel` (string)
   - Vault-relative Phase note path within the bundle, e.g.
     - `10 - OpenClaw/Platform/OpenClaw Ops/Phases/Phase 5 - Cron and Runtime Validation.md`

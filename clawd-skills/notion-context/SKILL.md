@@ -1,6 +1,6 @@
 ---
 name: notion-context
-description: Fetch project-scoped context from Notion using the official REST API for use in FanvueProjectSync and other orchestrators.
+description: Fetch project-scoped context from Notion using the official REST API for use in <workplace>ProjectSync and other orchestrators.
 version: 0.1.0
 author: Jamal + Claw
 metadata:
@@ -11,11 +11,11 @@ metadata:
 
 # Notion Context Skill
 
-Fetch structured project context from Notion using the official REST API so orchestrators (e.g. **FanvueProjectSync**) can enrich phase roadmaps and knowledge nodes.
+Fetch structured project context from Notion using the official REST API so orchestrators (e.g. **<workplace>ProjectSync**) can enrich phase roadmaps and knowledge nodes.
 
 ## When to Use
 
-- When syncing or atomizing a **Fanvue project** (or any project) and you want additional context from Notion:
+- When syncing or atomizing a **<workplace> project** (or any project) and you want additional context from Notion:
   - Product briefs
   - Design specs
   - Implementation notes
@@ -34,7 +34,7 @@ with at least:
 
 ```env
 NOTION_API_KEY=secret_xxx              # Notion integration token
-NOTION_SEARCH_FILTER=Fanvue            # Optional: string to filter search results
+NOTION_SEARCH_FILTER=<workplace>            # Optional: string to filter search results
 NOTION_MAX_RESULTS=10                  # Optional: cap number of pages per query (default 10)
 ```
 
@@ -120,7 +120,7 @@ The script returns JSON like:
   - Link out from vault knowledge nodes.
   - Help atomizer name/refine phases.
 
-## Integration with FanvueProjectSync
+## Integration with <workplace>ProjectSync
 
 To use this skill inside `fanvue-sync.js`:
 

@@ -10,7 +10,7 @@ metadata:
 
 # ElevenLabs TTS
 
-General-purpose text-to-speech connector. One binary, many voices. Each caller supplies its own voice ID + voice settings, so ManiPlus's podcast voice, Cartoon Remakes's character voices, and any future narration project share one implementation.
+General-purpose text-to-speech connector. One binary, many voices. Each caller supplies its own voice ID + voice settings, so My Podcast's podcast voice, My Show's character voices, and any future narration project share one implementation.
 
 ## When to use
 
@@ -136,10 +136,10 @@ Emits:
 
 Directives currently referencing this skill:
 
-- ManiPlus — `maniplus-audio-producer` (R3)
-- Cartoon Remakes — `cartoon-voice-director` (R4)
+- My Podcast — `my-podcast-audio-producer` (R3)
+- My Show — `cartoon-voice-director` (R4)
 
-Future: Suno Albums persona voiceovers, any narration-driven project.
+Future: My Album persona voiceovers, any narration-driven project.
 
 ## See also
 

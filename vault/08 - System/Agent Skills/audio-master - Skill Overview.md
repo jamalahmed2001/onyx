@@ -54,9 +54,9 @@ None — reads/writes local files. Requires `ffmpeg` on PATH.
 
 | Project | Directive | What gets mastered |
 |---|---|---|
-| ManiPlus | `maniplus-audio-producer` | ElevenLabs segments → full episode MP3 |
-| Suno Albums | `suno-track-master` | Each track to album-consistent LUFS |
-| Cartoon Remakes | `cartoon-voice-director` (polish) | Polished voice lines |
+| My Podcast | `my-podcast-audio-producer` | ElevenLabs segments → full episode MP3 |
+| My Album | `suno-track-master` | Each track to album-consistent LUFS |
+| My Show | `cartoon-voice-director` (polish) | Polished voice lines |
 
 ## See also
 

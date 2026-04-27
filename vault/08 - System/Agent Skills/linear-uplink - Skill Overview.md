@@ -172,7 +172,7 @@ Automatically apply labels based on domain and vault structure:
 
 ```json
 {
-  "FANVUE": ["Creator Experience", "Fanvue", "ENG"],
+  "FANVUE": ["Creator Experience", "<workplace>", "ENG"],
   "PERSONAL": ["Personal", "Side Project"],
   "PAID": ["Client", "Billable"],
   "OPENCLAW": ["OpenClaw", "Internal"]
@@ -216,7 +216,7 @@ Query Linear for:
 - Team ID (if not configured)
 - Project ID
 - State IDs (Backlog, Todo, In Progress, Done)
-- Label IDs (Creator Experience, Fanvue, etc.)
+- Label IDs (Creator Experience, <workplace>, etc.)
 - User ID (Jamal)
 
 ```graphql
@@ -396,8 +396,8 @@ linear-uplink sync vault-file.md
 # 3. Issue created in Linear
 # - Title: New Feature: Dark Mode
 # - Assigned: Jamal
-# - Project: Fanvue
-# - Labels: Creator Experience, Fanvue
+# - Project: <workplace>
+# - Labels: Creator Experience, <workplace>
 # - State: Backlog
 # - Identifier: ENG-9999
 

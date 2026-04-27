@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No LLM API key configured. Set OPENROUTER_API_KEY in .env.local' }, { status: 400 });
     }
 
-    const systemPrompt = `You are drafting a professional email reply on behalf of Jamal (jamal@fanvue.com).
+    const systemPrompt = `You are drafting a professional email reply on behalf of Jamal (<email>).
 
 Style: clear, direct, professional but human. No fluff. No "I hope this email finds you well". Get to the point.
 

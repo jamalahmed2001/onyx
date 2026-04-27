@@ -72,7 +72,7 @@ export async function POST(req: Request) {
     } else {
       // Create new project from the issue
       projectName = issue.title;
-      const projectsBase = (cfg.projects_glob ?? '').replace(/\{.*?\}/, '').replace('/**', '').split(',')[0]?.trim() || '02 - Fanvue';
+      const projectsBase = (cfg.projects_glob ?? '').replace(/\{.*?\}/, '').replace('/**', '').split(',')[0]?.trim() || '02 - <workplace>';
       bundleDir = path.join(vaultRoot, projectsBase, projectName);
     }
 

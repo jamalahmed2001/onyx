@@ -32,7 +32,7 @@ up: Agent Skills Hub
 ```bash
 ~/clawd/skills/comment-safety-filter/bin/comment-safety-filter \
   --input comments.json \
-  --rulepack rules/maniplus-safety.json \
+  --rulepack rules/my-podcast-safety.json \
   --output triaged.json
 ```
 
@@ -46,19 +46,19 @@ None — stateless filter.
 
 | Project | Directive | What it filters |
 |---|---|---|
-| ManiPlus | `universal-engagement` | Incoming comments + outgoing replies (same rulepack) |
-| Cartoon Remakes | `cartoon-engagement-manager` (when wired) | Same pattern, different rulepack |
+| My Podcast | `universal-engagement` | Incoming comments + outgoing replies (same rulepack) |
+| My Show | `cartoon-engagement-manager` (when wired) | Same pattern, different rulepack |
 
 ## Rulepack authoring
 
 Projects own their rulepack files. Store in the project repo or vault under project-specific paths. The skill itself is agnostic.
 
-**ManiPlus** example patterns (medical context):
+**My Podcast** example patterns (medical context):
 - `\\byou should take\\b` — direct medication instruction
 - `\\bdosage\\b` — dosage reference
 - `\\bconsult (a|your) doctor\\b` — medical referral advice
 
-**Cartoon Remakes** would use a different pack (copyright claim phrases, etc.).
+**My Show** would use a different pack (copyright claim phrases, etc.).
 
 ## See also
 

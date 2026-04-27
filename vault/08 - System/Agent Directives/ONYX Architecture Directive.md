@@ -143,16 +143,16 @@ Every piece of project state lives as a human-readable markdown file. The Orches
 
 ```jsonc
 {
-  "project_id": "OpenClaw/Almani",        // Unique project identifier
+  "project_id": "OpenClaw/Example Brand",        // Unique project identifier
   "repo_path": "~/workspace/almani",  // Absolute path to code repo
-  "bundle_path": "10 - OpenClaw/Ventures/Almani", // Vault-relative
+  "bundle_path": "10 - OpenClaw/Ventures/Example Brand", // Vault-relative
   "status": "active",                     // ProjectState FSM value
   "active_phase": 2,                      // Which phase is currently executing
   "health": "healthy",                    // 'healthy' | 'degraded' | 'unknown'
   "default_branch": "main",
   "phases": {                             // Phase number → vault-relative path
-    "1": "10 - OpenClaw/Ventures/Almani/Phase 01 - Setup.md",
-    "2": "10 - OpenClaw/Ventures/Almani/Phase 02 - Core API.md"
+    "1": "10 - OpenClaw/Ventures/Example Brand/Phase 01 - Setup.md",
+    "2": "10 - OpenClaw/Ventures/Example Brand/Phase 02 - Core API.md"
   },
   "pipeline_atoms": [                     // Discrete work atoms (from Linear/atomiser)
     { "atom": "import-linear", "status": "complete" },
@@ -590,7 +590,7 @@ buildQMDContext(
 ```yaml
 ```query
 phase:
-  file: 10 - OpenClaw/Ventures/Almani/Phase 02 - Core API.md
+  file: 10 - OpenClaw/Ventures/Example Brand/Phase 02 - Core API.md
   excerpt: |
     ## 📋 Implementation Plan (scoped)
     - [ ] **Task 3:** Implement auth middleware
@@ -600,7 +600,7 @@ phase:
 
 ```query
 knowledge:
-  file: 10 - OpenClaw/Ventures/Almani/Knowledge.md
+  file: 10 - OpenClaw/Ventures/Example Brand/Knowledge.md
   excerpts: |
     JWT tokens use HS256. Secret in ONYX_JWT_SECRET env.
     Auth middleware must attach decoded payload to req.user.
@@ -720,8 +720,8 @@ queryExecLog(projectId: string, level?: LogLevel, vaultRoot?: string): string[]
 Machine-readable structured events written to `.onyx-telemetry/YYYY-MM-DD.jsonl`:
 
 ```json
-{"type":"step_start","timestamp":"2026-03-25T10:05:00.000Z","run_id":"abc123","project_id":"OpenClaw/Almani","component":"executorStep","phase_number":2}
-{"type":"step_end","timestamp":"2026-03-25T10:05:04.123Z","run_id":"abc123","project_id":"OpenClaw/Almani","component":"executorStep","duration_ms":4123,"metadata":{"task":"Task 3 done"}}
+{"type":"step_start","timestamp":"2026-03-25T10:05:00.000Z","run_id":"abc123","project_id":"OpenClaw/Example Brand","component":"executorStep","phase_number":2}
+{"type":"step_end","timestamp":"2026-03-25T10:05:04.123Z","run_id":"abc123","project_id":"OpenClaw/Example Brand","component":"executorStep","duration_ms":4123,"metadata":{"task":"Task 3 done"}}
 ```
 
 **Event Types:** `step_start | step_end | step_error | step_retry | pipeline_start | pipeline_end | self_heal | circuit_break | dispatch`
@@ -981,19 +981,19 @@ export type { RunContext, FlowName }       from './runContext.js'
 npx tsx src/onyx/controllerKernel.ts --dry-run
 
 # Run the kernel for a single project
-npx tsx src/onyx/controllerKernel.ts --project-id "OpenClaw/Almani"
+npx tsx src/onyx/controllerKernel.ts --project-id "OpenClaw/Example Brand"
 
 # Dispatch a single command
-npx tsx src/onyx/runController.ts --text "execute phase 2 for Almani" --project-id "OpenClaw/Almani"
+npx tsx src/onyx/runController.ts --text "execute phase 2 for Example Brand" --project-id "OpenClaw/Example Brand"
 
 # Force-plan a phase
-npx tsx src/onyx/runController.ts --text "plan phase 2" --project-id "OpenClaw/Almani" --mode plan-phase
+npx tsx src/onyx/runController.ts --text "plan phase 2" --project-id "OpenClaw/Example Brand" --mode plan-phase
 
 # Check status
-npx tsx src/onyx/runController.ts --text "status" --project-id "OpenClaw/Almani" --mode status
+npx tsx src/onyx/runController.ts --text "status" --project-id "OpenClaw/Example Brand" --mode status
 
 # Import from Linear
-npx tsx src/onyx/runController.ts --text "import linear" --project-id "OpenClaw/Almani" --linear-project-id "PROJ-123"
+npx tsx src/onyx/runController.ts --text "import linear" --project-id "OpenClaw/Example Brand" --linear-project-id "PROJ-123"
 ```
 
 ### Adding a New Pipeline Step
@@ -1064,10 +1064,10 @@ const PHASE_TRANSITIONS: Record<PhaseState, PhaseState[]> = {
 
 ```bash
 # Enable verbose output
-DEBUG_ONYX=1 npx tsx src/onyx/controllerKernel.ts --project-id "OpenClaw/Almani"
+DEBUG_ONYX=1 npx tsx src/onyx/controllerKernel.ts --project-id "OpenClaw/Example Brand"
 
 # Read the exec log for a project
-cat "~/Obsidian/OnyxVault/10 - OpenClaw/Ventures/Almani/ExecLog.md"
+cat "~/Obsidian/OnyxVault/10 - OpenClaw/Ventures/Example Brand/ExecLog.md"
 
 # Read telemetry for today
 cat ".onyx-telemetry/$(date +%Y-%m-%d).jsonl" | jq .

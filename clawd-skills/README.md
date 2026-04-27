@@ -68,6 +68,6 @@ Each skill's `SKILL.md` documents its exact credential shape. Nothing is committ
 
 ## How they slot into ONYX
 
-A directive (e.g. `maniplus-audio-producer`) invokes a skill by calling its `bin/` entry point. The Skill Overview in the vault is the contract: what flags the directive should pass, what the output JSON looks like, what credentials are required. The vault doc is the "interface"; this directory is the "implementation". If you change the CLI shape here, update the Skill Overview doc in the same PR.
+A directive (e.g. `my-podcast-audio-producer`) invokes a skill by calling its `bin/` entry point. The Skill Overview in the vault is the contract: what flags the directive should pass, what the output JSON looks like, what credentials are required. The vault doc is the "interface"; this directory is the "implementation". If you change the CLI shape here, update the Skill Overview doc in the same PR.
 
 Directives ship under [`../vault/08 - System/Agent Directives/`](../vault/08%20-%20System/Agent%20Directives/) — they're already tracked in this repo.

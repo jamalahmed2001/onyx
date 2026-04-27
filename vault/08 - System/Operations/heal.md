@@ -154,7 +154,7 @@ One line per heal action:
 
 Example:
 ```
-2026-04-24T10:47:12Z | - | P14 | HEAL | 0 | stale-locks:cleared path=mani-plus/Phases/P14 - Script.md
+2026-04-24T10:47:12Z | - | P14 | HEAL | 0 | stale-locks:cleared path=my-podcast/Phases/P14 - Script.md
 ```
 
 ## Shadow-mode comparison criteria

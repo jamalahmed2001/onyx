@@ -93,7 +93,7 @@ export async function masterSingle(
 /**
  * Concatenate multiple mastered audio files into one, inserting silence between each.
  * Re-encodes to a consistent format (matches the codec/sample-rate/channels you pass)
- * to avoid the "silent-gap stereo + mono-segments" corruption the old ManiPlus pipeline hit.
+ * to avoid the "silent-gap stereo + mono-segments" corruption the old My Podcast pipeline hit.
  */
 export async function concatenate(
   inputPaths: string[],

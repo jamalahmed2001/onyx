@@ -39,7 +39,7 @@ tiktok-publish account remove <ref>
 
 # Upload (browser or api backend decided from the env file's BACKEND= line)
 ~/clawd/skills/tiktok-publish/bin/tiktok-publish \
-  --account-ref maniplus \
+  --account-ref my-podcast \
   --video ./out-9x16.mp4 \
   --title "Episode 8 — 60s preview" \
   --privacy PUBLIC_TO_EVERYONE \
@@ -47,7 +47,7 @@ tiktok-publish account remove <ref>
 
 # API backend only — poll status
 ~/clawd/skills/tiktok-publish/bin/tiktok-publish \
-  --account-ref maniplus \
+  --account-ref my-podcast \
   --check-status <publish_id>
 ```
 
@@ -71,7 +71,7 @@ tiktok-publish account remove <ref>
 
 | Project | Directive | Which video(s) |
 |---|---|---|
-| ManiPlus | `maniplus-distributor` | Short clips from each episode |
+| My Podcast | `my-podcast-distributor` | Short clips from each episode |
 
 ## See also
 

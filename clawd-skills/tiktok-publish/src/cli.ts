@@ -156,8 +156,8 @@ async function main(): Promise<void> {
 
   if (values.help) {
     process.stdout.write('See SKILL.md. Quick form:\n');
-    process.stdout.write('  tiktok-publish --account-ref maniplus --video ./v.mp4 --title "…"\n');
-    process.stdout.write('  tiktok-publish --account-ref maniplus --check-status <publish-id>\n');
+    process.stdout.write('  tiktok-publish --account-ref my-podcast --video ./v.mp4 --title "…"\n');
+    process.stdout.write('  tiktok-publish --account-ref my-podcast --check-status <publish-id>\n');
     process.exit(0);
   }
 

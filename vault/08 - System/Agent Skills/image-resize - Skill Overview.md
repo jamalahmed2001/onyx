@@ -1,7 +1,7 @@
 ---
 tool: image-resize
 type: npm
-repo: ~/clawd/openclaw/projects/mani-plus-agent
+repo: ~/clawd/openclaw/projects/my-podcast-agent
 script: image:resize
 free: true
 open_source: true
@@ -16,7 +16,7 @@ up: Agent Skills Hub
 ## Invocation
 
 ```bash
-cd ~/clawd/openclaw/projects/mani-plus-agent
+cd ~/clawd/openclaw/projects/my-podcast-agent
 npm run image:resize -- --input path/to/image.jpg --output path/to/out.jpg --width 1280 --height 720
 ```
 

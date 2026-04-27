@@ -39,7 +39,7 @@ If it's a one-off piece of content, an engineering project is probably a closer 
 
 ```yaml
 profile: content
-voice_profile: "Docs/ManiPlus - Voice Guide.md"   # path to voice guide, or inline description
+voice_profile: "Docs/My Podcast - Voice Guide.md"   # path to voice guide, or inline description
 pipeline_stage: research                             # current production stage (informational)
 safety_rules: no-medical-advice, cite-all-claims    # comma-separated safety constraints
 ```

@@ -1,7 +1,7 @@
 ---
 tool: analytics-pull
 type: npm
-repo: ~/clawd/openclaw/projects/mani-plus-agent
+repo: ~/clawd/openclaw/projects/my-podcast-agent
 script: analytics:pull
 free: true
 open_source: true
@@ -16,7 +16,7 @@ up: Agent Skills Hub
 ## Invocation
 
 ```bash
-cd ~/clawd/openclaw/projects/mani-plus-agent
+cd ~/clawd/openclaw/projects/my-podcast-agent
 npm run analytics:pull -- --week 2026-04-14
 ```
 

@@ -91,7 +91,7 @@ ONYX_VAULT_ROOT=/absolute/path/to/onyx/vault
   },
   "max_iterations": 20,
   "stale_lock_threshold_ms": 300000,
-  "projects_glob": "{02 - Fanvue/**,03 - Ventures/**,10 - OpenClaw/**}"
+  "projects_glob": "{02 - <workplace>/**,03 - Ventures/**,10 - OpenClaw/**}"
 }
 ```
 

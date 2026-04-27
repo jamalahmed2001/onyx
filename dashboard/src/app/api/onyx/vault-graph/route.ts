@@ -20,7 +20,7 @@ export interface VaultGraphNode {
   isPhase: boolean;
   /** Phase profile when set in frontmatter (content, engineering, research…). */
   profile: string | null;
-  /** Directive when set in frontmatter (maniplus-audio-producer, …). */
+  /** Directive when set in frontmatter (my-podcast-audio-producer, …). */
   directive: string | null;
   /** Project ID when inferable from path/frontmatter. */
   projectId: string | null;
@@ -79,7 +79,7 @@ export async function GET() {
   walkAll(vaultRoot, vaultRoot, files);
 
   // 2. Build lookup maps: basename → [relPath], normPath → relPath
-  const byBase = new Map<string, string[]>();   // "fanvue (main) - overview" → ["02 - Fanvue/..."]
+  const byBase = new Map<string, string[]>();   // "fanvue (main) - overview" → ["02 - <workplace>/..."]
   const byNorm = new Map<string, string>();     // full norm path → relPath
   for (const f of files) {
     const base = path.basename(f.relPath, '.md').toLowerCase();
@@ -207,7 +207,7 @@ export async function GET() {
   // files as connected: they share a folder, so they're part of the same cluster.
   //
   // We also add an edge from each bundle Overview up to the top-level Hub file (e.g.
-  // "Fanvue Hub.md") when one exists in the parent directory.
+  // "<workplace> Hub.md") when one exists in the parent directory.
 
   // Build bundle root map: absDir → overviewRelPath
   const bundleRootMap = new Map<string, string>(); // absDir → overviewRelPath

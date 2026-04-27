@@ -21,7 +21,7 @@ up: Agent Skills Hub
 
 | Operation | Tool | Example |
 |---|---|---|
-| Read a file | `Read` | Read `03 - Ventures/Personal/Core/ManiPlus Weekly/ManiPlus Weekly - Knowledge.md` |
+| Read a file | `Read` | Read `03 - Ventures/Personal/Core/My Podcast Weekly/My Podcast Weekly - Knowledge.md` |
 | Search content | `Grep` | Search for `safety_rules` in `08 - System/Profiles/` |
 | Find files | `Glob` | `03 - Ventures/**/Phases/*.md` |
 

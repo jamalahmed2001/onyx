@@ -95,8 +95,8 @@ TypeScript handles all deterministic operations. Claude handles judgment. Neithe
 |---|---|---|---|
 | **Core** | Universal | Phase lifecycle, FSM, logging, healing, knowledge | Never changes |
 | **Profile** | Project | ONYX's mechanical behaviour: extra fields, templates, verification | `engineering`, `content`, `research` |
-| **Directive** | Phase | Agent identity: role, context to load, rules, constraints | `maniplus-script-writer`, `market-analyst` |
-| **Bundle** | Instance | The actual vault folder for one project | `ManiPlus/`, `KrakenBot/` |
+| **Directive** | Phase | Agent identity: role, context to load, rules, constraints | `my-podcast-script-writer`, `market-analyst` |
+| **Bundle** | Instance | The actual vault folder for one project | `My Podcast/`, `KrakenBot/` |
 
 ### Core artefacts
 
@@ -204,7 +204,7 @@ My Project/Directives/<name>.md   ← project-local (project-specific)
 
 **Wire a directive to a phase:**
 ```yaml
-directive: maniplus-script-writer   # in phase frontmatter
+directive: my-podcast-script-writer   # in phase frontmatter
 ```
 
 **Context injection order (what the agent reads):**
@@ -225,22 +225,22 @@ directive: maniplus-script-writer   # in phase frontmatter
 
 ```markdown
 ---
-name: maniplus-script-writer
+name: my-podcast-script-writer
 type: directive
 scope: project
-project: ManiPlus
+project: My Podcast
 ---
 
 # Script Writer Directive
 
 ## Role
-You are the ManiPlus Script Writer. Your job is to produce episode scripts
+You are the My Podcast Script Writer. Your job is to produce episode scripts
 that match Mani's voice, build on previous episodes, and stay within
 medical safety constraints.
 
 ## Context you must load before starting
-- ManiPlus - Knowledge.md — voice constraints, tone, safety rules, learned preferences
-- Docs/ManiPlus - Source Context.md — show identity and positioning
+- My Podcast - Knowledge.md — voice constraints, tone, safety rules, learned preferences
+- Docs/My Podcast - Source Context.md — show identity and positioning
 - Last 3 episode scripts — continuity
 
 ## How to function
@@ -314,30 +314,30 @@ Phase D (distributor)   → reads audio manifest → publishes + writes links ba
 
 That's it. This rule is what makes multi-agent coordination safe. No agent can corrupt another phase.
 
-### Example: ManiPlus pipeline (8-directive set)
+### Example: My Podcast pipeline (8-directive set)
 
 | Directive | Role | What it enforces |
 |---|---|---|
-| `maniplus-researcher` | Weekly health topic research | Source constraints, citation format, topic selection rules |
-| `maniplus-script-writer` | Episode script generation | Mani's voice, continuity, medical safety, output format |
-| `maniplus-audio-producer` | ElevenLabs voice generation | Pronunciation rules, pacing markers, file naming |
-| `maniplus-video-composer` | Long video + shorts assembly | Branding rules, caption requirements, aspect ratios |
-| `maniplus-distributor` | RSS + YouTube + TikTok publish | Platform-specific format rules, description templates |
-| `maniplus-engagement` | Comment ingestion + reply assist | Mani's reply voice, escalation rules, response time norms |
-| `maniplus-analyst` | Analytics → vault learning loop | What to measure, how to write learnings back to Knowledge |
-| `maniplus-meta` | Full pipeline orchestration | Delegates to all the above in sequence |
+| `my-podcast-researcher` | Weekly health topic research | Source constraints, citation format, topic selection rules |
+| `my-podcast-script-writer` | Episode script generation | Mani's voice, continuity, medical safety, output format |
+| `my-podcast-audio-producer` | ElevenLabs voice generation | Pronunciation rules, pacing markers, file naming |
+| `my-podcast-video-composer` | Long video + shorts assembly | Branding rules, caption requirements, aspect ratios |
+| `my-podcast-distributor` | RSS + YouTube + TikTok publish | Platform-specific format rules, description templates |
+| `my-podcast-engagement` | Comment ingestion + reply assist | Mani's reply voice, escalation rules, response time norms |
+| `my-podcast-analyst` | Analytics → vault learning loop | What to measure, how to write learnings back to Knowledge |
+| `my-podcast-meta` | Full pipeline orchestration | Delegates to all the above in sequence |
 
 ```
-ManiPlus/
-├── ManiPlus - Overview.md          ← profile: content
-├── ManiPlus - Knowledge.md         ← voice + safety + learnings compound here
+My Podcast/
+├── My Podcast - Overview.md          ← profile: content
+├── My Podcast - Knowledge.md         ← voice + safety + learnings compound here
 ├── Directives/
-│   ├── maniplus-researcher.md
-│   ├── maniplus-script-writer.md
+│   ├── my-podcast-researcher.md
+│   ├── my-podcast-script-writer.md
 │   └── ... (8 total)
 ├── Phases/
-│   ├── P2 - Build research pipeline.md       directive: maniplus-researcher
-│   ├── P3 - Implement script generation.md   directive: maniplus-script-writer
+│   ├── P2 - Build research pipeline.md       directive: my-podcast-researcher
+│   ├── P3 - Implement script generation.md   directive: my-podcast-script-writer
 │   └── ...
 └── Episodes/                                 ← agent output lands here
 ```
@@ -661,7 +661,7 @@ OPENROUTER_API_KEY=sk-or-...
 {
   "vault_root": "/absolute/path/to/vault",
   "agent_driver": "claude-code",
-  "projects_glob": "{02 - Fanvue/**,03 - Ventures/**}",
+  "projects_glob": "{02 - <workplace>/**,03 - Ventures/**}",
   "model_tiers": {
     "planning": "anthropic/claude-opus-4-6",
     "light":    "anthropic/claude-haiku-4-5-20251001",

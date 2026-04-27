@@ -81,8 +81,8 @@ export function readBundle(bundleDir: string, projectId: string): VaultBundle {
 // Convenience: discover all Overview files and return their bundles.
 export function discoverBundles(vaultRoot: string, projectsGlob: string): VaultBundle[] {
   // Build a glob pattern that searches for Overview files within each brace arm.
-  // Input: "{01 - Projects/**,02 - Fanvue/**,...}" or "10 - OpenClaw/**"
-  // Output: "{01 - Projects/**/*Overview*.md,02 - Fanvue/**/*Overview*.md,...}"
+  // Input: "{01 - Projects/**,02 - <workplace>/**,...}" or "10 - OpenClaw/**"
+  // Output: "{01 - Projects/**/*Overview*.md,02 - <workplace>/**/*Overview*.md,...}"
   let overviewGlob: string;
   if (projectsGlob.includes('/**')) {
     // Replace trailing /** in each brace arm (or simple glob) with /**/*Overview*.md

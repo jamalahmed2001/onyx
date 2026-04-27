@@ -157,7 +157,7 @@ Top-level folders are subroots anchored to the central dashboard node.
 Example set (names can vary; concept must hold):
 - Dashboard
 - Life
-- Fanvue
+- <workplace>
 - Ventures
 - Planning
 - Finance

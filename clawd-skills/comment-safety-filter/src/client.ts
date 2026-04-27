@@ -6,7 +6,7 @@ export interface RulePattern {
 }
 
 export interface RulePack {
-  /** Medical-advice language patterns (ManiPlus, health creators). */
+  /** Medical-advice language patterns (My Podcast, health creators). */
   medical_advice_patterns?: RulePattern[];
   /** PII patterns (phone, email, SSN-like). */
   pii_patterns?: RulePattern[];

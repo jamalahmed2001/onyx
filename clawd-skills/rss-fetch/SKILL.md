@@ -71,7 +71,7 @@ Individual feed failures (HTTP errors, timeouts, malformed XML) are surfaced in 
 ## Callers
 
 - Universal research phases ingesting blog/news feeds
-- ManiPlus research phases — replace per-project `rss-fetcher.ts`
+- My Podcast research phases — replace per-project `rss-fetcher.ts`
 - Any trend-watching directive (marketing-strategist, journalist)
 
 ## See also

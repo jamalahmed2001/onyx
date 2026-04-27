@@ -12,14 +12,14 @@ status: draft
 
 # Skill: heal-fractal-links
 
-> **Validated 2026-04-24** by manual application to the three `Automated Distribution Pipelines/` projects (ManiPlus, Suno Albums, Cartoon Remakes). Applied against 28 phases + 6 per-album Overviews + 8 hubs. Net effect: tree-shaped graph instead of star topology.
+> **Validated 2026-04-24** by manual application to the three `Automated Distribution Pipelines/` projects (My Podcast, My Album, My Show). Applied against 28 phases + 6 per-album Overviews + 8 hubs. Net effect: tree-shaped graph instead of star topology.
 
 ## Purpose
 Enforce the [[08 - System/Conventions/Fractal Linking Convention.md|Fractal Linking Convention]] across the vault — every note has exactly one parent, leaves don't link to grandparents, hubs don't link sideways to siblings.
 
 ## Inputs
 - `vault_path: string`
-- `projects_glob: string` — default `"{02 - Fanvue/**,03 - Ventures/**,10 - OpenClaw/**}"`
+- `projects_glob: string` — default `"{02 - <workplace>/**,03 - Ventures/**,10 - OpenClaw/**}"`
 - `scope: "project" | "domain" | "all"` — default `"all"`. Optionally restricts to one project (e.g. scope=project + project_id=Clutr) or one domain.
 - `project_id: string | null` — when scope=project.
 - `dry_run: bool` — default false. When true, report intended fixes without writing.
@@ -105,30 +105,30 @@ Return aggregated `fixes` + `detections`. Caller decides whether to treat detect
 
 ## Examples
 
-**Example 1 — double-linked phase file (fixture case from ManiPlus, 2026-04-24):**
+**Example 1 — double-linked phase file (fixture case from My Podcast, 2026-04-24):**
 
 Input frontmatter:
 ```yaml
-up: ManiPlus - Overview
+up: My Podcast - Overview
 ```
 Input nav:
 ```markdown
 ## 🔗 Navigation
 
-- [[ManiPlus - Overview|ManiPlus]]
+- [[My Podcast - Overview|My Podcast]]
 - [[L21 - Research [episode topic]|L21 — Execution Log]]
 ```
 
 After skill:
 Frontmatter:
 ```yaml
-up: ManiPlus - Phases Hub
+up: My Podcast - Phases Hub
 ```
 Nav:
 ```markdown
 ## 🔗 Navigation
 
-**UP:** [[ManiPlus - Phases Hub|Phases Hub]]
+**UP:** [[My Podcast - Phases Hub|Phases Hub]]
 ```
 
 **Example 2 — hub with sideways link (Book Hub):**
@@ -137,16 +137,16 @@ Input nav:
 ```markdown
 ## 🔗 Navigation
 
-- [[ManiPlus - Overview|ManiPlus]]
-- [[ManiPlus - Episodes Hub|Episodes]]
-- [[ManiPlus - Knowledge|Knowledge]]
+- [[My Podcast - Overview|My Podcast]]
+- [[My Podcast - Episodes Hub|Episodes]]
+- [[My Podcast - Knowledge|Knowledge]]
 ```
 
 After skill:
 ```markdown
 ## 🔗 Navigation
 
-**UP:** [[ManiPlus - Overview|ManiPlus]]
+**UP:** [[My Podcast - Overview|My Podcast]]
 ```
 
 Sideways links (Episodes Hub, Knowledge) removed. Body content unchanged.

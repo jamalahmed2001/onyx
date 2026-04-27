@@ -432,8 +432,8 @@ export function buildVaultGraph(vaultRoot: string): { nodes: GraphNode[]; edges:
   const nameLookup = new Map<string, string>();
 
   // Area hubs — derive from folder prefixes (level1 + level2)
-  // level1: "02 - Fanvue" → "Fanvue"
-  // level2: "02 - Fanvue/01 - Creator Tools" → "Creator Tools" (connected hub→subhub→project)
+  // level1: "02 - <workplace>" → "<workplace>"
+  // level2: "02 - <workplace>/01 - Creator Tools" → "Creator Tools" (connected hub→subhub→project)
   const HUB_PALETTE = [
     '#e3b341', // gold
     '#58a6ff', // blue

@@ -43,7 +43,7 @@ System Directive domain identity — "in this domain, you are this kind of agent
 Bundle Directive project identity — "for this specific project, here is your exact brief"
 ```
 
-**Example chain — ManiPlus research phase:**
+**Example chain — My Podcast research phase:**
 
 | Layer | Artifact | What it contributes |
 |---|---|---|
@@ -51,7 +51,7 @@ Bundle Directive project identity — "for this specific project, here is your e
 | Tool | `pubmed-search` | "Run npm run research:fetch. Reads research-briefs/{date}-raw.json." |
 | Skill | `researcher` | "Search → select top 5 sources → summarise each → cite inline." |
 | System directive | `clinical-researcher` | "Prefer PubMed. Cite every clinical claim. Never give personal medical advice." |
-| Bundle directive | `maniplus-researcher` | "Focus: kidney/dialysis/transplant health. Audience: patients and carers. Faith-aware. Write to vault/research-briefs/{date}.json." |
+| Bundle directive | `my-podcast-researcher` | "Focus: kidney/dialysis/transplant health. Audience: patients and carers. Faith-aware. Write to vault/research-briefs/{date}.json." |
 
 ---
 
@@ -351,14 +351,14 @@ Synthesis section: Key consensus | Contradictions | Gaps | Overall confidence
 
 **Where it lives:** `{bundle}/Directives/{name}.md`
 
-**How it enters context:** Same as system directives — set `directive: name` in phase frontmatter. The bundle's `Directives/` folder is checked *before* `08 - System/Agent Directives/`. So `maniplus-researcher` resolves before `clinical-researcher`.
+**How it enters context:** Same as system directives — set `directive: name` in phase frontmatter. The bundle's `Directives/` folder is checked *before* `08 - System/Agent Directives/`. So `my-podcast-researcher` resolves before `clinical-researcher`.
 
-**Example bundle directive — `ManiPlus/Directives/maniplus-researcher.md`:**
+**Example bundle directive — `My Podcast/Directives/my-podcast-researcher.md`:**
 
 ```markdown
 ---
 type: directive
-name: maniplus-researcher
+name: my-podcast-researcher
 extends: clinical-researcher    # conceptual note — not a formal field
 skills:
   - researcher
@@ -367,14 +367,14 @@ tools:
   - web-search
 ---
 
-# Directive: maniplus-researcher
+# Directive: my-podcast-researcher
 
 ## Role
-You are the ManiPlus research specialist. Your job is to find evidence-based information about kidney health, renal failure, dialysis, and transplantation — written for patients and their families, not clinicians.
+You are the My Podcast research specialist. Your job is to find evidence-based information about kidney health, renal failure, dialysis, and transplantation — written for patients and their families, not clinicians.
 
 ## What you read first
-1. `ManiPlus - Source Context.md` — the show's identity, audience, voice, safety rules
-2. `ManiPlus - Knowledge.md` — what prior research phases found; don't duplicate
+1. `My Podcast - Source Context.md` — the show's identity, audience, voice, safety rules
+2. `My Podcast - Knowledge.md` — what prior research phases found; don't duplicate
 3. The Research Brief if present
 4. The phase file — what to research this phase
 
@@ -395,7 +395,7 @@ Patients and family carers. Most have some medical knowledge from living with th
 - **Patient voice:** Flag if findings contradict common patient beliefs — these make good episode topics.
 
 ## Output location
-Write research brief to: `ManiPlus/Research/{date} - {topic}.md`
+Write research brief to: `My Podcast/Research/{date} - {topic}.md`
 
 ## Citation format
 (Author Surname, Journal Abbreviation, Year, PMID if available)
@@ -503,7 +503,7 @@ status: active
 
 **What it is:** A Bundle is the folder for one project. Everything related to one project lives inside its bundle: the Overview, phases, knowledge, directives, outputs, and logs. Bundles are the namespacing unit. Each bundle is one project.
 
-**Where it lives:** Anywhere inside the vault paths covered by `projects_glob` in `onyx.config.json`. Typically: `02 - Fanvue/ProjectName/`, `03 - Ventures/Personal/ProjectName/`, `10 - OpenClaw/ProjectName/`.
+**Where it lives:** Anywhere inside the vault paths covered by `projects_glob` in `onyx.config.json`. Typically: `02 - <workplace>/ProjectName/`, `03 - Ventures/Personal/ProjectName/`, `10 - OpenClaw/ProjectName/`.
 
 **How to create one:**
 
@@ -546,8 +546,8 @@ onyx init "KrakenBot" --profile trading
 
 ```markdown
 ---
-title: ManiPlus
-project_id: ManiPlus
+title: My Podcast
+project_id: My Podcast
 profile: content
 voice_profile: Directives/voice-guide.md
 pipeline_stage: research
@@ -558,7 +558,7 @@ safety_rules:
 status: active
 ---
 
-# ManiPlus — Overview
+# My Podcast — Overview
 
 ## What is this project
 A podcast about kidney health for patients and their families. Bilingual (English/Arabic). Published fortnightly.
@@ -596,12 +596,12 @@ Warm, knowledgeable, direct. Like a trusted friend who happens to be a health pr
 
 ```markdown
 ---
-project_id: "ManiPlus"
+project_id: "My Podcast"
 phase_number: 3
 phase_name: "Write script for episode 12 — Faith and Dialysis"
 state: ready
 tags: [onyx-phase, phase-ready]
-directive: maniplus-script-writer
+directive: my-podcast-script-writer
 priority: 7
 risk: medium
 complexity: standard
@@ -622,7 +622,7 @@ Write the full script for episode 12. Topic: balancing dialysis schedules with R
 
 ## Tasks
 
-- [ ] Read Source Context (ManiPlus - Source Context.md) for voice calibration
+- [ ] Read Source Context (My Podcast - Source Context.md) for voice calibration
 - [ ] Read Research Brief from P2 (Research/2026-04-10 - Ramadan and Dialysis.md)
 - [ ] Read last 3 episode scripts for tone consistency
 - [ ] Write script: hook → patient story → evidence → expert context → takeaway → CTA
@@ -695,7 +695,7 @@ future time-based logic.
 **Example (content project):**
 
 ```markdown
-# ManiPlus — Knowledge
+# My Podcast — Knowledge
 
 ## Voice refinements
 - "Kidney journey" resonates better than "kidney disease" — less clinical, more lived experience
@@ -725,7 +725,7 @@ future time-based logic.
 **Example:**
 
 ```markdown
-# ManiPlus — Source Context
+# My Podcast — Source Context
 
 ## Format
 Audio-first podcast. Episodes 18–22 minutes. Published fortnightly on Spotify, Apple Podcasts, YouTube (with subtitles).
@@ -822,14 +822,14 @@ The agent reads identity → rules → capabilities → project → history → 
 
 ## Directive resolution order
 
-When a phase says `directive: maniplus-researcher`, ONYX checks:
+When a phase says `directive: my-podcast-researcher`, ONYX checks:
 
 ```
-1. {bundle}/Directives/maniplus-researcher.md   ← project-specific (checked first)
-2. 08 - System/Agent Directives/maniplus-researcher.md ← system (fallback)
+1. {bundle}/Directives/my-podcast-researcher.md   ← project-specific (checked first)
+2. 08 - System/Agent Directives/my-podcast-researcher.md ← system (fallback)
 ```
 
-If a bundle directive has the same name as a system directive, the bundle version wins. This is how you specialise: you create `maniplus-researcher.md` in the bundle and it automatically overrides `clinical-researcher` without any formal inheritance — it just gets resolved first.
+If a bundle directive has the same name as a system directive, the bundle version wins. This is how you specialise: you create `my-podcast-researcher.md` in the bundle and it automatically overrides `clinical-researcher` without any formal inheritance — it just gets resolved first.
 
 ---
 

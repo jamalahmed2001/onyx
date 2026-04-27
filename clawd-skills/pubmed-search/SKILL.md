@@ -70,7 +70,7 @@ Without `--output`, articles are included inline in the stdout JSON. Output shap
 
 - Universal research phases needing peer-reviewed biomedical evidence
 - `clinical-researcher` directive — replace inline `curl` snippets with this skill
-- ManiPlus research phases — replace per-project `pubmed-fetcher.ts`
+- My Podcast research phases — replace per-project `pubmed-fetcher.ts`
 
 ## See also
 
