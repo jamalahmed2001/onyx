@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# notify — fire one openclaw notification per Master Directive §15.
+#
+# Usage:
+#   notify --event <name> --project <pid> --phase <pid|-> --severity <info|warn|alert> --message "<text>"
+#
+# Reads OPENCLAW_NOTIFY_TARGET from env (or onyx.config.json's notify.openclaw.target
+# if config-load was sourced). Stdout-only mode if no target is configured — prints
+# "[ONYX] <event> · <project> · <phase> · <message>" then exits 0.
+#
+# Replaces src/notify/notify.ts. The TS path had 500ms batching; the bash version
+# is fire-and-forget per call. If callers want batching, they should buffer events
+# locally and emit one consolidated message.
+#
+# Exit codes:
+#   0  — notification fired (or stdout-only)
+#   2  — usage error
+
+set -eo pipefail
+
+EVENT=""; PROJECT=""; PHASE="-"; SEVERITY="info"; MESSAGE=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --event)    EVENT="$2"; shift 2 ;;
+    --project)  PROJECT="$2"; shift 2 ;;
+    --phase)    PHASE="$2"; shift 2 ;;
+    --severity) SEVERITY="$2"; shift 2 ;;
+    --message)  MESSAGE="$2"; shift 2 ;;
+    --help|-h)
+      cat >&2 <<USAGE
+usage: notify --event <name> --project <pid> --phase <pid|-> --severity <info|warn|alert> --message "<text>"
+
+Required: --event, --project, --message
+Optional: --phase (default "-"), --severity (default info)
+
+Reads OPENCLAW_NOTIFY_TARGET from env. Falls back to stdout-only if unset.
+USAGE
+      exit 0 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+if [[ -z "$EVENT" || -z "$PROJECT" || -z "$MESSAGE" ]]; then
+  echo "missing required: --event, --project, --message" >&2
+  exit 2
+fi
+
+case "$SEVERITY" in
+  info|warn|alert) ;;
+  *) echo "invalid --severity: $SEVERITY (must be info|warn|alert)" >&2; exit 2 ;;
+esac
+
+# Always log to stdout (Master Directive §15.4 format)
+SEV_UPPER=$(echo "$SEVERITY" | tr '[:lower:]' '[:upper:]')
+echo "[ONYX] $EVENT · $PROJECT · $PHASE · $MESSAGE"
+
+# OpenClaw output if target configured
+TARGET="${OPENCLAW_NOTIFY_TARGET:-}"
+if [[ -z "$TARGET" ]]; then
+  exit 0
+fi
+
+# Fire-and-forget — never block, never fail the caller
+{
+  timeout 10 openclaw \
+    --event "$EVENT" \
+    --project "$PROJECT" \
+    --phase "$PHASE" \
+    --severity "$SEVERITY" \
+    --message "$MESSAGE" 2>/dev/null
+} || true
+
+exit 0

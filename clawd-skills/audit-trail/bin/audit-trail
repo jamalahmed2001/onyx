@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# audit-trail — append events to <vault>/.onyx-audit/audit.jsonl, recover
+# orphaned locks (PID-based), and read events back.
+#
+# Replaces src/audit/recover.ts + src/audit/trail.ts (66 LOC).
+#
+# Verbs:
+#   append   — write one event line.
+#   list     — print events (optionally filtered by --project).
+#   recover  — scan phase-active phases, clear locks whose PIDs are gone.
+#
+# Usage:
+#   audit-trail append --vault <path> --event <name> --phase <phase-path> \
+#                     [--project <id>] [--pid <int>] [--detail "<text>"]
+#   audit-trail list   --vault <path> [--project <id>]
+#   audit-trail recover --vault <path> --projects-glob <glob>
+#
+# Exit codes:
+#   0 — success
+#   2 — usage error
+
+set -eo pipefail
+
+VERB="${1:-}"
+shift || true
+
+[[ -z "$VERB" ]] && { echo "usage: audit-trail <append|list|recover> [args...]" >&2; exit 2; }
+
+# Common arg parser
+VAULT=""
+EVENT=""
+PHASE=""
+PROJECT=""
+PID_VAL=""
+DETAIL=""
+GLOB=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --vault)         VAULT="$2"; shift 2 ;;
+    --event)         EVENT="$2"; shift 2 ;;
+    --phase)         PHASE="$2"; shift 2 ;;
+    --project)       PROJECT="$2"; shift 2 ;;
+    --pid)           PID_VAL="$2"; shift 2 ;;
+    --detail)        DETAIL="$2"; shift 2 ;;
+    --projects-glob) GLOB="$2"; shift 2 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+[[ -z "$VAULT" ]] && { echo "missing --vault" >&2; exit 2; }
+
+AUDIT_DIR="$VAULT/.onyx-audit"
+AUDIT_FILE="$AUDIT_DIR/audit.jsonl"
+
+case "$VERB" in
+  append)
+    [[ -z "$EVENT" || -z "$PHASE" ]] && { echo "missing --event or --phase" >&2; exit 2; }
+    mkdir -p "$AUDIT_DIR"
+    ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    line=$(jq -nc \
+      --arg ts "$ts" \
+      --arg event "$EVENT" \
+      --arg phaseNotePath "$PHASE" \
+      --arg projectId "$PROJECT" \
+      --arg pid "$PID_VAL" \
+      --arg detail "$DETAIL" \
+      '{ts: $ts, event: $event, phaseNotePath: $phaseNotePath}
+       + (if $projectId != "" then {projectId: $projectId} else {} end)
+       + (if $pid != ""       then {pid: ($pid | tonumber)} else {} end)
+       + (if $detail != ""    then {detail: $detail} else {} end)')
+    echo "$line" >> "$AUDIT_FILE"
+    echo "$line"
+    ;;
+
+  list)
+    [[ ! -f "$AUDIT_FILE" ]] && exit 0
+    if [[ -n "$PROJECT" ]]; then
+      jq -c --arg p "$PROJECT" 'select(.projectId == $p)' "$AUDIT_FILE"
+    else
+      cat "$AUDIT_FILE"
+    fi
+    ;;
+
+  recover)
+    [[ -z "$GLOB" ]] && { echo "missing --projects-glob" >&2; exit 2; }
+    cleared=0
+    while IFS= read -r -d '' phase; do
+      # Extract lock_pid from frontmatter
+      pid=$(awk '/^---$/{c++} c==1 && /^lock_pid:/ {gsub(/^lock_pid:[[:space:]]*/,""); gsub(/[" ]/,""); print; exit} c==2{exit}' "$phase")
+      [[ -z "$pid" ]] && continue
+      [[ ! "$pid" =~ ^[0-9]+$ ]] && continue
+      # Check if PID is alive
+      if kill -0 "$pid" 2>/dev/null; then
+        continue  # still running
+      fi
+      # PID is gone — clear lock + swap tag
+      tmp=$(mktemp)
+      awk -v in_fm=0 '
+        /^---$/ { in_fm++; print; next }
+        in_fm == 1 && /^lock_pid:/ { next }
+        in_fm == 1 && /^lock_run_id:/ { next }
+        in_fm == 1 && /^lock_acquired_at:/ { next }
+        in_fm == 1 && /^locked_by:/  { print "locked_by: \"\""; next }
+        in_fm == 1 && /^locked_at:/  { print "locked_at: \"\""; next }
+        in_fm == 1 && /^status:/     { print "status: ready"; next }
+        in_fm == 1 && /^state:/      { print "state: ready"; next }
+        in_fm == 1 && /^[[:space:]]*-[[:space:]]*phase-active/ { print "  - phase-ready"; next }
+        { print }
+      ' "$phase" > "$tmp"
+      mv "$tmp" "$phase"
+
+      # Audit the recovery
+      project_id=$(awk '/^---$/{c++} c==1 && (/^project_id:/ || /^project:/) {gsub(/^[a-z_]+:[[:space:]]*/,""); gsub(/["]/,""); print; exit} c==2{exit}' "$phase")
+      "$0" append --vault "$VAULT" \
+        --event lock_force_cleared \
+        --phase "$phase" \
+        --project "$project_id" \
+        --pid "$pid" \
+        --detail "PID $pid no longer running — lock cleared" >/dev/null
+
+      cleared=$((cleared+1))
+      echo "  recovered: $phase (PID $pid gone)"
+    done < <(find "$VAULT" -path "$VAULT/$GLOB" -name "*.md" -exec grep -lZ "phase-active" {} \;)
+
+    echo "[audit-trail] cleared $cleared orphaned lock(s)"
+    ;;
+
+  *)
+    echo "unknown verb: $VERB" >&2
+    echo "usage: audit-trail <append|list|recover>" >&2
+    exit 2
+    ;;
+esac

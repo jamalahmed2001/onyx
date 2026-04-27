@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# agent-spawn — spawn a Claude Code or Cursor agent to execute a prompt against a repo.
+#
+# Replaces src/agents/{claudeCodeSpawn,cursorSpawn,spawnAgent}.ts (179 LOC).
+#
+# Usage:
+#   agent-spawn --driver <claude-code|cursor> --prompt "<text>" --repo <path> [--timeout 600]
+#
+# Or read prompt from stdin:
+#   echo "$prompt" | agent-spawn --driver claude-code --repo <path>
+#
+# Stdout: agent's text response.
+# Exit codes:
+#   0   — agent finished successfully
+#   1   — agent exited non-zero
+#   124 — timeout
+#   2   — usage error
+
+set -eo pipefail
+
+DRIVER=""
+PROMPT=""
+REPO=""
+TIMEOUT=600
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --driver)  DRIVER="$2"; shift 2 ;;
+    --prompt)  PROMPT="$2"; shift 2 ;;
+    --repo)    REPO="$2"; shift 2 ;;
+    --timeout) TIMEOUT="$2"; shift 2 ;;
+    --help|-h)
+      cat >&2 <<USAGE
+usage: agent-spawn --driver <claude-code|cursor> --prompt "<text>" --repo <path> [--timeout 600]
+
+Or pipe prompt via stdin:
+  echo "\$prompt" | agent-spawn --driver claude-code --repo <path>
+
+Stdout: agent's text response.
+USAGE
+      exit 0 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+[[ -z "$DRIVER" ]] && { echo "missing --driver" >&2; exit 2; }
+[[ -z "$REPO" ]] && { echo "missing --repo" >&2; exit 2; }
+
+# Read prompt from stdin if not given
+if [[ -z "$PROMPT" ]]; then
+  if [[ -t 0 ]]; then
+    echo "missing --prompt and stdin is a tty" >&2; exit 2
+  fi
+  PROMPT=$(cat)
+fi
+
+[[ ! -d "$REPO" ]] && { echo "repo path doesn't exist: $REPO" >&2; exit 2; }
+
+case "$DRIVER" in
+  claude-code)
+    # Claude Code: --print for non-interactive output
+    # --dangerously-skip-permissions because we're inside a controlled flow
+    # --add-dir to scope read access to the repo
+    exec timeout "$TIMEOUT" claude \
+      --dangerously-skip-permissions \
+      --output-format text \
+      --print "$PROMPT" \
+      --add-dir "$REPO"
+    ;;
+
+  cursor)
+    # Cursor agent: --print for non-interactive, --yolo skips perm prompts
+    # cursor uses its own configured model (no --model flag exposed)
+    exec timeout "$TIMEOUT" cursor agent \
+      --print \
+      --yolo \
+      --output-format text \
+      --workspace "$REPO" \
+      "$PROMPT"
+    ;;
+
+  *)
+    echo "unknown --driver: $DRIVER (must be claude-code or cursor)" >&2
+    exit 2
+    ;;
+esac

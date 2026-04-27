@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# config-load — read onyx.config.json + .env, emit env-var exports for sourcing.
+#
+# Replaces src/config/load.ts (200 LOC). The TS path returned a typed object;
+# the bash version emits `export VAR="value"` lines so callers can `source <(...)`.
+#
+# Usage:
+#   config-load [--config <path>] [--cwd <path>]
+#   eval "$(config-load)"           # populate env from .env + onyx.config.json
+#
+# Reads in order:
+#   1. <cwd>/.env (gitignored secrets — every VAR=value line)
+#   2. <cwd>/onyx.config.json — flattened to env vars:
+#        vault_root         → ONYX_VAULT_ROOT
+#        repos_root         → ONYX_REPOS_ROOT
+#        projects_glob      → ONYX_PROJECTS_GLOB
+#        agent_driver       → ONYX_AGENT_DRIVER
+#        max_iterations     → ONYX_MAX_ITERATIONS
+#        max_runtime_seconds → ONYX_MAX_RUNTIME_SECONDS
+#        notify.openclaw.target → OPENCLAW_NOTIFY_TARGET
+#        linear.team_id     → LINEAR_TEAM_ID
+#        llm.model          → ONYX_LLM_MODEL
+#   3. Existing env vars take precedence over config-file values (env always wins).
+#
+# Exit codes:
+#   0 — emitted exports
+#   2 — config file invalid JSON
+#   3 — vault_root unresolvable
+
+set -eo pipefail
+
+CONFIG_PATH=""
+CWD="$(pwd)"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --config) CONFIG_PATH="$2"; shift 2 ;;
+    --cwd)    CWD="$2"; shift 2 ;;
+    --help|-h)
+      cat >&2 <<USAGE
+usage: config-load [--config <path>] [--cwd <path>]
+
+Reads <cwd>/.env then <cwd>/onyx.config.json. Emits env-var exports
+for sourcing:  eval "\$(config-load)"
+
+Output: \`export VAR="value"\` lines on stdout.
+Errors go to stderr.
+
+Existing env vars take precedence (env wins over config).
+USAGE
+      exit 0 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+[[ -z "$CONFIG_PATH" ]] && CONFIG_PATH="$CWD/onyx.config.json"
+ENV_PATH="$CWD/.env"
+
+# Track which vars we've already emitted so config-file values don't override .env
+declare -A EMITTED
+
+# Helper — emit an export line, but only once per var, and only if not already in env
+emit_export() {
+  local var="$1"; local val="$2"
+  [[ -z "$val" || "$val" == "null" ]] && return 0
+  # Skip if already emitted (preserves .env > config-file precedence within this run)
+  if [[ -n "${EMITTED[$var]+x}" ]]; then
+    return 0
+  fi
+  # Skip if already set in calling shell's env (preserves shell-env > .env precedence)
+  if [[ -n "${!var+x}" ]]; then
+    EMITTED[$var]=1
+    return 0
+  fi
+  # Escape any double quotes / backslashes in val
+  local escaped
+  escaped=$(printf '%s' "$val" | sed 's/\\/\\\\/g; s/"/\\"/g')
+  echo "export $var=\"$escaped\""
+  EMITTED[$var]=1
+}
+
+# 1. .env file — emit each KEY=value as an export (env vars in shell still take precedence)
+if [[ -f "$ENV_PATH" ]]; then
+  while IFS= read -r line; do
+    line="${line%%#*}"  # strip inline comment
+    [[ -z "${line// }" ]] && continue
+    [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+    if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
+      key="${BASH_REMATCH[1]}"
+      val="${BASH_REMATCH[2]}"
+      # Strip surrounding single/double quotes
+      val="${val%\"}"; val="${val#\"}"
+      val="${val%\'}"; val="${val#\'}"
+      # Trim trailing whitespace
+      val="${val%"${val##*[![:space:]]}"}"
+      emit_export "$key" "$val"
+    fi
+  done < "$ENV_PATH"
+fi
+
+# 2. onyx.config.json — extract canonical fields
+if [[ -f "$CONFIG_PATH" ]]; then
+  if ! jq empty "$CONFIG_PATH" 2>/dev/null; then
+    echo "[config-load] $CONFIG_PATH is not valid JSON" >&2
+    exit 2
+  fi
+
+  emit_export ONYX_VAULT_ROOT          "$(jq -r '.vault_root // .vaultRoot // empty' "$CONFIG_PATH")"
+  emit_export ONYX_REPOS_ROOT          "$(jq -r '.repos_root // .reposRoot // empty' "$CONFIG_PATH")"
+  emit_export ONYX_PROJECTS_GLOB       "$(jq -r '.projects_glob // .projectsGlob // empty' "$CONFIG_PATH")"
+  emit_export ONYX_AGENT_DRIVER        "$(jq -r '.agent_driver // .agentDriver // empty' "$CONFIG_PATH")"
+  emit_export ONYX_MAX_ITERATIONS      "$(jq -r '.max_iterations // .maxIterations // empty' "$CONFIG_PATH")"
+  emit_export ONYX_MAX_RUNTIME_SECONDS "$(jq -r '.max_runtime_seconds // .maxRuntimeSeconds // empty' "$CONFIG_PATH")"
+  emit_export OPENCLAW_NOTIFY_TARGET   "$(jq -r '.notify.openclaw.target // empty' "$CONFIG_PATH")"
+  emit_export LINEAR_TEAM_ID           "$(jq -r '.linear.team_id // .linear.teamId // empty' "$CONFIG_PATH")"
+  emit_export ONYX_LLM_MODEL           "$(jq -r '.llm.model // empty' "$CONFIG_PATH")"
+fi
+
+# 3. Validation — vault_root must be set somewhere
+if [[ -z "${ONYX_VAULT_ROOT:-}" ]] && ! jq -re '.vault_root // .vaultRoot' "$CONFIG_PATH" >/dev/null 2>&1 && [[ -z "${VAULT_ROOT_FROM_ENV:-}" ]]; then
+  # Re-check after our own emits — if neither path set it, error
+  vault_check=$(jq -r '.vault_root // .vaultRoot // empty' "$CONFIG_PATH" 2>/dev/null || true)
+  if [[ -z "$vault_check" && -z "${ONYX_VAULT_ROOT:-}" ]]; then
+    echo "[config-load] vault_root is not set in .env or onyx.config.json" >&2
+    exit 3
+  fi
+fi
+
+exit 0

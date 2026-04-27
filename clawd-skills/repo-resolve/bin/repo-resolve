@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# repo-resolve — resolve a project's repo path.
+#
+# Replaces src/repos/resolveRepoPath.ts (61 LOC).
+#
+# Usage:
+#   repo-resolve --project-id <id> [--explicit <path>] [--repos-root <path>]
+#
+# Resolution order:
+#   1. If --explicit is given AND it exists on disk → return it (source: "explicit").
+#   2. Else if --repos-root is given AND a directory under it matches the project_id
+#      (lowercase substring match, then closest-prefix tie-break) → return it
+#      (source: "fuzzy").
+#   3. Else exit 1 with empty result.
+#
+# Output: single JSON line — { "repoPath": "...", "source": "explicit|fuzzy|none" }
+#
+# Exit codes:
+#   0 — resolved (repoPath non-empty)
+#   1 — unresolved (repoPath empty)
+#   2 — usage error
+
+set -eo pipefail
+
+PROJECT_ID=""
+EXPLICIT=""
+REPOS_ROOT=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --project-id) PROJECT_ID="$2"; shift 2 ;;
+    --explicit)   EXPLICIT="$2"; shift 2 ;;
+    --repos-root) REPOS_ROOT="$2"; shift 2 ;;
+    --help|-h)
+      cat >&2 <<USAGE
+usage: repo-resolve --project-id <id> [--explicit <path>] [--repos-root <path>]
+
+Output: { "repoPath": "...", "source": "explicit|fuzzy|none" }
+USAGE
+      exit 0 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+if [[ -z "$PROJECT_ID" ]]; then
+  echo "missing --project-id" >&2; exit 2
+fi
+
+# 1. Explicit path
+if [[ -n "$EXPLICIT" && -d "$EXPLICIT" ]]; then
+  jq -nc --arg p "$EXPLICIT" --arg s "explicit" '{repoPath: $p, source: $s}'
+  exit 0
+fi
+
+# 2. Fuzzy match under repos_root
+if [[ -n "$REPOS_ROOT" && -d "$REPOS_ROOT" ]]; then
+  needle=$(echo "$PROJECT_ID" | tr '[:upper:]' '[:lower:]')
+  best=""
+  best_score=999
+
+  while IFS= read -r d; do
+    name=$(basename "$d")
+    name_lower=$(echo "$name" | tr '[:upper:]' '[:lower:]')
+
+    # exact match (highest priority)
+    if [[ "$name_lower" == "$needle" ]]; then
+      best="$d"
+      best_score=0
+      break
+    fi
+
+    # substring match — score = length difference (smaller = better)
+    if [[ "$name_lower" == *"$needle"* ]]; then
+      score=$(( ${#name_lower} - ${#needle} ))
+      if [[ $score -lt $best_score ]]; then
+        best="$d"
+        best_score=$score
+      fi
+    fi
+
+    # reverse substring (project_id contains directory name)
+    if [[ "$needle" == *"$name_lower"* ]]; then
+      score=$(( ${#needle} - ${#name_lower} + 100 ))  # weighted lower than direct match
+      if [[ $score -lt $best_score ]]; then
+        best="$d"
+        best_score=$score
+      fi
+    fi
+  done < <(find "$REPOS_ROOT" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
+
+  if [[ -n "$best" ]]; then
+    jq -nc --arg p "$best" --arg s "fuzzy" '{repoPath: $p, source: $s}'
+    exit 0
+  fi
+fi
+
+# 3. Unresolved
+jq -nc --arg s "none" '{repoPath: "", source: $s}'
+exit 1
