@@ -14,6 +14,11 @@ status: active
 
 - [[ONYX - Quick Start|ONYX Quick Start]] — **start here**: step-by-step to your first running pipeline
 - [[ONYX - Reference|ONYX Reference]] — complete reference: architecture, profiles, directives, commands, internals, laws
+- [[ONYX Master Directive|ONYX Master Directive]] — the runtime, in prose
+- [[ONYX - Zero-Code Architecture Vision|Zero-Code Architecture Vision]] — why the runtime is moving into the vault
+- [[ONYX - Decomposition Plan|Decomposition Plan]] — staged migration from TS to vault (Operations + runtime skills)
+- [[Doctor Directive|Doctor Directive]] — pre-flight health checks (replaces `onyx doctor`)
+- [[Operations/Operations Hub|Operations Hub]] — the eight operation directives (heal, atomise, execute, …)
 
 ---
 
