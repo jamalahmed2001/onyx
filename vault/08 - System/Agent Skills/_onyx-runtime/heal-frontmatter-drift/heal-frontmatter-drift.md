@@ -6,8 +6,9 @@ replaces: src/healer/drift.ts (the non-nav-block portion)
 lines_replaced: 200
 version: 0.1
 created: 2026-04-24
-updated: 2026-04-24
+updated: 2026-04-27T11:59:53Z
 status: draft
+up: Agent Skills - _onyx-runtime Hub
 ---
 
 # Skill: heal-frontmatter-drift

@@ -9,7 +9,7 @@ replaces: src/healer/
 lines_replaced: 882
 version: 0.2
 created: 2026-04-24
-updated: 2026-04-24
+updated: 2026-04-27T10:09:17Z
 graph_domain: system
 up: Operations Hub
 status: draft
@@ -34,56 +34,78 @@ migration_stage: 3
 
 ## Read order
 1. `08 - System/Profiles/Profiles Hub.md` — for shell-policy if any remediation needs Bash.
-2. Glob `<projects-glob>/*/Phases/*.md` — all phase files.
-3. Glob `<projects-glob>/*/Logs/*.md` — all log files.
-4. Glob `<projects-glob>/*/Overview.md` — for `project_id` lookup when backfilling.
-5. Glob `<vault>/**/*.md` ignoring `.git/`, `node_modules/`, `_Archive/` — for nav-dedup pass.
+2. [[08 - System/Conventions/Project ID Convention.md|Project ID Convention]] — slug contract used in Step 4. Hub naming downstream depends on this.
+3. [[08 - System/Conventions/Fractal Linking Convention.md|Fractal Linking Convention]] — hub-name derivation, used in Step 7.
+4. Glob `<projects-glob>/*/Phases/*.md` — all phase files.
+5. Glob `<projects-glob>/*/Logs/*.md` — all log files.
+6. Glob `<projects-glob>/*/Overview.md` — for `project_id` lookup, validation, and uniqueness scan.
+7. Glob `<vault>/**/*.md` ignoring `.git/`, `node_modules/`, `_Archive/` — for nav-dedup pass.
 
 ## Procedure
 
 Run the six sub-checks in this order. Each is implemented by a dedicated skill; this operation is a checklist, not a body of logic. An order is prescribed because later checks depend on earlier ones (e.g. frontmatter drift fix should run before project_id backfill so we're operating on normalised frontmatter).
 
 ### Step 1 — Stale locks
-Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-stale-locks/SKILL.md|heal-stale-locks]].
+Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-stale-locks/heal-stale-locks.md|heal-stale-locks]].
 - **Input:** vault path, stale-lock threshold (ms).
 - **Effect:** phases with `status: active` and `locked_at:` older than threshold (or missing) are reset to `ready`. Lock fields cleared.
 - **ExecLog:** one line per cleared lock.
 
 ### Step 2 — Frontmatter drift
-Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-frontmatter-drift/SKILL.md|heal-frontmatter-drift]].
+Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-frontmatter-drift/heal-frontmatter-drift.md|heal-frontmatter-drift]].
 - **Input:** vault path.
 - **Effect:** for every phase, verify the six invariants in the skill (tag-uniqueness, state presence, state ↔ tag alignment, status ↔ tag alignment, lock-field orphans, replan_count reset). Apply fixes.
 - **ExecLog:** one line per applied fix.
 
+### Step 2.5 — Kind-tag classification
+Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-kind-tag/heal-kind-tag.md|heal-kind-tag]].
+- **Input:** vault path, scope glob.
+- **Effect:** every markdown file lacking a structural-kind tag (family 2 or family 8 per [[08 - System/Conventions/Tag Convention.md|Tag Convention]] §1.1) gets one inserted, derived from file location + name pattern. Tag list is then re-ordered to family order 1→8.
+- **Never overwrites** an existing kind tag — manual classifications are preserved.
+- **Detect-only when ambiguous** (multiple rules match, or no rule fires).
+- **ExecLog:** one line per applied tag; one line per detection.
+
 ### Step 3 — Log migration
-Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-migrate-logs/SKILL.md|heal-migrate-logs]] *(stub)*.
+Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-migrate-logs/heal-migrate-logs.md|heal-migrate-logs]] *(stub)*.
 - **Input:** vault path.
 - **Effect:** move log files from legacy locations to canonical `<project>/Logs/L<N> - <phase-title>.md`. Update `phase:` frontmatter on each log to point at the current phase file.
 - **ExecLog:** one line per migrated log.
 
-### Step 4 — project_id backfill
-Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-project-id/SKILL.md|heal-project-id]] *(stub)*.
-- **Input:** vault path.
-- **Effect:** for any phase missing `project_id:`, walk up to the bundle's `Overview.md` and backfill.
-- **ExecLog:** one line per backfilled phase.
+### Step 4 — project_id validation + backfill
+Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-project-id/heal-project-id.md|heal-project-id]].
+- **Input:** vault path, projects glob.
+- **Contract:** authoritative rules in [[08 - System/Conventions/Project ID Convention.md|Project ID Convention]] §1 (presence, format, length, uniqueness).
+- **Effects:**
+  - **Uniqueness scan** — duplicate `project_id` across Overviews → `INTEGRITY: project_id_duplicate`, halt iteration.
+  - **Format validation** — every Overview's `project_id` checked against the regex / length contract; failures emit `detection: project_id_invalid_format` (no auto-fix).
+  - **Backfill** — child files (phases, logs, directives, profiles) missing `project_id` are filled from their bundle Overview *only when the Overview's value is itself valid*. Backfilling a malformed slug is forbidden (would just spread corruption).
+  - **Hub-name coherence** — Overview slug vs hub filenames in the bundle compared; mismatch emits `detection: project_id_hub_mismatch`.
+- **What this step does NOT do:** invent slugs, rename hubs, or rewrite wikilinks. Those are [[08 - System/Agent Skills/_onyx-runtime/heal-project-id-migrate/heal-project-id-migrate.md|heal-project-id-migrate]] (one-shot, explicit invocation).
+- **ExecLog:** one line per backfill; one line per emitted detection (kind + path).
 
 ### Step 5 — Orphan-lock clearing
-Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-orphan-locks/SKILL.md|heal-orphan-locks]] *(stub)*.
+Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-orphan-locks/heal-orphan-locks.md|heal-orphan-locks]] *(stub)*.
 - **Input:** vault path.
 - **Effect:** detect locks held by the current process (PID match) whose state doesn't match — artefact of a crashed agent process. Clear them.
 - **ExecLog:** one line per recovered lock.
 
 ### Step 6 — Duplicate nav-block collapse
-Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-dup-nav/SKILL.md|heal-dup-nav]] *(stub)*.
+Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-dup-nav/heal-dup-nav.md|heal-dup-nav]] *(stub)*.
 - **Input:** vault path.
 - **Effect:** for every markdown file in vault, if more than one `## 🔗 Navigation` block exists → keep the first, strip the rest. Within any single nav block, deduplicate wikilinks.
 - **ExecLog:** one line per collapsed file.
 
 ### Step 7 — Fractal link integrity
-Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-fractal-links/SKILL.md|heal-fractal-links]].
+Invoke [[08 - System/Agent Skills/_onyx-runtime/heal-fractal-links/heal-fractal-links.md|heal-fractal-links]].
 - **Input:** vault path, projects glob.
 - **Effect:** enforces the [[08 - System/Conventions/Fractal Linking Convention.md|Fractal Linking Convention]]. Leaves don't link to grandparent. Hubs don't link sideways. `up:` frontmatter points at the correct parent hub. Missing Phases/Directives/Albums/Logs Hubs auto-created when a folder has > 2 markdown children pointing at a non-existent hub.
-- **Detections (no auto-fix):** hub omits a child that exists in its folder; circular `up:` chain; ambiguous hub membership.
+- **Auto-fixes (Rules 1–5):**
+  - **Rule 1** (default-on): files lacking `up:` get one set, derived from folder location.
+  - **Rule 2**: missing target hub → auto-create skeleton hub when threshold met.
+  - **Rule 3**: `up:` pointing at wrong parent → re-pointed at correct hub.
+  - **Rule 4**: nav block grandparent / sideways links → rewritten to UP-only pattern.
+  - **Rule 5** (promoted from detect-only 2026-04-27): hub omits a folder child → child appended under `## Children` section in hub body.
+- **Detections (no auto-fix):** circular `up:` chain (INTEGRITY); ambiguous hub membership; broken cross-domain wikilinks.
 - **ExecLog:** one line per applied fix.
 
 ### Step 8 — Missing-section detection (detect-only)
@@ -92,6 +114,7 @@ No skill — this runs inline at the end. For every phase file, verify it contai
 ## What heal does NOT do
 
 - **Orphan-node scaffolding.** Creating new hub files or attaching isolated notes is not a heal action. It belongs to a separate `scaffold-hubs` operation (not yet written). Decision from [[08 - System/Operations/_agent-native-validation.md|heal probe 2026-04-24]].
+- **Inventing or renaming `project_id` slugs.** Routine heal *validates* and *backfills* per [[08 - System/Conventions/Project ID Convention.md|Project ID Convention]], but never invents a slug for a bundle that lacks one and never renames an existing slug. Both belong to [[08 - System/Agent Skills/_onyx-runtime/heal-project-id-migrate/heal-project-id-migrate.md|heal-project-id-migrate]] — explicit, one-shot, gated by the human.
 - **Deleting any file.** Heal never deletes; it only corrects in place.
 - **Fixing broken wikilinks.** Detect, log, mark the source with `drift: broken-link` frontmatter. Repair is a separate operation.
 - **Bulk frontmatter migrations** (e.g. renaming a field across the vault). Those are explicit phases, not heal.
@@ -110,13 +133,18 @@ No skill — this runs inline at the end. For every phase file, verify it contai
 
 ## Skills invoked
 
-- [[08 - System/Agent Skills/_onyx-runtime/heal-stale-locks/SKILL.md|heal-stale-locks]] — full procedure
-- [[08 - System/Agent Skills/_onyx-runtime/heal-frontmatter-drift/SKILL.md|heal-frontmatter-drift]] — full procedure
-- [[08 - System/Agent Skills/_onyx-runtime/heal-migrate-logs/SKILL.md|heal-migrate-logs]] — full procedure
-- [[08 - System/Agent Skills/_onyx-runtime/heal-project-id/SKILL.md|heal-project-id]] — full procedure
-- [[08 - System/Agent Skills/_onyx-runtime/heal-orphan-locks/SKILL.md|heal-orphan-locks]] — full procedure
-- [[08 - System/Agent Skills/_onyx-runtime/heal-dup-nav/SKILL.md|heal-dup-nav]] — full procedure
-- [[08 - System/Agent Skills/_onyx-runtime/heal-fractal-links/SKILL.md|heal-fractal-links]] — full procedure
+- [[08 - System/Agent Skills/_onyx-runtime/heal-stale-locks/heal-stale-locks.md|heal-stale-locks]] — full procedure
+- [[08 - System/Agent Skills/_onyx-runtime/heal-frontmatter-drift/heal-frontmatter-drift.md|heal-frontmatter-drift]] — full procedure
+- [[08 - System/Agent Skills/_onyx-runtime/heal-kind-tag/heal-kind-tag.md|heal-kind-tag]] — full procedure (canonical kind-tag classification + family-order normalisation)
+- [[08 - System/Agent Skills/_onyx-runtime/heal-migrate-logs/heal-migrate-logs.md|heal-migrate-logs]] — full procedure
+- [[08 - System/Agent Skills/_onyx-runtime/heal-project-id/heal-project-id.md|heal-project-id]] — full procedure (routine validate + backfill)
+- [[08 - System/Agent Skills/_onyx-runtime/heal-orphan-locks/heal-orphan-locks.md|heal-orphan-locks]] — full procedure
+- [[08 - System/Agent Skills/_onyx-runtime/heal-dup-nav/heal-dup-nav.md|heal-dup-nav]] — full procedure
+- [[08 - System/Agent Skills/_onyx-runtime/heal-fractal-links/heal-fractal-links.md|heal-fractal-links]] — full procedure
+
+## Skills NOT invoked routinely (one-shot, human-gated)
+
+- [[08 - System/Agent Skills/_onyx-runtime/heal-project-id-migrate/heal-project-id-migrate.md|heal-project-id-migrate]] — slug rename + cascade. Triggered by `detection: project_id_*` from Step 4; run explicitly per bundle.
 
 ## Tools invoked
 
@@ -154,7 +182,7 @@ One line per heal action:
 
 Example:
 ```
-2026-04-24T10:47:12Z | - | P14 | HEAL | 0 | stale-locks:cleared path=my-podcast/Phases/P14 - Script.md
+2026-04-24T10:47:12Z | - | P14 | HEAL | 0 | stale-locks:cleared path=mani-plus/Phases/P14 - Script.md
 ```
 
 ## Shadow-mode comparison criteria

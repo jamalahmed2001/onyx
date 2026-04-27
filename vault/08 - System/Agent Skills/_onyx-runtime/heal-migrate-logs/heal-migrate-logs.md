@@ -6,8 +6,9 @@ replaces: src/healer/migrateLogs.ts
 lines_replaced: 172
 version: 0.1
 created: 2026-04-24
-updated: 2026-04-24
+updated: 2026-04-27T11:59:53Z
 status: draft
+up: Agent Skills - _onyx-runtime Hub
 ---
 
 # Skill: heal-migrate-logs
@@ -133,7 +134,7 @@ After skill:
 
 **Example 2 — stale duplicate deleted:**
 
-Bundle `Example Brand/`:
+Bundle `Almani/`:
 - Canonical `Logs/L2 - Launch Readiness Validation.md` (exists).
 - Stale `Logs/L2 - P2 - Launch Readiness Validation.md` (legacy #2).
 

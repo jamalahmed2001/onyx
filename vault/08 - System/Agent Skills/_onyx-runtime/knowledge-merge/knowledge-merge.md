@@ -6,8 +6,9 @@ replaces: src/planner/consolidator.ts (CONSOLIDATE_SYSTEM_PROMPT + CROSS_PROJECT
 lines_replaced: 200
 version: 0.1
 created: 2026-04-24
-updated: 2026-04-24
+updated: 2026-04-27T11:59:53Z
 status: draft
+up: Agent Skills - _onyx-runtime Hub
 ---
 
 # Skill: knowledge-merge

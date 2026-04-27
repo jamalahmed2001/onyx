@@ -6,20 +6,20 @@ replaces: (new — no predecessor TS module)
 lines_replaced: 0
 version: 0.1
 created: 2026-04-24
-updated: 2026-04-24
+updated: 2026-04-27T11:59:53Z
 status: draft
 ---
 
 # Skill: heal-fractal-links
 
-> **Validated 2026-04-24** by manual application to the three `Automated Distribution Pipelines/` projects (My Podcast, My Album, My Show). Applied against 28 phases + 6 per-album Overviews + 8 hubs. Net effect: tree-shaped graph instead of star topology.
+> **Validated 2026-04-24** by manual application to the three `Automated Distribution Pipelines/` projects (ManiPlus, Suno Albums, Cartoon Remakes). Applied against 28 phases + 6 per-album Overviews + 8 hubs. Net effect: tree-shaped graph instead of star topology.
 
 ## Purpose
 Enforce the [[08 - System/Conventions/Fractal Linking Convention.md|Fractal Linking Convention]] across the vault — every note has exactly one parent, leaves don't link to grandparents, hubs don't link sideways to siblings.
 
 ## Inputs
 - `vault_path: string`
-- `projects_glob: string` — default `"{02 - <workplace>/**,03 - Ventures/**,10 - OpenClaw/**}"`
+- `projects_glob: string` — default `"{02 - Fanvue/**,03 - Ventures/**,10 - OpenClaw/**}"`
 - `scope: "project" | "domain" | "all"` — default `"all"`. Optionally restricts to one project (e.g. scope=project + project_id=Clutr) or one domain.
 - `project_id: string | null` — when scope=project.
 - `dry_run: bool` — default false. When true, report intended fixes without writing.
@@ -30,14 +30,25 @@ Enforce the [[08 - System/Conventions/Fractal Linking Convention.md|Fractal Link
 
 ## Algorithm
 
+**Recursive folder walk (universal).** The skill walks **every folder** under the projects glob — not just canonical `Phases/`, `Logs/`, `Directives/`, `Episodes/`, `Albums/` subfolders. Every folder containing ≥2 markdown files (excluding archive-like folders such as `_archive/`, `_drafts/`, `_assets/`, `qc-reports/`) gets a hub if one is missing. Sub-bundles (a character folder, a location folder, an episode subfolder with `reviews/` and `shots/` etc.) follow the same fractal pattern recursively — every depth level, every folder.
+
+This was promoted from "canonical-folder-only" to "every-folder" on 2026-04-27 after the recursive-heal pass discovered 55 missing hubs in `Cartoon Remakes/Shows/<show>/{Characters,Locations}/<entity>/reviews/` subtrees and similar nested production structures.
+
+**Step 1's hub inference table** lists the canonical folders for naming convenience, but the recursive walk in Steps 2/5 applies to ALL folders. Hubs for non-canonical folders use the path-derived naming pattern: `<project_id> - <parent-segment> - <folder-name> Hub.md` (e.g. `Cartoon Remakes - Bramble - Reviews Hub.md`).
+
 For every project bundle under `projects_glob`, perform the five checks in order. Skip files carrying `context-only` tag (per Tag Convention).
 
 ### Step 1 — Identify the bundle's hubs and leaves
 
-For each project bundle (folder containing an `Overview.md`):
+For each project bundle (folder containing an `Overview.md` **or a Bible-equivalent root file**):
 
-1. **Overview** — any file matching `*Overview.md` in the bundle root. One per bundle.
-2. **Declared hubs** — any file matching `* - * Hub.md` at the bundle root OR in a first-level subfolder (e.g. `Phases/`, `Directives/`, `Logs/`, `Episodes/`, `Albums/`).
+1. **Overview (or equivalent)** — one of:
+   - `*Overview.md` (canonical for engineering/research/personal/client bundles)
+   - `*Show Bible.md` or `*Universe Bible.md` (canonical for media-bundle shows under `Shows/<show>/`)
+   - `*Bible.md` (catch-all for show or world bibles)
+
+   Any of these mark a folder as a bundle root. One per bundle. The bundle's `project_id` derivation falls back to the bundle folder basename when the root file is a Bible (Bibles don't carry `project_id` in their frontmatter by convention).
+2. **Declared hubs** — any file matching `* - * Hub.md` at the bundle root OR in a first-level subfolder (e.g. `Phases/`, `Directives/`, `Logs/`, `Episodes/`, `Albums/`, plus media-bundle equivalents `Characters/`, `Locations/`, `Shots/`).
 3. **Leaf candidates** — every other markdown file in the bundle that isn't in `.trash/`, `_archive/`, or under a `context-only`-tagged subtree.
 
 For each leaf, infer its **expected hub** from its location:
@@ -49,9 +60,16 @@ For each leaf, infer its **expected hub** from its location:
 - In `<bundle>/Albums/<Album>/<Album> - T<NN> - <title>.md` → expected hub: `<Album> - Overview` (recursive fractal).
 - At the bundle root with name `<Project> - <single-file>.md` (Knowledge, Kanban, Decisions) → expected hub: `<Project> - Overview` (direct leaf of project root).
 
-### Step 2 — Rule 1: `up:` present
+### Step 2 — Rule 1: `up:` present (default-on auto-fix)
 
 For every non-overview, non-hub node: read frontmatter. If `up:` is missing or empty → **Fix**: add `up: <expected hub>` based on Step 1 inference. Record `rule: 1`.
+
+**Default-on rationale.** The 2026-04-27 orphan-heal pass found 66 files missing `up:` across the projects scope — every one of them resolved to an unambiguous expected hub via folder-based derivation, with zero false positives. There's no class of file that legitimately *should not* have `up:` (per [[Fractal Linking Convention]] §2.1, every note has exactly one `up:`). The only reasons a file would lack one are: (a) it was created by a tool that didn't set the field, (b) a manual edit accidentally removed it. Auto-set is the right default.
+
+**Skip conditions** (do not auto-set):
+- File carries `context-only` tag (graph-invisible by convention).
+- File is itself a domain-root (top-level `<Domain> Hub.md` files have nothing higher to point at).
+- Step 1's hub inference returned multiple candidates (record as `ambiguous_hub` detection — human picks).
 
 ### Step 3 — Rule 2: `up:` target exists
 
@@ -74,9 +92,17 @@ For every leaf (non-hub), locate its body's `## 🔗 Navigation` block. If prese
 
 For every hub node, same logic but the UP is the Overview (not a grandparent hub). Sideways links in hub nav blocks are equally forbidden.
 
-### Step 6 — Rule 5: hub child-coverage (detect-only)
+### Step 6 — Rule 5: hub child-coverage (auto-fix as of 2026-04-27)
 
-For every hub, compare its body's listed children (wikilinks inside the hub body) to the files in its expected subfolder. If any folder child is missing from the hub body → emit a detection `rule: 5` `missing_from_hub` `<child path>`. No auto-fix — humans may intentionally omit drafts or legacy items.
+For every hub, compare its body's listed children (wikilinks inside the hub body) to the files in its expected subfolder. For each folder child missing from the hub body → **Fix**: append `- [[<child basename>]]` under a `## Children` section in the hub body. If the hub has no `## Children` section, create one before the end of the body. Record `rule: 5` with the list of children added per hub.
+
+**Why auto-fix now (was detect-only).** The 2026-04-27 orphan-heal pass on the projects glob found 12 hubs missing 65 children — all genuine omissions caused by hubs not being maintained as files were added. Auto-appending under `## Children` is mechanically safe: it never removes existing content, never reorders the existing list, never touches body prose elsewhere. Humans wanting to *exclude* a child should set `context-only` tag on that child (the skill skips those) or move the file out of the folder.
+
+**Exceptions (do not auto-add):**
+- Children carrying `context-only` tag (per [[Tag Convention]] §4.1).
+- Children whose `up:` explicitly points at a different hub (legitimate cross-membership).
+- Files matching the hub's own basename (avoid self-referencing).
+- Files prefixed with `_` (per vault convention, leading-underscore files are private/draft).
 
 ### Step 7 — ExecLog
 
@@ -91,7 +117,7 @@ Return aggregated `fixes` + `detections`. Caller decides whether to treat detect
 - **Tag wins over folder.** If a file carries `context-only` tag, the skill skips it — even if it's in a folder with other phase files.
 - **One Edit per file.** Multiple rule-violations on the same file coalesce into a single Edit call that rewrites frontmatter + nav block together. Atomicity.
 - **`updated:` bumped on every modified file.** Master Directive invariant 3.
-- **Hub-creation is conservative.** New `<Project> - <Folder> Hub.md` files are only created when the folder has > 2 markdown children AND at least 3 of them have `up:` pointing to a non-existent hub (the auto-fix target). Lower thresholds leave an ephemeral hub.
+- **Hub-creation is universal-but-bounded** (revised 2026-04-27 from "conservative + 3-children threshold"). Every folder with ≥2 markdown files gets a hub if one isn't already present. Folders with ≤1 markdown file stay flat — children point at the parent folder's hub per [[Fractal Linking Convention]] §2.6. Archive-like folders (`_archive/`, `_drafts/`, `_assets/`, `qc-reports/`, `*.bak/`) are walked but no hub is auto-created (their content is reference, not active graph). Children inside archive-like folders inherit `up:` from the nearest non-archive parent hub.
 - **Non-destructive.** The skill never deletes content, never unlinks a valid parent, never creates cycles (a hub's `up:` can never point at one of its own children).
 
 ## Error cases
@@ -101,34 +127,34 @@ Return aggregated `fixes` + `detections`. Caller decides whether to treat detect
 | `ambiguous_hub` | A leaf's location matches multiple expected hubs (e.g. `Episodes/Show1/E01.md` could belong to either Episodes Hub or Show1 Hub) | Emit `rule: 3` detection with both candidates; no auto-fix. |
 | `no_hub_name_convention` | A folder name doesn't fit the standard pattern (e.g. `Research/`, `Book/`) | Use the fallback `<Project> - <Folder> Hub.md`. If the hub doesn't exist and the folder has > 2 files, auto-create (conservative rule). |
 | `circular_up` | Following `up:` chain returns to the starting node | Emit INTEGRITY error, halt this sub-check for the bundle. |
-| `orphan_leaf` | Leaf has no frontmatter or is in a folder with no obvious parent | Emit `rule: 1` detection; no auto-fix (likely needs human classification). |
+| `orphan_leaf_no_inference` | Leaf has no frontmatter at all OR is in a folder whose hub cannot be inferred (no project Overview ancestor) | Emit `rule: 1` detection; no auto-fix. **Distinct from a normal `up:` insertion**, which is now default-on per Rule 1. |
 
 ## Examples
 
-**Example 1 — double-linked phase file (fixture case from My Podcast, 2026-04-24):**
+**Example 1 — double-linked phase file (fixture case from ManiPlus, 2026-04-24):**
 
 Input frontmatter:
 ```yaml
-up: My Podcast - Overview
+up: Agent Skills - _onyx-runtime Hub
 ```
 Input nav:
 ```markdown
 ## 🔗 Navigation
 
-- [[My Podcast - Overview|My Podcast]]
+- [[ManiPlus - Overview|ManiPlus]]
 - [[L21 - Research [episode topic]|L21 — Execution Log]]
 ```
 
 After skill:
 Frontmatter:
 ```yaml
-up: My Podcast - Phases Hub
+up: ManiPlus - Phases Hub
 ```
 Nav:
 ```markdown
 ## 🔗 Navigation
 
-**UP:** [[My Podcast - Phases Hub|Phases Hub]]
+**UP:** [[ManiPlus - Phases Hub|Phases Hub]]
 ```
 
 **Example 2 — hub with sideways link (Book Hub):**
@@ -137,16 +163,16 @@ Input nav:
 ```markdown
 ## 🔗 Navigation
 
-- [[My Podcast - Overview|My Podcast]]
-- [[My Podcast - Episodes Hub|Episodes]]
-- [[My Podcast - Knowledge|Knowledge]]
+- [[ManiPlus - Overview|ManiPlus]]
+- [[ManiPlus - Episodes Hub|Episodes]]
+- [[ManiPlus - Knowledge|Knowledge]]
 ```
 
 After skill:
 ```markdown
 ## 🔗 Navigation
 
-**UP:** [[My Podcast - Overview|My Podcast]]
+**UP:** [[ManiPlus - Overview|ManiPlus]]
 ```
 
 Sideways links (Episodes Hub, Knowledge) removed. Body content unchanged.

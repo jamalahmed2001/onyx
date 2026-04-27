@@ -1,14 +1,15 @@
 ---
 title: Operations Hub
 tags:
+  - hub
+  - hub-subdomain
   - system
   - operations
   - onyx
-  - hub
 type: hub
 version: 0.1
 created: 2026-04-24
-updated: 2026-04-24
+updated: 2026-04-27T10:52:05Z
 graph_domain: system
 up: System Hub
 status: active
@@ -34,14 +35,12 @@ status: active
 | `planning` | *(wait, no-op)* | — | — | — | — | in Master Directive §6.2 |
 | `ready` / `active` | execute | [[08 - System/Operations/execute-phase.md]] | `src/executor/runPhase.ts` + `selectTask.ts` | 833 | 5 | **draft** (task loop + selection inlined; lock-lifecycle shared skill) |
 | `blocked` | surface_blocker | [[08 - System/Operations/surface-blocker.md]] | `src/notify/*` (partial) | ~50 | 3 | **draft** (inline-only, no skills) |
-| `completed` | consolidate *(per-phase, on transition)* | [[08 - System/Operations/consolidate.md]] | `src/planner/consolidator.ts` | 238 | 4 | **draft** (knowledge-merge + monthly-rollup) |
-| *(bundle shipped)* | consolidate-bundle *(profile-agnostic, manual)* | [[08 - System/Operations/consolidate-bundle.md]] | *(new — vault-native from inception)* | 0 | 1 | **draft** (consolidate-bundle skill) |
+| `completed` | consolidate *(phase-level, on transition)* | [[08 - System/Operations/consolidate.md]] | `src/planner/consolidator.ts` | 238 | 4 | **draft** (knowledge-merge + monthly-rollup) |
+| *(bundle shipped)* | consolidate-bundle *(profile-agnostic, manual)* | [[08 - System/Operations/consolidate-bundle.md]] | `src/planner/bundleConsolidator.ts` (new — no TS predecessor; vault-native from inception) | 0 | 1 | **draft** (consolidate-bundle skill) |
 | *(whole project)* | decompose-project | [[08 - System/Operations/decompose-project.md]] | `src/planner/phasePlanner.ts` | 785 | 6 | **draft** (phase-decompose shared with replan) |
 | *(blocked → re-atomise)* | replan | [[08 - System/Operations/replan.md]] | `src/planner/replan.ts` | 226 | 6 | **draft** (inline-only, no new skills) |
-| *(every iteration, step 1)* | heal | [[08 - System/Operations/heal.md]] | `src/healer/*.ts` | 882 | 3 | **draft** (7 heal-* skills) |
+| *(every iteration, step 1)* | heal | [[08 - System/Operations/heal.md]] | `src/healer/*.ts` | 882 | 3 | **draft** (8 heal-* skills incl. heal-kind-tag) |
 | *(every iteration, step 5)* | route | [[08 - System/Operations/route.md]] | `src/controller/router.ts` | 38 | 2 | **draft** (inline-only, no skills) |
-
-`consolidate` runs at the *phase* boundary (every time a phase transitions to `completed`). `consolidate-bundle` runs at the *bundle* boundary — when an entire project, episode, album, or other shippable unit has finished and you want to roll its working notes into a single canonical document. Profile-agnostic and operator-invoked, not auto-dispatched by §5.
 
 Total TS replaced at end of migration: **~3,550 LOC** across these operations. Remaining code surface: doorbell + agent spawner + tool scripts + read-only parsers + dashboard.
 
@@ -81,7 +80,8 @@ Master Directive
 
 - **heal** runs every iteration before work starts.
 - **route** maps phase status → operation.
-- **execute** is the hot path; **consolidate** runs when execute transitions to `completed`.
+- **execute** is the hot path; **consolidate** (phase-level) runs when execute transitions to `completed`.
+- **consolidate-bundle** is the manual "this work is done, fold the bundle" move — content/engineering/research/personal/client/business — invoked once a bundle has shipped or been abandoned. Profile-agnostic; reacts to kind tags. Not in the routine loop.
 - **atomise** / **decompose-project** / **replan** are planner operations.
 - **surface_blocker** makes a blocked phase visible to a human.
 

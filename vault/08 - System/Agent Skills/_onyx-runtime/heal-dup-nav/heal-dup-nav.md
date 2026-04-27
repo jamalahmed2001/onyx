@@ -6,8 +6,9 @@ replaces: src/healer/drift.ts (NAV_BLOCK_RE + deduplicateNavLinks + nav-collapse
 lines_replaced: 90
 version: 0.1
 created: 2026-04-24
-updated: 2026-04-24
+updated: 2026-04-27T11:59:53Z
 status: draft
+up: Agent Skills - _onyx-runtime Hub
 ---
 
 # Skill: heal-dup-nav
@@ -96,16 +97,16 @@ Input (excerpt):
 ```markdown
 ## 🔗 Navigation
 
-- [[My Podcast - Overview|My Podcast]]
-- [[My Podcast - Knowledge|Knowledge]]
+- [[ManiPlus - Overview|ManiPlus]]
+- [[ManiPlus - Knowledge|Knowledge]]
 
-# My Podcast — Episodes Hub
+# ManiPlus — Episodes Hub
 
 Body content here.
 
 ## 🔗 Navigation
 
-- [[My Podcast - Overview|My Podcast]]
+- [[ManiPlus - Overview|ManiPlus]]
 
 ## Episodes
 ```
@@ -114,10 +115,10 @@ After skill:
 ```markdown
 ## 🔗 Navigation
 
-- [[My Podcast - Overview|My Podcast]]
-- [[My Podcast - Knowledge|Knowledge]]
+- [[ManiPlus - Overview|ManiPlus]]
+- [[ManiPlus - Knowledge|Knowledge]]
 
-# My Podcast — Episodes Hub
+# ManiPlus — Episodes Hub
 
 Body content here.
 
@@ -133,20 +134,20 @@ Input:
 ```markdown
 ## 🔗 Navigation
 
-- [[My Album - Overview|My Album]]
-- [[My Album - Overview|Home]]
-- [[My Album - Knowledge|Knowledge]]
+- [[Suno Albums - Overview|Suno Albums]]
+- [[Suno Albums - Overview|Home]]
+- [[Suno Albums - Knowledge|Knowledge]]
 ```
 
 After skill:
 ```markdown
 ## 🔗 Navigation
 
-- [[My Album - Overview|My Album]]
-- [[My Album - Knowledge|Knowledge]]
+- [[Suno Albums - Overview|Suno Albums]]
+- [[Suno Albums - Knowledge|Knowledge]]
 ```
 
-Second link with same target `My Album - Overview` dropped (first one — with the `My Album` alias — wins).
+Second link with same target `Suno Albums - Overview` dropped (first one — with the `Suno Albums` alias — wins).
 
 **Example 3 — preserve non-link lines:**
 

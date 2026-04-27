@@ -6,8 +6,9 @@ replaces: src/planner/atomiser.ts (the LLM + agent-spawn portions)
 lines_replaced: 400
 version: 0.1
 created: 2026-04-24
-updated: 2026-04-24
+updated: 2026-04-27T11:59:53Z
 status: draft
+up: Agent Skills - _onyx-runtime Hub
 ---
 
 # Skill: atomise-phase
@@ -169,7 +170,7 @@ Generate the implementation task plan for this phase.
 
 ## Validation after generation (code profiles only)
 
-Invoke [[08 - System/Agent Skills/_onyx-runtime/repo-scan/SKILL.md|repo-scan]] or direct Glob on each `**Files:**` path (ignoring `(new)` markers). Files that don't exist → append to `missing_files` output.
+Invoke [[08 - System/Agent Skills/_onyx-runtime/repo-scan/repo-scan.md|repo-scan]] or direct Glob on each `**Files:**` path (ignoring `(new)` markers). Files that don't exist → append to `missing_files` output.
 
 Caller decides whether to annotate the plan with a warning comment block or abort.
 
@@ -197,7 +198,7 @@ Caller decides whether to annotate the plan with a warning comment block or abor
 
 Input:
 - `profile_name = engineering`
-- `repo_path = /path/to/your/repo`
+- `repo_path = /home/jamal/clawd/openclaw/projects/amazonpipe`
 - `phase_name = Moderation UX for Designs and Listings`
 - `phase_content` describes: build an admin panel for moderators to review AI-generated designs before listing them.
 

@@ -9,7 +9,7 @@ replaces: src/planner/consolidator.ts
 lines_replaced: 238
 version: 0.2
 created: 2026-04-24
-updated: 2026-04-24
+updated: 2026-04-27T10:09:17Z
 graph_domain: system
 up: Operations Hub
 status: draft
@@ -18,10 +18,11 @@ migration_stage: 4
 ## 🔗 Navigation
 
 **UP:** [[08 - System/Operations/Operations Hub.md|Operations Hub]]
+**Related:** [[08 - System/Operations/consolidate-bundle.md|consolidate-bundle]] — bundle-level cousin: collapses an entire shipped bundle (episode/album/project) into one node + archives sources. This phase-level operation is invoked by `consolidate-bundle` Step 0 to flush each phase's learnings to Knowledge.md before the bundle collapses.
 
 # Operation: consolidate
 
-> Extract learnings / decisions / gotchas from a completed (or blocked) phase's log + body, merge them into the project's Knowledge.md, and propagate genuinely-new cross-project principles to the global principles file.
+> Extract learnings / decisions / gotchas from a completed (or blocked) phase's log + body, merge them into the project's Knowledge.md, and propagate genuinely-new cross-project principles to the global principles file. **Phase-level**: one phase → Knowledge.md merge. For collapsing an entire bundle once it ships, use [[08 - System/Operations/consolidate-bundle.md|consolidate-bundle]].
 
 ## Preconditions
 - Phase `status:` is `active` transitioning to `completed` (inline call), OR `completed` already (standalone call), OR `blocked` (we still consolidate — failure teaches).
@@ -47,7 +48,7 @@ migration_stage: 4
 3. Compute Knowledge path: `<bundle>/<project> - Knowledge.md`. If missing, plan to create one with seed frontmatter (`type: knowledge`, `project: <id>`, `up: <project> - Overview`).
 
 ### Step 2 — Extract learnings
-Invoke [[08 - System/Agent Skills/_onyx-runtime/knowledge-merge/SKILL.md|knowledge-merge]] with:
+Invoke [[08 - System/Agent Skills/_onyx-runtime/knowledge-merge/knowledge-merge.md|knowledge-merge]] with:
 - `phase_content` = full phase file body
 - `log_content` = log file content (or placeholder)
 - `phase_label` = `phase_name`
@@ -84,7 +85,7 @@ Write Knowledge.md. Bump `updated:`.
 ### Step 4 — Cross-project propagation (optional but default-on)
 If `08 - System/Cross-Project Knowledge.md` exists AND `(learnings + gotchas).length > 0`:
 
-Invoke [[08 - System/Agent Skills/_onyx-runtime/knowledge-merge/SKILL.md|knowledge-merge]] in **dedup-check mode** (same skill, different method). It:
+Invoke [[08 - System/Agent Skills/_onyx-runtime/knowledge-merge/knowledge-merge.md|knowledge-merge]] in **dedup-check mode** (same skill, different method). It:
 1. Extracts existing principle names from Cross-Project Knowledge.md.
 2. Asks the LLM to compare new items against them and return an array of genuinely-new principles.
 3. Returns a JSON array `[{ name, rule, why, first_seen }, ...]`, possibly empty.
@@ -123,8 +124,8 @@ Operation returns without performing any phase status transition. That's the cal
 - **INTEGRITY:** Knowledge.md frontmatter corrupt on read. Escalate to INTEGRITY error (heal will catch on next run).
 
 ## Skills invoked
-- [[08 - System/Agent Skills/_onyx-runtime/knowledge-merge/SKILL.md|knowledge-merge]] — extraction + dedup-check.
-- [[08 - System/Agent Skills/_onyx-runtime/monthly-rollup/SKILL.md|monthly-rollup]] — used only by the monthly-consolidate invocation path.
+- [[08 - System/Agent Skills/_onyx-runtime/knowledge-merge/knowledge-merge.md|knowledge-merge]] — extraction + dedup-check.
+- [[08 - System/Agent Skills/_onyx-runtime/monthly-rollup/monthly-rollup.md|monthly-rollup]] — used only by the monthly-consolidate invocation path.
 
 ## Tools invoked
 - `tools/write-exec-log.sh` — Step 5.

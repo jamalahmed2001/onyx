@@ -1,11 +1,12 @@
 ---
 tags:
-  - system
   - hub
+  - hub-subdomain
+  - system
   - convention
 graph_domain: system
 created: 2026-04-19T00:00:00.000Z
-updated: 2026-04-19T00:00:00.000Z
+updated: 2026-04-27T10:52:05Z
 up: System Hub
 ---
 ## 🔗 Navigation
@@ -20,5 +21,9 @@ up: System Hub
 
 - [[Minimal Code Max Utility]] — authoring principle for skills/directives/profiles. Start here.
 - [[Browser Automation for Services Without APIs]] — the CDP-attach pattern for services that refuse APIs.
-- [[Tag Convention]] — seven tag families, ordering, Obsidian colour scheme, graph groups. Applies to every note.
-- [[Fractal Linking Convention]] — parent-only `up:` rule, hubs link up-only, leaves don't reach grandparents. Enforced by `heal-fractal-links`.
+
+## Graph + identity conventions
+
+- [[Project ID Convention]] — the `project_id` slug contract: kebab-case, ≤30 chars, unique vault-wide. All hub names derive from it.
+- [[Fractal Linking Convention]] — single-parent tree shape, hub-as-index pattern, the 5-check fractal audit.
+- [[Tag Convention]] — tag families and `phase-*` / `hub-*` naming.

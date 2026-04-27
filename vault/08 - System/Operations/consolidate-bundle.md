@@ -91,7 +91,7 @@ Compute target path:
 <bundle_parent>/<bundle_name> - Consolidated.md
 ```
 
-Example: `Episodes/<show>/E03 - <Title>/` → `Episodes/<show>/E03 - <Title> - Consolidated.md`. The bundle folder itself is preserved (now empty except `_archive/`); the consolidated node sits beside it as the canonical reference.
+Example: `Episodes/<show>/E03 - Heron/` → `Episodes/<show>/E03 - Heron - Consolidated.md`. The bundle folder itself is preserved (now empty except `_archive/`); the consolidated node sits beside it as the canonical reference.
 
 Compute frontmatter:
 
@@ -296,72 +296,82 @@ If any acceptance check fails after apply, log `INTEGRITY` and surface; do not a
 
 ## Examples (worked invocations across profiles)
 
-### Example 1 — Engineering project (a feature has shipped)
+### Example 1 — Cartoon episode (content / media)
 
 Input:
-- `bundle = 01 - Projects/My Service - Auth Rewrite/`
+- `bundle = 10 - OpenClaw/Automated Distribution Pipelines/Cartoon Remakes/Episodes/The Higher Branch/E03 - Heron/`
 - `dry_run = true`
 
-Sources discovered:
-- `My Service - Auth Rewrite - Overview.md` (`onyx-project`)
-- `My Service - Auth Rewrite - Phases Hub.md` (`hub-project`)
-- `Phases/P1 - Schema design.md` … `Phases/P8 - Cutover.md` (`onyx-phase` × 8)
-- `Logs/L1 - …` … `Logs/L8 - …` (`project-log` × 8)
-- `My Service - Auth Rewrite - Knowledge.md` (`project-knowledge`)
-- `My Service - Auth Rewrite - Kanban.md` (`project-kanban`)
+Sources discovered (sample):
+- `E03 - Heron - Overview.md` (onyx-episode)
+- `Phases/E03 - Concept.md` … `Phases/E03 - Audio Polish.md` (onyx-phase × N)
+- `Logs/L1 - Concept.md` … `Logs/L8 - Audio Polish.md` (project-log × N)
+- `Shots/p1-s01.md` … `Shots/p3-s12.md` (onyx-asset × ~30)
+- `E03 - Heron - Knowledge.md` (project-knowledge)
 
 Plan:
-- Target: `01 - Projects/My Service - Auth Rewrite - Consolidated.md`
-- Frontmatter: `tags: [onyx-project-consolidated]`
-- Sections: Overview (premise + outcome), Final state (production endpoints / commit ranges / ticket links), Activity timeline (8 logs), Phases (8 with completion status), Knowledge, Decisions / Gotchas, References (cross-links to other projects this depends on or unblocks), Source manifest.
+- Target: `Episodes/The Higher Branch/E03 - Heron - Consolidated.md`
+- Frontmatter: `tags: [onyx-episode-consolidated, cartoon-remakes, openclaw, onyx-episode]`
+- Sections: Overview, Final state (final mp4 path), Activity timeline (8 logs), Phases (8), Knowledge, Decisions/Gotchas, Source manifest
 
-After apply: the working folder contains `_archive/2026-04-27/…` only; the consolidated node sits beside it.
+After apply: `E03 - Heron/` folder contains `_archive/2026-04-27/...` and nothing else; the consolidated node sits beside it.
 
-### Example 2 — Audio episode (podcast / spoken-audio pipeline)
+### Example 2 — Suno album (content / media)
 
 Input:
-- `bundle = 01 - Projects/My Podcast/Episodes/E03 - Example Episode/`
+- `bundle = 10 - OpenClaw/Automated Distribution Pipelines/Suno Albums/Albums/Long Way Round/`
 - `dry_run = false`, `--auto`
 
-Sources: episode Overview (`onyx-episode`), per-phase notes (`onyx-phase` × ~7), per-phase logs, audio segment notes, references doc.
+Sources: 9 tracks (`onyx-track`), album Overview (`onyx-album`), per-track lyrics + Suno generation logs (`project-log`), cover art reference (`onyx-asset`).
 
-Result: `Episodes/E03 - Example Episode - Consolidated.md` with episode overview, final mp3 + duration, transcript reference, activity timeline, knowledge, decisions, source manifest. Working folder archived. One ExecLog line.
+Result: `Albums/Long Way Round - Consolidated.md` with full tracklist, lyrics, generation prompts, mix notes, cover art reference. `Long Way Round/` folder contents archived. ExecLog one line.
 
-### Example 3 — Music album (music-production pipeline)
-
-Input:
-- `bundle = 01 - Projects/My Album/Albums/Example Album/`
-- `dry_run = true`
-
-Sources: album Overview (`onyx-album`), N tracks (`onyx-track`), per-track lyrics + generation logs (`project-log`), cover art reference (`onyx-asset`), mastering notes.
-
-Plan: `Albums/Example Album - Consolidated.md` with full tracklist, lyrics, generation prompts, mix notes, cover art reference. After apply, `Example Album/` folder contents archived.
-
-### Example 4 — Research bundle (free-form notes, no phases)
+### Example 3 — Engineering project (Fanvue feature shipped)
 
 Input:
-- `bundle = 01 - Projects/Research — Topic X/`
+- `bundle = 02 - Fanvue/Fanvue Core/AI Sentiment Analysis pt3/`
 - `dry_run = true`
 
-Sources: Overview, 2 phases, 2 logs, Knowledge, Decisions, free-form research brief (no kind tag → `heal-kind-tag` would auto-tag, or fall back to "working note").
+Sources: Overview (`onyx-project`), Phases Hub (`hub-project`), 8 phases (`onyx-phase`), 8 logs (`project-log`), Knowledge (`project-knowledge`), Kanban (`project-kanban`), Decisions doc (`project-docs`).
 
-Plan: profile-neutral mode kicks in for the free-form note. Sections: Overview, Phases (2), Activity timeline (2), Knowledge, Decisions, **Working notes** (research brief in `<details>` block), Source manifest.
+Plan:
+- Target: `Fanvue Core/AI Sentiment Analysis pt3 - Consolidated.md`
+- Frontmatter: `tags: [onyx-project-consolidated, fanvue]`
+- Sections: Overview (premise + outcome), Final state (production endpoints + dashboards + ENG- ticket links), Activity timeline (8 logs), Phases (8 with completion status), Knowledge, Decisions/Gotchas (architectural decisions made during the project), References (cross-links to other Fanvue projects this depends on or unblocks), Source manifest
 
-### Example 5 — Bundle with no phases (recipe / protocol / playbook)
+### Example 4 — Research bundle (no phases, free-form notes)
 
 Input:
-- `bundle = 01 - Projects/Playbook — Customer onboarding/`
+- `bundle = 03 - Ventures/Personal/Experiments/LinkedIn University Followers/`
 - `dry_run = true`
 
-Sources: Overview, weekly check-in logs (`project-log`), measurements / outcomes file, retro write-up.
+Sources: Overview, 2 phases, 2 logs, Knowledge, Decisions, Research Brief (free-form note, no kind tag yet → heal-kind-tag would tag, or fall back to "working note").
 
-Plan: Overview → "what the playbook was", Final state → "outcome + measurements", Activity timeline → check-ins, Knowledge → what worked / didn't, Source manifest. No `Phases/` directory; the phase section is omitted gracefully.
+Plan: profile-neutral mode kicks in for the free-form note. Sections: Overview, Phases (2), Activity timeline (2), Knowledge, Decisions, **Working notes** (Research Brief in `<details>` block), Source manifest.
 
-The operation does not distinguish between an internal project, a client engagement, or a personal playbook — they're all bundles with phases (or none) + logs + knowledge.
+### Example 5 — Personal / health protocol
+
+Input:
+- `bundle = 01 - Life/Health/<protocol>/`
+- `dry_run = true`
+
+Sources: Overview, weekly check-in logs (`project-log`), measurements file, retro write-up.
+
+Plan: Overview → "what the protocol was", Final state → "outcome + measurements", Activity timeline → weekly check-ins, Knowledge → what worked / didn't, Source manifest. No `Phases/` directory; phase section omitted gracefully.
+
+### Example 6 — Client engagement (paid project)
+
+Input:
+- `bundle = 03 - Ventures/Paid Projects/Clutr/`
+- `dry_run = true`
+
+Sources: Overview, Phases Hub, 8 phases, 8 logs, Knowledge, Decisions, Kanban.
+
+Plan: same shape as Example 3 (engineering). The operation does not distinguish between an internal Fanvue project and a paid client engagement — they're both bundles with phases + logs + knowledge.
 
 ## Migration / rollout
 
-1. Ratify this directive + the [[consolidate-bundle]] runtime skill.
-2. Spot-test on one recently shipped bundle. Dry-run first; review the plan; apply.
-3. Add to your shipping checklist: when a bundle finishes (PR merged, episode published, album released), run `consolidate-bundle` on its working folder.
-4. After 5 successful applies on each pipeline shape you use (engineering, podcast, album, research, playbook), promote status from `draft` → `active`.
+1. Ratify this directive + the [[consolidate-bundle]] skill.
+2. Spot-test on one shipped episode (E03 - Heron likely candidate). Dry-run first; review the plan; apply.
+3. Add to "shipping checklist" for episodes / albums / weekly batches: when X is published, run consolidate-bundle on its working folder.
+4. After 5 successful applies on each pipeline (cartoon, suno-albums, maniplus-weekly), promote status from `draft` → `active`.

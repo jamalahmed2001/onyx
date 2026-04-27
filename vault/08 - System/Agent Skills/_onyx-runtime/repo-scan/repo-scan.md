@@ -6,8 +6,9 @@ replaces: src/vault/repoScanner.ts + validatePlanFilePaths helper
 lines_replaced: 180
 version: 0.1
 created: 2026-04-24
-updated: 2026-04-24
+updated: 2026-04-27T11:59:53Z
 status: draft
+up: Agent Skills - _onyx-runtime Hub
 ---
 
 # Skill: repo-scan
@@ -92,7 +93,7 @@ notes: [ optional truncation info ]
 
 ## Output format example
 
-For `repo_path = /path/to/your/repo`:
+For `repo_path = /home/jamal/clawd/openclaw/projects/amazonpipe`:
 
 ```
 package.json
@@ -175,7 +176,7 @@ tests/
 
 **Example 2 — large monorepo, capped:**
 
-Input: `repo_path = /path/to/your/repos` (assume ≥ 1000 source files).
+Input: `repo_path = /home/jamal/clawd/openclaw` (assume ≥ 1000 source files).
 
 Output: 150-line tree prioritising top-level `packages/`, `services/`, etc.
 
