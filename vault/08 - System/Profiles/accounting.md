@@ -16,6 +16,36 @@ init_docs:
   - Ledger
   - Financial Notes
 tags: [onyx-profile]
+allowed_shell:
+  - ls
+  - test
+  - grep
+  - cat
+  - mkdir
+  - find
+  - which
+  - head
+  - tail
+  - wc
+  - echo
+  - jq
+  - timeout
+  - python
+  - python3
+  - pip
+  - bc
+denied_shell:
+  - rm
+  - mv
+  - cp
+  - dd
+  - mkfs
+  - chmod
+  - chown
+  - sudo
+  - curl
+  - wget
+  - git
 ---
 
 ## 🔗 Navigation

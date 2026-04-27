@@ -9,6 +9,35 @@ phase_fields:
 init_docs:
   - Project Context
 tags: [onyx-profile]
+allowed_shell:
+  - ls
+  - test
+  - grep
+  - cat
+  - mkdir
+  - find
+  - which
+  - head
+  - tail
+  - wc
+  - echo
+  - git
+  - bun
+  - node
+  - npm
+  - jq
+  - timeout
+denied_shell:
+  - rm
+  - mv
+  - cp
+  - dd
+  - mkfs
+  - chmod
+  - chown
+  - sudo
+  - curl
+  - wget
 ---
 
 ## 🔗 Navigation

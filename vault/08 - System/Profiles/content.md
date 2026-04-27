@@ -13,6 +13,37 @@ phase_fields:
 init_docs:
   - Source Context
 tags: [onyx-profile]
+allowed_shell:
+  - ls
+  - test
+  - grep
+  - cat
+  - mkdir
+  - find
+  - which
+  - head
+  - tail
+  - wc
+  - echo
+  - git
+  - bun
+  - node
+  - npm
+  - timeout
+  - ffmpeg
+  - ffprobe
+  - jq
+denied_shell:
+  - rm
+  - mv
+  - cp
+  - dd
+  - mkfs
+  - chmod
+  - chown
+  - sudo
+  - curl
+  - wget
 ---
 
 ## 🔗 Navigation

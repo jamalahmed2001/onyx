@@ -18,6 +18,39 @@ init_docs:
   - Experiment Log
   - Cognition Store
 tags: [onyx-profile]
+allowed_shell:
+  - ls
+  - test
+  - grep
+  - cat
+  - mkdir
+  - find
+  - which
+  - head
+  - tail
+  - wc
+  - echo
+  - git
+  - bun
+  - node
+  - npm
+  - npx
+  - python
+  - python3
+  - pip
+  - jq
+  - timeout
+denied_shell:
+  - rm
+  - mv
+  - cp
+  - dd
+  - mkfs
+  - chmod
+  - chown
+  - sudo
+  - curl
+  - wget
 ---
 
 ## 🔗 Navigation

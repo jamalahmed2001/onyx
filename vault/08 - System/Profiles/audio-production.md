@@ -13,6 +13,37 @@ phase_fields:
 init_docs:
   - Music Style Guide
 tags: [onyx-profile]
+allowed_shell:
+  - ls
+  - test
+  - grep
+  - cat
+  - mkdir
+  - find
+  - which
+  - head
+  - tail
+  - wc
+  - echo
+  - ffmpeg
+  - ffprobe
+  - sox
+  - bun
+  - node
+  - npm
+  - timeout
+  - jq
+denied_shell:
+  - rm
+  - mv
+  - cp
+  - dd
+  - mkfs
+  - chmod
+  - chown
+  - sudo
+  - curl
+  - wget
 ---
 
 ## 🔗 Navigation
