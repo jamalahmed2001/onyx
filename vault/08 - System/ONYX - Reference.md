@@ -346,6 +346,14 @@ ManiPlus/
 
 A meta-directive describes the orchestrator — the agent that knows the whole pipeline and drives it end-to-end. It references all atomic directives and describes sequencing logic, handoff formats, and conditions that pause for human review. Use when you want a single `onyx run` to drive the whole weekly production loop.
 
+**Graph integrity invariant (important):** any time ONYX performs healing/consolidation/cleanup, it must not silently create or leave behind *orphaned nodes* (notes with no links in/out). Orphans must be handled deterministically:
+
+- **Attach**: if a nearest hub can be inferred (project Overview/Knowledge), auto-add a navigation link so the node is connected.
+- **Consolidate**: if the orphan is clearly a duplicate of an existing doc, consolidate via the existing node-consolidator rules.
+- **Block + alert**: if ONYX cannot safely attach/consolidate, it should *not* guess. It should surface a detectable alert (heal action) so a human can decide.
+
+This prevents random, unconnected graph dots (like stray “Untitled” nodes) from accumulating.
+
 ### Rules for keeping it simple
 
 1. **One directive per role, not per phase.** If two phases use the same persona, they share one directive file.

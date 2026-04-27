@@ -4,6 +4,7 @@ import { healDrift } from './drift.js';
 import { healMigrateLogs } from './migrateLogs.js';
 import { repairMissingProjectIds } from './repairProjectId.js';
 import { recoverOrphanedLocks } from '../audit/recover.js';
+import { healOrphanNodes } from './orphans.js';
 
 export interface HealAction {
   type:
@@ -14,7 +15,9 @@ export interface HealAction {
     | 'orphaned_lock_field_cleared'
     | 'replan_count_reset'
     | 'duplicate_nav_removed'
-    | 'project_id_repaired';
+    | 'project_id_repaired'
+    | 'orphan_node_detected'
+    | 'orphan_node_attached';
   phaseNotePath: string;
   description: string;
   applied: boolean;
@@ -37,6 +40,7 @@ export function runAllHeals(config: ControllerConfig): HealResult {
   const logMigrationActions = healMigrateLogs(config.vaultRoot, config.projectsGlob);
   const projectIdActions = repairMissingProjectIds(config.vaultRoot, config.projectsGlob);
   const crashRecoveryActions = recoverOrphanedLocks(config.vaultRoot, config.projectsGlob);
+  const orphanNodeActions = healOrphanNodes(config.vaultRoot, config.projectsGlob);
 
   const actions: HealAction[] = [
     ...staleLockActions,
@@ -44,6 +48,7 @@ export function runAllHeals(config: ControllerConfig): HealResult {
     ...logMigrationActions,
     ...projectIdActions,
     ...crashRecoveryActions,
+    ...orphanNodeActions,
   ];
 
   const applied = actions.filter(a => a.applied).length;
