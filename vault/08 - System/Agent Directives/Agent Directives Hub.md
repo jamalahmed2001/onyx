@@ -114,6 +114,23 @@ Specialist agents that simulate professional roles. Each has domain-specific rul
 
 - [[08 - System/Agent Directives/clinical-researcher.md|clinical-researcher]] — biomedical literature synthesis; evidence hierarchy (RCT > cohort > expert opinion); Vancouver citations; no medical advice under any circumstances.
 - [[08 - System/Agent Directives/journalist.md|journalist]] — story research, article writing, fact-checking; multiple-source corroboration; right-of-reply noted; no fabrication.
+- [[08 - System/Agent Directives/research-brief-writer.md|research-brief-writer]] — turn an editorial topic into a structured brief a downstream writer can produce from; locale-first sourcing; verified contact details; honest gap-flagging.
+
+---
+
+## Content Pipeline Roles
+
+Universal role-archetypes for content / video / audio / publishing pipelines. Each describes the role abstractly; project-specific directives can override or extend.
+
+- [[08 - System/Agent Directives/creative-director.md|creative-director]] — concept gate; one paragraph satisfying relatable + action + hook + engine + principle, before any production phase fires.
+- [[08 - System/Agent Directives/script-writer.md|script-writer]] — turn an approved concept + brief into final script in the project's voice; no invented specifics; no signifier ladders; verifiable contact details only.
+- [[08 - System/Agent Directives/scene-composer.md|scene-composer]] — beat-by-beat shot list from script; audio drives timing; one camera move per shot; three-things rule; verbatim Bible descriptions in prompts.
+- [[08 - System/Agent Directives/audio-producer.md|audio-producer]] — TTS synthesis, per-segment master, concat, mix; sanitise stage directions; pronunciation dictionary applied before synthesis.
+- [[08 - System/Agent Directives/mastering-engineer.md|mastering-engineer]] — platform-spec master (LUFS / true-peak / sample rate); two-pass loudnorm; no creative processing.
+- [[08 - System/Agent Directives/qc-reviewer.md|qc-reviewer]] — review at every phase boundary; defects only, not creative criticism; concrete blockers with locations.
+- [[08 - System/Agent Directives/launch-ops.md|launch-ops]] — publish-day procedure; never auto-submit paid actions; sequential platform fan-out.
+- [[08 - System/Agent Directives/engagement-manager.md|engagement-manager]] — comment triage + reply drafting; safety filter first; HITL on first-of-kind replies.
+- [[08 - System/Agent Directives/metadata-curator.md|metadata-curator]] — platform-specific metadata (titles, descriptions, tags, genres); honour platform vocabularies and field limits.
 
 ---
 

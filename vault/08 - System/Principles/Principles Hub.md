@@ -38,9 +38,18 @@ Apply when shipping software through ONYX (any language, any stack).
 - [[08 - System/Principles/no-features-beyond-task.md|no-features-beyond-task]] — bug fix doesn't need surrounding cleanup
 - [[08 - System/Principles/cdp-attach-over-persistent-profile.md|cdp-attach-over-persistent-profile]] — for any session-auth automation
 
-## Storytelling / content *(M2b — coming next)*
+## Storytelling / content
 
 Apply to any project producing narrative content for an audience.
+
+- [[08 - System/Principles/concept-mandate.md|concept-mandate]] — relatable + action + hook-in-3s + engine + principle, before any production phase fires
+- [[08 - System/Principles/avatar-diversity-across-episodes.md|avatar-diversity-across-episodes]] — vary gender, region, family, age, name register
+- [[08 - System/Principles/no-invented-specifics.md|no-invented-specifics]] — no fictional weekdays / dates inside narrative
+- [[08 - System/Principles/no-chained-identity-signifiers.md|no-chained-identity-signifiers]] — don't stack culture-specific roles on every listener
+- [[08 - System/Principles/show-dont-say.md|show-dont-say]] — demonstrate through behaviour and detail
+- [[08 - System/Principles/verifiable-contact-details-only.md|verifiable-contact-details-only]] — phone numbers and helplines only when verified live
+- [[08 - System/Principles/no-dated-citations-you-cant-pin.md|no-dated-citations-you-cant-pin]] — drop the year if you can't pin the publication
+- [[08 - System/Principles/narrator-no-stage-directions.md|narrator-no-stage-directions]] — sanitise the script before TTS
 
 ## Video / animation *(M2c)*
 
