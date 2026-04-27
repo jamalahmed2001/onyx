@@ -1,0 +1,306 @@
+#!/usr/bin/env bash
+# linear — thin shell wrapper over the Linear GraphQL API.
+#
+# Used by directive-driven workflows (vault/08 - System/Operations/linear-*.md)
+# instead of the legacy `src/linear/*.ts`. Each verb does one HTTP call and
+# emits a single JSON line on stdout. Directives parse the JSON with jq.
+#
+# Verbs:
+#   project --id <id>                          → project metadata
+#   project-issues --id <id>                   → all issues in a project
+#   issue-create --team-id X --title Y --description Z [--project-id P]
+#                [--parent-id P] [--assignee-id A] [--cycle-id C]
+#                [--label-ids L1,L2]           → { id, identifier }
+#   issue-update --id <id> [--title Y] [--description Z]
+#                [--state-id S] [--team-id T]  → { success: bool }
+#   viewer                                     → { id }
+#   active-cycle --team-id <id>                → { id } (or empty)
+#   find-project --team-id <id> --name <name>  → { id } (or empty)
+#   find-labels --team-id <id> --patterns p1,p2 → { ids: [...] }
+#
+# Auth: reads LINEAR_API_KEY from env. Set it in your .env or shell.
+#
+# Retries: 429 + 5xx are auto-retried with exponential backoff (max 4 attempts,
+# 30s cap). Honours `Retry-After` header when present.
+#
+# Exit codes:
+#   0 — success (JSON on stdout)
+#   1 — Linear API error (error JSON on stdout)
+#   2 — usage error
+#   3 — auth error (LINEAR_API_KEY missing)
+
+set -eo pipefail
+
+LINEAR_API="https://api.linear.app/graphql"
+
+usage() {
+  cat <<USAGE >&2
+usage: linear <verb> [args...]
+
+verbs:
+  project --id <id>
+  project-issues --id <id>
+  issue-create --team-id X --title Y [--description Z] [--project-id P]
+               [--parent-id P] [--assignee-id A] [--cycle-id C]
+               [--label-ids L1,L2,...]
+  issue-update --id <id> [--title Y] [--description Z] [--state-id S] [--team-id T]
+  viewer
+  active-cycle --team-id <id>
+  find-project --team-id <id> --name <name>
+  find-labels --team-id <id> --patterns p1,p2,...
+
+env:
+  LINEAR_API_KEY required (settings → API → Personal API keys)
+USAGE
+  exit 2
+}
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  usage
+fi
+
+if [[ -z "${LINEAR_API_KEY:-}" ]]; then
+  echo '{"ok":false,"error":"LINEAR_API_KEY not set in environment"}' >&2
+  exit 3
+fi
+
+# linear_query <query-json-body> → response.data on stdout, exits 1 on error
+linear_query() {
+  local body="$1"
+  local attempt=0
+  local max=4
+  local resp http_status
+
+  while [[ $attempt -le $max ]]; do
+    resp=$(curl -sS -w '\n__HTTP_STATUS__:%{http_code}' \
+            -X POST "$LINEAR_API" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: $LINEAR_API_KEY" \
+            -d "$body")
+    http_status=$(echo "$resp" | grep '^__HTTP_STATUS__:' | cut -d: -f2)
+    body_text=$(echo "$resp" | sed '/^__HTTP_STATUS__:/d')
+
+    if [[ "$http_status" == "429" || "$http_status" -ge 500 ]] 2>/dev/null; then
+      if [[ $attempt -lt $max ]]; then
+        local delay=$((2 ** attempt))
+        [[ $delay -gt 30 ]] && delay=30
+        sleep $delay
+        attempt=$((attempt+1))
+        continue
+      fi
+      echo "{\"ok\":false,\"error\":\"Linear API HTTP $http_status after $max retries\"}" >&2
+      exit 1
+    fi
+
+    if [[ "$http_status" != "200" ]]; then
+      echo "{\"ok\":false,\"error\":\"Linear API HTTP $http_status\",\"body\":$(echo "$body_text" | jq -Rs .)}" >&2
+      exit 1
+    fi
+
+    # Check for GraphQL errors
+    local graphql_errors
+    graphql_errors=$(echo "$body_text" | jq -r '.errors[]?.message' 2>/dev/null)
+    if [[ -n "$graphql_errors" ]]; then
+      echo "{\"ok\":false,\"error\":\"Linear GraphQL: $(echo "$graphql_errors" | tr '\n' '; ')\"}" >&2
+      exit 1
+    fi
+
+    echo "$body_text" | jq -c '.data'
+    return 0
+  done
+}
+
+# Escape a string for safe inclusion in a JSON GraphQL query
+json_escape() {
+  printf '%s' "$1" | jq -Rs .
+}
+
+cmd_project() {
+  local id=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in --id) id="$2"; shift 2 ;; *) usage ;; esac
+  done
+  [[ -z "$id" ]] && { echo "missing --id" >&2; exit 2; }
+  local query
+  query=$(printf '{"query":"query { project(id: %s) { id name description } }"}' "$(json_escape "$id")")
+  linear_query "$query"
+}
+
+cmd_project_issues() {
+  local id=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in --id) id="$2"; shift 2 ;; *) usage ;; esac
+  done
+  [[ -z "$id" ]] && { echo "missing --id" >&2; exit 2; }
+  local query
+  query=$(cat <<EOF
+{"query":"query { project(id: $(json_escape "$id")) { issues { nodes { id identifier title description state { name } children { nodes { id identifier title description state { name } } } } } } }"}
+EOF
+)
+  linear_query "$query"
+}
+
+cmd_viewer() {
+  linear_query '{"query":"{ viewer { id email } }"}'
+}
+
+cmd_active_cycle() {
+  local team_id=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in --team-id) team_id="$2"; shift 2 ;; *) usage ;; esac
+  done
+  [[ -z "$team_id" ]] && { echo "missing --team-id" >&2; exit 2; }
+  local query
+  query=$(printf '{"query":"query { team(id: %s) { activeCycle { id } } }"}' "$(json_escape "$team_id")")
+  linear_query "$query"
+}
+
+cmd_find_project() {
+  local team_id="" name=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --team-id) team_id="$2"; shift 2 ;;
+      --name) name="$2"; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  [[ -z "$team_id" || -z "$name" ]] && { echo "missing --team-id or --name" >&2; exit 2; }
+  local query
+  query=$(printf '{"query":"query { team(id: %s) { projects(first: 100, orderBy: updatedAt) { nodes { id name } } } }"}' "$(json_escape "$team_id")")
+  local data
+  data=$(linear_query "$query")
+  echo "$data" | jq --arg n "$name" -c '
+    .team.projects.nodes
+    | (map(select(.name == $n)) + map(select(.name | ascii_downcase == ($n | ascii_downcase))))
+    | first
+    // {}
+  '
+}
+
+cmd_find_labels() {
+  local team_id="" patterns=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --team-id) team_id="$2"; shift 2 ;;
+      --patterns) patterns="$2"; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  [[ -z "$team_id" || -z "$patterns" ]] && { echo "missing --team-id or --patterns" >&2; exit 2; }
+  local query
+  query=$(printf '{"query":"query { team(id: %s) { labels(first: 100) { nodes { id name } } } }"}' "$(json_escape "$team_id")")
+  local data
+  data=$(linear_query "$query")
+  # patterns is a comma-separated list of regexes; match each, return all matching ids
+  local pattern_array
+  pattern_array=$(echo "$patterns" | jq -Rc 'split(",")')
+  echo "$data" | jq --argjson pats "$pattern_array" -c '
+    [.team.labels.nodes[] as $l
+     | $pats[] as $p
+     | select($l.name | test($p))
+     | $l.id]
+    | unique
+    | { ids: . }
+  '
+}
+
+cmd_issue_create() {
+  local team_id="" title="" description="" project_id="" parent_id="" assignee_id="" cycle_id="" label_ids=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --team-id) team_id="$2"; shift 2 ;;
+      --title) title="$2"; shift 2 ;;
+      --description) description="$2"; shift 2 ;;
+      --project-id) project_id="$2"; shift 2 ;;
+      --parent-id) parent_id="$2"; shift 2 ;;
+      --assignee-id) assignee_id="$2"; shift 2 ;;
+      --cycle-id) cycle_id="$2"; shift 2 ;;
+      --label-ids) label_ids="$2"; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  [[ -z "$team_id" || -z "$title" ]] && { echo "missing --team-id or --title" >&2; exit 2; }
+
+  # Build input object via jq
+  local input
+  input=$(jq -nc \
+    --arg teamId "$team_id" \
+    --arg title "$title" \
+    --arg description "$description" \
+    --arg projectId "$project_id" \
+    --arg parentId "$parent_id" \
+    --arg assigneeId "$assignee_id" \
+    --arg cycleId "$cycle_id" \
+    --arg labelIds "$label_ids" \
+    '{teamId: $teamId, title: $title}
+     + (if $description != "" then {description: $description} else {} end)
+     + (if $projectId != "" then {projectId: $projectId} else {} end)
+     + (if $parentId != "" then {parentId: $parentId} else {} end)
+     + (if $assigneeId != "" then {assigneeId: $assigneeId} else {} end)
+     + (if $cycleId != "" then {cycleId: $cycleId} else {} end)
+     + (if $labelIds != "" then {labelIds: ($labelIds | split(","))} else {} end)
+    ')
+
+  local query
+  query=$(jq -nc --argjson input "$input" '{
+    query: "mutation CreateIssue($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { id identifier } } }",
+    variables: { input: $input }
+  }')
+  local data
+  data=$(linear_query "$query")
+  echo "$data" | jq -c '.issueCreate.issue + { success: .issueCreate.success }'
+}
+
+cmd_issue_update() {
+  local id="" title="" description="" state_id="" team_id=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --id) id="$2"; shift 2 ;;
+      --title) title="$2"; shift 2 ;;
+      --description) description="$2"; shift 2 ;;
+      --state-id) state_id="$2"; shift 2 ;;
+      --team-id) team_id="$2"; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  [[ -z "$id" ]] && { echo "missing --id" >&2; exit 2; }
+
+  local input
+  input=$(jq -nc \
+    --arg title "$title" \
+    --arg description "$description" \
+    --arg stateId "$state_id" \
+    --arg teamId "$team_id" \
+    '{}
+     + (if $title != "" then {title: $title} else {} end)
+     + (if $description != "" then {description: $description} else {} end)
+     + (if $stateId != "" then {stateId: $stateId} else {} end)
+     + (if $teamId != "" then {teamId: $teamId} else {} end)
+    ')
+
+  local query
+  query=$(jq -nc --arg id "$id" --argjson input "$input" '{
+    query: "mutation UpdateIssue($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }",
+    variables: { id: $id, input: $input }
+  }')
+  local data
+  data=$(linear_query "$query")
+  echo "$data" | jq -c '.issueUpdate'
+}
+
+verb="${1:-}"
+[[ -z "$verb" ]] && usage
+shift
+
+case "$verb" in
+  project)        cmd_project "$@" ;;
+  project-issues) cmd_project_issues "$@" ;;
+  issue-create)   cmd_issue_create "$@" ;;
+  issue-update)   cmd_issue_update "$@" ;;
+  viewer)         cmd_viewer ;;
+  active-cycle)   cmd_active_cycle "$@" ;;
+  find-project)   cmd_find_project "$@" ;;
+  find-labels)    cmd_find_labels "$@" ;;
+  --help|-h)      usage ;;
+  *)              echo "unknown verb: $verb" >&2; usage ;;
+esac

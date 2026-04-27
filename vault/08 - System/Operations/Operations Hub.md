@@ -38,8 +38,10 @@ status: active
 | `completed` / parent shipped / bundle marked complete | consolidate *(unified — phase, bundle, children all one operation)* | [[08 - System/Operations/consolidate.md]] | `src/planner/consolidator.ts` | 238 | 4 | **active v1.0** (agent reads children, picks shape) |
 | *(whole project)* | decompose-project | [[08 - System/Operations/decompose-project.md]] | `src/planner/phasePlanner.ts` | 785 | 6 | **draft** (phase-decompose shared with replan) |
 | *(blocked → re-atomise)* | replan | [[08 - System/Operations/replan.md]] | `src/planner/replan.ts` | 226 | 6 | **draft** (inline-only, no new skills) |
-| *(every iteration, step 1)* | heal | [[08 - System/Operations/heal.md]] | `src/healer/*.ts` | 882 | 3 | **draft** (8 heal-* skills incl. heal-kind-tag) |
+| *(every iteration, step 1)* | heal | [[08 - System/Operations/heal.md]] | `src/healer/*.ts` | 882 | 3 | **draft** (9 heal-* skills incl. heal-cross-link) |
 | *(every iteration, step 5)* | route | [[08 - System/Operations/route.md]] | `src/controller/router.ts` | 38 | 2 | **draft** (inline-only, no skills) |
+| *(operator: bring Linear project in)* | linear-import | [[08 - System/Operations/linear-import.md]] | `src/linear/import.ts` + `src/linear/merge.ts` + `src/cli/import-linear.ts` | 410 | 7 | **draft** (uses `linear` skill — bash + curl + jq) |
+| *(operator: push vault phases out)* | linear-uplink | [[08 - System/Operations/linear-uplink.md]] | `src/linear/uplink.ts` + `src/cli/linear-uplink.ts` | 309 | 7 | **draft** (uses `linear` skill) |
 
 ### Consolidate (one operation)
 
