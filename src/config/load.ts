@@ -46,11 +46,6 @@ interface RawConfig {
   };
   notify?: {
     stdout?: boolean;
-    whatsapp?: {
-      api_url?: string;
-      apiUrl?: string;             // deprecated
-      recipient?: string;
-    };
     openclaw?: {
       target?: string;
       channel?: string;
@@ -153,25 +148,6 @@ export function loadConfig(configPath?: string): ControllerConfig {
       }
     : undefined;
 
-  // WhatsApp: merge env vars (WHATSAPP_RECIPIENT, WHATSAPP_API_KEY) into config
-  const envWhatsappRecipient = process.env['WHATSAPP_RECIPIENT'];
-  const envWhatsappApiKey = process.env['WHATSAPP_API_KEY'];
-
-  let whatsapp: ControllerConfig['notify']['whatsapp'];
-  if (raw.notify?.whatsapp) {
-    const configApiUrl = raw.notify.whatsapp.api_url ?? raw.notify.whatsapp.apiUrl;
-    whatsapp = {
-      apiUrl: configApiUrl
-        ?? (envWhatsappApiKey ? `https://api.callmebot.com/whatsapp.php?apikey=${envWhatsappApiKey}` : ''),
-      recipient: envWhatsappRecipient ?? raw.notify.whatsapp.recipient ?? '',
-    };
-  } else if (envWhatsappRecipient && envWhatsappApiKey) {
-    whatsapp = {
-      apiUrl: `https://api.callmebot.com/whatsapp.php?apikey=${envWhatsappApiKey}`,
-      recipient: envWhatsappRecipient,
-    };
-  }
-
   const rawTiers = raw.model_tiers ?? raw.modelTiers;
   const modelTiers = {
     light:    rawTiers?.light    ?? 'anthropic/claude-haiku-4-5-20251001',
@@ -217,7 +193,6 @@ export function loadConfig(configPath?: string): ControllerConfig {
     linear,
     notify: {
       stdout: raw.notify?.stdout ?? true,
-      whatsapp,
       openclaw,
     },
     prompts: raw.prompts,

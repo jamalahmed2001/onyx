@@ -213,12 +213,6 @@ export interface ControllerConfig {
       profile?: string;
       accountId?: string;
     };
-
-    // Legacy: CallMeBot WhatsApp (kept for backward compat, not recommended)
-    whatsapp?: {
-      apiUrl: string;
-      recipient: string;
-    };
   };
   prompts?: {
     executor?: string;

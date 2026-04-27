@@ -66,8 +66,8 @@ Be direct. No padding.`;
       ],
     });
 
-    // Send via WhatsApp if configured
-    if (config.notify?.whatsapp) {
+    // Send via OpenClaw if configured (Master Directive §15)
+    if (config.notify?.openclaw) {
       await notify({
         event: 'phase_completed',
         projectId,
