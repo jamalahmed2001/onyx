@@ -28,13 +28,16 @@ Profiles now declare `allowed_shell:` and `denied_shell:` frontmatter — the wh
 
 ## Available Profiles
 
-Nine profiles. Each one is a genuinely distinct mechanical contract — different required fields, different bundle structure, different acceptance gate.
+Twelve profiles. Each one is a genuinely distinct mechanical contract — different required fields, different bundle structure, different acceptance gate.
 
 | Profile | Use for | Key required fields | Acceptance gate |
 |---|---|---|---|
 | [[08 - System/Profiles/general.md\|general]] | Catch-all — unsure which profile, mixed domains, lightweight tasks | none | all tasks checked + output documented |
 | [[08 - System/Profiles/engineering.md\|engineering]] | Software projects with a git repo | `repo_path`, `test_command` | test command exits 0 |
 | [[08 - System/Profiles/content.md\|content]] | Podcast, video, newsletter, social pipelines | `voice_profile`, `pipeline_stage` | safety filter + voice check |
+| [[08 - System/Profiles/audio-production.md\|audio-production]] | Audio-first pipelines (podcast, music album, narration) | `voice_target_lufs`, `music_style_guide` | mastered audio + LUFS target met |
+| [[08 - System/Profiles/video-production.md\|video-production]] | Video pipelines (animated short, serial cartoons, music videos) | `aspect_ratio`, `target_duration_s`, `render_engine` | shot list duration matches audio + final render exists |
+| [[08 - System/Profiles/publishing.md\|publishing]] | Publish-day fan-out across platforms | `target_platforms`, `scheduled_publish_at` | live verified + publish ledger updated |
 | [[08 - System/Profiles/research.md\|research]] | Investigation, analysis, synthesis | `research_question`, `source_constraints`, `output_format` | source count + confidence level |
 | [[08 - System/Profiles/operations.md\|operations]] | System ops, monitoring, incident response, e-commerce, events | `monitored_systems`, `runbook_path` | runbook_followed + outcome documented |
 | [[08 - System/Profiles/trading.md\|trading]] | Algorithmic trading, strategy dev, exchange integration | `exchange`, `strategy_type`, `risk_limits`, `backtest_command` | backtest passes + risk model compliance |

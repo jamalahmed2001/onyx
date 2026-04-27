@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# bible-to-prompt — assemble a canonical one-shot prompt from a character or location bible MD.
+#
+# Usage:
+#   bible-to-prompt <bible.md>                        # auto-detect type from frontmatter
+#   bible-to-prompt --kind char <bible.md>            # force character framing
+#   bible-to-prompt --kind loc  <bible.md>            # force location framing
+#
+# Output: assembled prompt text on stdout, suitable for nano-compose --prompt or any
+# image-gen call. Stderr carries diagnostic messages.
+
+set -euo pipefail
+
+KIND="auto"
+while [[ "${1:-}" == --* ]]; do
+  case "$1" in
+    --kind) KIND="$2"; shift 2 ;;
+    -h|--help)
+      sed -n '2,12p' "$0" | sed 's/^# //; s/^#//' >&2
+      exit 0
+      ;;
+    *) echo "unknown flag $1" >&2; exit 1 ;;
+  esac
+done
+
+BIBLE="${1:-}"
+if [[ -z "$BIBLE" || ! -f "$BIBLE" ]]; then
+  echo "usage: bible-to-prompt [--kind char|loc] <bible.md>" >&2
+  exit 1
+fi
+
+# Auto-detect kind if not specified
+if [[ "$KIND" == "auto" ]]; then
+  if grep -q '^type: character-bible' "$BIBLE"; then KIND="char"
+  elif grep -q '^type: location-bible' "$BIBLE"; then KIND="loc"
+  else echo "could not detect bible type from frontmatter; pass --kind char|loc" >&2; exit 2
+  fi
+fi
+
+# Extract a single-line YAML field (strips wrapping double quotes if present)
+yaml_get() {
+  local key="$1"
+  awk -v k="$key" 'BEGIN{found=0}
+    $0 ~ "^"k": " {
+      sub("^"k": ","")
+      gsub(/^"|"$/, "")
+      print
+      found=1
+      exit
+    }
+    END{ if (!found) exit 1 }' "$BIBLE"
+}
+
+NAME="$(yaml_get name 2>/dev/null || true)"
+VERBATIM="$(yaml_get verbatim_visual 2>/dev/null || true)"
+NEG="$(yaml_get negative_prompt_stack 2>/dev/null || true)"
+LIGHTING="$(yaml_get lighting_default 2>/dev/null || true)"
+
+if [[ -z "$VERBATIM" ]]; then
+  echo "bible $BIBLE is missing required 'verbatim_visual' frontmatter field" >&2
+  exit 3
+fi
+
+case "$KIND" in
+  char)
+    # Character framing: identity + visual + (optional) negation
+    printf '%s, %s' "${NAME:-character}" "$VERBATIM"
+    [[ -n "$NEG" ]] && printf '. NEGATIVE: %s' "$NEG"
+    ;;
+  loc)
+    # Location framing: name + visual + (optional) lighting
+    printf '%s. %s' "${NAME:-location}" "$VERBATIM"
+    [[ -n "$LIGHTING" ]] && printf '. Lighting: %s' "$LIGHTING"
+    ;;
+  *)
+    echo "unknown kind: $KIND" >&2
+    exit 4
+    ;;
+esac
+
+echo

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# nano-compose — multi-ref image composition via nano-banana/edit
+# Wrapper that runs the .ts via bun. See SKILL.md for usage.
+
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec bun "$SCRIPT_DIR/src/nano-compose.ts" "$@"

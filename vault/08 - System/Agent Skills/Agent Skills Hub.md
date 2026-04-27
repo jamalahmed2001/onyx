@@ -34,7 +34,10 @@ status: active
 - [[08 - System/Agent Skills/whisper-groq - Skill Overview.md|whisper-groq]] — Transcribe audio files using Groq's Whisper API.
 - [[08 - System/Agent Skills/remotion-best-practices - Skill Overview.md|remotion-best-practices]] — Best practices for Remotion video creation in React.
 - [[08 - System/Agent Skills/suno - Skill Overview.md|suno]] — Music generation via Suno (library, track, download, generate) over CDP-attached Chrome.
+- [[08 - System/Agent Skills/suno-generate - Skill Overview.md|suno-generate]] — Music generation via Suno through a pluggable HTTP backend (gateway / browser / self-hosted).
 - [[08 - System/Agent Skills/fal - Skill Overview.md|fal]] — fal.ai API layer for video / image / audio generation. One CLI, every fal model (Veo, Kling, Flux, etc.), multi-account.
+- [[08 - System/Agent Skills/nano-banana-compose - Skill Overview.md|nano-banana-compose]] — Multi-reference image composition via fal-ai/nano-banana/edit (per-shot keyframes, brand bakes, ensemble shots).
+- [[08 - System/Agent Skills/subtitle-burner - Skill Overview.md|subtitle-burner]] — Burn-in styled ASS subtitles for short-form / longform video (Whisper word-level timestamps + ffmpeg).
 - [[08 - System/Agent Skills/comment-safety-filter - Skill Overview.md|comment-safety-filter]] — Filter comments for spam, harassment, toxicity before reply pipelines see them.
 
 ## Distribution
